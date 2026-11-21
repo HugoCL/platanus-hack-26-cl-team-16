@@ -1,4 +1,6 @@
 import { z } from "zod";
+import type { Message, Recipient, SendableContent } from "./messages";
+import type { Participant, SessionContract } from "./session";
 
 export const ModerationStage = z.enum([
   "deterministic",
@@ -113,3 +115,29 @@ export const MessageModeration = z.object({
   decidedAt: z.number().optional(),
 });
 export type MessageModeration = z.infer<typeof MessageModeration>;
+
+export type ModerationInput = {
+  content: SendableContent;
+  sender: Participant;
+  recipient: Recipient;
+  contract: SessionContract;
+  participants: Participant[];
+  history: Message[];
+};
+
+export type ModerationEvent = {
+  stage: ModerationStage;
+  action: ModerationAction;
+  reasons: ModerationReason[];
+  model?: string;
+  latencyMs?: number;
+};
+
+export type ModerationOutcome = {
+  verdict: Verdict;
+  events: ModerationEvent[];
+};
+
+export interface Moderator {
+  moderate(input: ModerationInput): Promise<ModerationOutcome>;
+}
