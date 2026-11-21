@@ -7,6 +7,7 @@ import {
 } from "../shared/fixtures/moderationSet";
 import type { SendableContent } from "../shared/messages";
 import { checkRules } from "../shared/moderator/rules";
+import { CLINIC_AGENT_SLUG } from "../shared/seedData";
 
 type Side = ModerationCase["message"]["from"];
 
@@ -64,22 +65,53 @@ describe("deterministic rules on the moderation set", () => {
 });
 
 describe("RUT", () => {
-  it("passes only from the consumer agent to a provider that asks for it", () => {
-    const rut = text("RUT 12.345.678-5");
-    expect(rulesFor("clinica", "consumidor", "proveedor", rut)).toEqual([]);
-    expect(rulesOf(rulesFor("clinica", "consumidor", "humano", rut))).toEqual([
-      "sensitive_data",
-    ]);
-    expect(rulesOf(rulesFor("clinica", "consumidor", "all", rut))).toEqual([
-      "sensitive_data",
-    ]);
-    expect(rulesOf(rulesFor("clinica", "humano", "proveedor", rut))).toEqual([
-      "sensitive_data",
-    ]);
-    expect(
-      rulesOf(rulesFor("clinica", "proveedor", "consumidor", rut)),
-    ).toEqual(["sensitive_data"]);
-    expect(rulesOf(rulesFor("hotel", "consumidor", "proveedor", rut))).toEqual([
+  it.each([
+    ["RUT 12.345.678-5", "consumidor"],
+    ["RUT 12.345.678-5", "humano"],
+    ["123456785", "consumidor"],
+    ["123456785", "humano"],
+  ] as const)(
+    "passes %j only from the %s to a provider that asks for it",
+    (value, from) => {
+      const rut = text(value);
+      expect(rulesFor("clinica", from, "proveedor", rut)).toEqual([]);
+      expect(rulesOf(rulesFor("clinica", from, "all", rut))).toEqual([
+        "sensitive_data",
+      ]);
+      expect(rulesOf(rulesFor("hotel", from, "proveedor", rut))).toEqual([
+        "sensitive_data",
+      ]);
+      const other = from === "consumidor" ? "humano" : "consumidor";
+      expect(rulesOf(rulesFor("clinica", from, other, rut))).toEqual([
+        "sensitive_data",
+      ]);
+      expect(rulesOf(rulesFor("clinica", "proveedor", from, rut))).toEqual([
+        "sensitive_data",
+      ]);
+    },
+  );
+
+  it.each([
+    ["the provider", CLINIC_AGENT_SLUG],
+    ["no agent", undefined],
+  ])("blocks it from a human who acts for %s", (_who, onBehalfOfAgentId) => {
+    const input = moderationInput({
+      id: "prueba",
+      room: "clinica",
+      description: "",
+      message: {
+        from: "humano",
+        to: "proveedor",
+        content: text("RUT 12.345.678-5"),
+      },
+      expected: { decision: "allow" },
+    });
+    const participants = input.participants.map((p) =>
+      p.kind === "human" ? { ...p, onBehalfOfAgentId } : p,
+    );
+    const sender = participants.find((p) => p.kind === "human");
+    if (!sender) throw new Error("the room lost its human");
+    expect(rulesOf(checkRules({ ...input, participants, sender }))).toEqual([
       "sensitive_data",
     ]);
   });
@@ -91,6 +123,13 @@ describe("RUT", () => {
     "10000013-k",
     "rut: 123456785",
     "RUN 100000040",
+    "123456785",
+    "12345674",
+    "1000005K",
+    "trámite de rutina 123456785",
+    "Ya, es el 12345674.",
+    "91234567k",
+    "RUT 987654325",
   ])("finds %s", (value) => {
     const findings = rulesFor("hotel", "consumidor", "proveedor", text(value));
     expect(rulesOf(findings)).toEqual(["sensitive_data"]);
@@ -103,7 +142,13 @@ describe("RUT", () => {
     "+56 2 2345 6789",
     "$1.234.567",
     "2026-11-24T09:00:00-03:00",
-    "trámite de rutina 123456785",
+    "Mi celular es 987654325",
+    "+56987654325",
+    "$123456785",
+    "Total: $12.345.678",
+    "123456789",
+    "12345678",
+    "Pedido 123456789",
   ])("ignores %s", (value) => {
     expect(rulesFor("hotel", "consumidor", "proveedor", text(value))).toEqual(
       [],
