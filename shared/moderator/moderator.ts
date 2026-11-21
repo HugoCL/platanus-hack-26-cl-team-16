@@ -77,56 +77,64 @@ export function createModerator({
 
       await beforeJudge?.();
       const started = Date.now();
-      let verdict: Verdict;
-      let reasons: ModerationReason[];
-      try {
-        const decision = await withTimeout(
-          (signal) => judge(llm, input, signal),
-          timeoutMs,
-        );
-        verdict = publicVerdict(decision);
-        reasons =
-          decision.decision === "block"
-            ? [
-                {
-                  code: JUDGE_BLOCK[decision.rule].code,
-                  stage: "purpose",
-                  detail: JUDGE_BLOCK[decision.rule].reason,
-                },
-              ]
-            : [];
-      } catch (error) {
-        const timedOut = error instanceof JudgeTimeout;
-        verdict = {
-          decision: "block",
-          rule: "purpose",
-          reason: timedOut
-            ? "El moderador no respondió a tiempo; el mensaje se bloqueó."
-            : "El moderador falló; el mensaje se bloqueó.",
+      for (let retry = false; ; retry = true) {
+        let attemptStarted = false;
+        let verdict: Verdict;
+        let reasons: ModerationReason[];
+        try {
+          if (retry) await beforeJudge?.();
+          attemptStarted = true;
+          const decision = await withTimeout(
+            (signal) => judge(llm, input, signal),
+            timeoutMs,
+          );
+          verdict = publicVerdict(decision);
+          reasons =
+            decision.decision === "block"
+              ? [
+                  {
+                    code: JUDGE_BLOCK[decision.rule].code,
+                    stage: "purpose",
+                    detail: JUDGE_BLOCK[decision.rule].reason,
+                  },
+                ]
+              : [];
+        } catch (error) {
+          const timedOut = error instanceof JudgeTimeout;
+          if (timedOut && !retry) continue;
+          verdict = {
+            decision: "block",
+            rule: "purpose",
+            reason: timedOut
+              ? "El moderador no respondió a tiempo; el mensaje se bloqueó."
+              : "El moderador falló; el mensaje se bloqueó.",
+          };
+          reasons = [
+            {
+              code: "moderator_error",
+              stage: "purpose",
+              detail: timedOut
+                ? `El juez no respondió en ${2 * timeoutMs} ms.`
+                : attemptStarted
+                  ? "El juez falló o devolvió una respuesta inválida."
+                  : "No se pudo iniciar el reintento del juez.",
+            },
+          ];
+        }
+        return {
+          verdict,
+          events: [
+            deterministic,
+            {
+              stage: "purpose",
+              action: verdict.decision,
+              reasons,
+              model,
+              latencyMs: Date.now() - started,
+            },
+          ],
         };
-        reasons = [
-          {
-            code: "moderator_error",
-            stage: "purpose",
-            detail: timedOut
-              ? `El juez no respondió en ${timeoutMs} ms.`
-              : "El juez falló o devolvió una respuesta inválida.",
-          },
-        ];
       }
-      return {
-        verdict,
-        events: [
-          deterministic,
-          {
-            stage: "purpose",
-            action: verdict.decision,
-            reasons,
-            model,
-            latencyMs: Date.now() - started,
-          },
-        ],
-      };
     },
   };
 }
