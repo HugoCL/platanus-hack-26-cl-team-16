@@ -29,18 +29,17 @@ async function describe(
   ctx: QueryCtx,
   slot: Doc<"availability">,
   total: Doc<"transactions">["total"],
-  created: boolean,
 ): Promise<Booking> {
   const offering = await ctx.db.get("offerings", slot.offeringId);
   if (!offering) invalid("the booked offering is missing");
   return {
     status: "booked",
+    slotId: slot._id,
     offeringId: slot.offeringId,
     offeringName: offering.name,
     start: slot.start,
     end: slot.end,
     total,
-    created,
   };
 }
 
@@ -82,7 +81,7 @@ export const book = internalMutation({
         ? await ctx.db.get("availability", bookedSlotId)
         : null;
       if (!bookedSlot) invalid("the room's booking has no slot");
-      return describe(ctx, bookedSlot, existing.total, false);
+      return describe(ctx, bookedSlot, existing.total);
     }
 
     const session = await ctx.db.get("sessions", sessionId);
@@ -119,6 +118,6 @@ export const book = internalMutation({
     await ctx.db.patch("availability", availabilityId, {
       booked: slot.booked + 1,
     });
-    return describe(ctx, slot, total, true);
+    return describe(ctx, slot, total);
   },
 });
