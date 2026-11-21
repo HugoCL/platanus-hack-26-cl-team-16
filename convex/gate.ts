@@ -441,12 +441,18 @@ export const reply = internalAction({
           if (sent.status !== "allowed") return null;
         }
       } catch (error) {
-        if (isRateLimitError(error) && index === 0) {
-          await ctx.scheduler.runAfter(
-            error.data.retryAfter,
-            internal.gate.reply,
-            args,
-          );
+        if (isRateLimitError(error)) {
+          if (index === 0) {
+            await ctx.scheduler.runAfter(
+              error.data.retryAfter,
+              internal.gate.reply,
+              args,
+            );
+          } else {
+            console.error(
+              `gate.reply: dropped ${actions.length - index} of the reply actions of ${self}, rate limited`,
+            );
+          }
           return null;
         }
         if (

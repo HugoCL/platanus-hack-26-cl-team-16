@@ -137,3 +137,44 @@ it("keeps two answering agents going past the judge's rate limit until the turn 
     content: { kind: "system", code: "turn_limit_reached" },
   });
 });
+
+it("drops a later reply action that the judge's rate limit rejects without failing the job", async () => {
+  const fixture = await seededRooms();
+  const { t } = fixture;
+  const { sessionId, consumer, provider, human } = await roomWithHuman(
+    fixture,
+    40,
+  );
+  const send = (
+    sender: Id<"participants">,
+    recipient: Id<"participants"> | "all",
+  ) =>
+    t.action(internal.gate.sendAsParticipant, {
+      sessionId,
+      senderParticipantId: sender,
+      recipient,
+      content: { kind: "text", text: "Tell me more." },
+    });
+  for (let i = 0; i < 10; i++) await send(provider, "all");
+  for (let i = 0; i < 8; i++) await send(consumer, "all");
+  vi.spyOn(testRoomAgent, "reply").mockImplementation(async ({ message }) => [
+    {
+      kind: "send",
+      recipient: message.senderParticipantId as Id<"participants">,
+      content: { kind: "text", text: "Uno." },
+    },
+    {
+      kind: "send",
+      recipient: message.senderParticipantId as Id<"participants">,
+      content: { kind: "text", text: "Dos." },
+    },
+  ]);
+
+  await send(human, provider);
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+  const jobs = await t.run((ctx) =>
+    ctx.db.system.query("_scheduled_functions").collect(),
+  );
+  expect(jobs.map((job) => job.state.kind)).not.toContain("failed");
+});
