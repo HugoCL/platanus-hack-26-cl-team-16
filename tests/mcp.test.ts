@@ -37,7 +37,7 @@ describe.each<[Negotiation, string]>([
 });
 
 it("refuses a request from another site's page with 403", async () => {
-  const initialize = (origin: string) =>
+  const initialize = (origin: string, proxy: Record<string, string> = {}) =>
     endpoint(
       new Request(MCP_URL, {
         method: "POST",
@@ -45,6 +45,7 @@ it("refuses a request from another site's page with 403", async () => {
           "content-type": "application/json",
           accept: "application/json, text/event-stream",
           origin,
+          ...proxy,
         },
         body: JSON.stringify({
           jsonrpc: "2.0",
@@ -61,9 +62,20 @@ it("refuses a request from another site's page with 403", async () => {
   for (const origin of [
     "https://evil.example",
     "http://localhost.evil.example",
+    "https://localhost",
+    "http://localhost/api/mcp",
     "null",
   ]) {
     expect((await initialize(origin)).status).toBe(403);
   }
   expect((await initialize("http://localhost")).status).toBe(200);
+
+  const proxy = {
+    "x-forwarded-proto": "https",
+    "x-forwarded-host": "directorio.example",
+  };
+  expect((await initialize("https://directorio.example", proxy)).status).toBe(
+    200,
+  );
+  expect((await initialize("http://localhost", proxy)).status).toBe(403);
 });
