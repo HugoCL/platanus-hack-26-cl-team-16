@@ -98,8 +98,12 @@
   --sm-map-grid: light-dark(oklch(0.9 0.004 95), oklch(0.26 0.006 56));
   --sm-map-you: oklch(0.6 0.15 250);
 
-  /* Landing: the phone-book yellow, the brand's one loud color. Ink text on it, never yellow text on light. */
-  --sm-yellow: oklch(0.9 0.18 97);
+  /*
+   * Brand: the yellow of the phone book's paper and logo, the one loud color. Ink text on it
+   * (13:1 or more in both themes); never yellow text on a light surface. Light is a shade deeper so
+   * it holds up on cream.
+   */
+  --brand-yellow: light-dark(oklch(0.86 0.175 91), oklch(0.885 0.18 94));
 
   --sm-radius-2xl: 13px; /* swatches, map, inner panels */
   --sm-radius-3xl: 16px; /* bubbles, inputs, options */

@@ -165,18 +165,20 @@ export function SelectedCard({
           <span className="text-xs text-subtle-foreground">
             También en esta dirección
           </span>
-          {pin
-            .filter((c) => c !== selected)
-            .map((c) => (
-              <button
-                key={c.agentId}
-                type="button"
-                onClick={() => onSelect(c.agentId)}
-                className="cursor-pointer truncate border-0 bg-transparent p-0 text-left text-[13px] font-medium text-foreground underline-offset-3 hover:underline"
-              >
-                {c.name}
-              </button>
-            ))}
+          <div className="flex max-h-32 flex-col gap-1 overflow-y-auto overscroll-contain">
+            {pin
+              .filter((c) => c !== selected)
+              .map((c) => (
+                <button
+                  key={c.agentId}
+                  type="button"
+                  onClick={() => onSelect(c.agentId)}
+                  className="shrink-0 cursor-pointer truncate border-0 bg-transparent p-0 text-left text-[13px] font-medium text-foreground underline-offset-3 hover:underline"
+                >
+                  {c.name}
+                </button>
+              ))}
+          </div>
         </div>
       ) : null}
       <Link

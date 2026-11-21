@@ -49,6 +49,7 @@ const ALL = "all";
 const MAX_INTENT_FILTERS = 6;
 const DEFAULT_RADIUS_KM = 5;
 const PAGE_SIZE = 20;
+const FIRST_PAGE = [0];
 
 const GoogleDirectoryMap = dynamic(() => import("./google-directory-map"), {
   ssr: false,
@@ -102,12 +103,12 @@ export function DirectorySearch() {
 
   const [fixture, setFixture] = useFixtureState();
   const filterKey = `${category}|${comuna}`;
-  const [more, setMore] = useState({ key: filterKey, pages: 1 });
-  const pages = more.key === filterKey ? more.pages : 1;
+  const [more, setMore] = useState({ key: filterKey, offsets: FIRST_PAGE });
+  const offsets = more.key === filterKey ? more.offsets : FIRST_PAGE;
   const { result: liveResult, loadingMore } = usePagedSearch(
     category,
     comuna,
-    pages,
+    offsets,
   );
   const result =
     fixture === "demo" ? liveResult : fixtureResult(fixture, liveResult);
@@ -601,14 +602,17 @@ export function DirectorySearch() {
                     onConverse={setConverse}
                   />
                 )}
-                {result.truncated ? (
+                {result.nextOffset !== undefined ? (
                   <Button
                     data-testid="load-more"
                     className="self-center"
                     aria-busy={loadingMore}
                     disabled={loadingMore}
                     onClick={() =>
-                      setMore({ key: filterKey, pages: pages + 1 })
+                      setMore({
+                        key: filterKey,
+                        offsets: [...offsets, result.nextOffset ?? 0],
+                      })
                     }
                   >
                     {loadingMore ? "Cargando…" : "Ver más agentes"}
@@ -762,12 +766,12 @@ function TextSearch({
 function usePagedSearch(
   category: string | null,
   comuna: string | null,
-  pages: number,
+  offsets: number[],
 ) {
   const requests = useMemo(
     () =>
       Object.fromEntries(
-        Array.from({ length: pages }, (_, page) => [
+        offsets.map((offset, page) => [
           String(page),
           {
             query: api.directory.search,
@@ -775,16 +779,16 @@ function usePagedSearch(
               ...(category ? { category } : {}),
               ...(comuna ? { comuna } : {}),
               limit: PAGE_SIZE,
-              offset: page * PAGE_SIZE,
+              offset,
             },
           },
         ]),
       ),
-    [category, comuna, pages],
+    [category, comuna, offsets],
   );
   const results = useQueries(requests);
   const loaded: DirectorySearchResult[] = [];
-  for (let page = 0; page < pages; page++) {
+  for (let page = 0; page < offsets.length; page++) {
     const value: DirectorySearchResult | Error | undefined =
       results[String(page)];
     if (value instanceof Error) throw value;
@@ -806,11 +810,12 @@ function usePagedSearch(
       result: last && {
         agents: loaded.flatMap((page) => page.agents),
         truncated: last.truncated && last.agents.length > 0,
+        nextOffset: last.nextOffset,
       },
     };
   }
   return {
     result: cache.current.result,
-    loadingMore: loaded.length > 0 && loaded.length < pages,
+    loadingMore: loaded.length > 0 && loaded.length < offsets.length,
   };
 }

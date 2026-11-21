@@ -1,6 +1,7 @@
 // @vitest-environment edge-runtime
 import { beforeEach, describe, expect, it } from "vitest";
 import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import { CLINIC_AGENT_SLUG } from "../../shared/seed-data";
 import { errorKind, REQUEST, ROOM_OWNER, seededRooms } from "./roomFixture";
 
@@ -18,6 +19,30 @@ const open = () =>
   rooms.t.withIdentity(owner).action(api.rooms.openFromCard, args);
 
 describe("room UI API", () => {
+  it("never marks a self-registered participant verified in room metadata", async () => {
+    const agent = await rooms.t.action(api.agentRegistration.register, {
+      name: "Servicio ciudadano",
+      description: "Información pública",
+    });
+    const caller = rooms.t.withIdentity(owner);
+    await caller.mutation(api.agentRegistration.link, {
+      code: agent.linkCode,
+      publish: { purpose: "Informar", category: "asistente_personal" },
+    });
+    await rooms.t.run((ctx) => ctx.db.patch(agent.agentId, { verified: true }));
+    const room = await rooms.open({
+      providerAgentId: agent.agentId,
+      intent: "ask_info",
+      request: "Necesito información",
+      human: { displayName: "Ana" },
+    });
+    const view = await caller.query(api.rooms.view, {
+      sessionId: room.sessionId as Id<"sessions">,
+    });
+    expect(view?.participantNames).toContainEqual(
+      expect.objectContaining({ name: "Servicio ciudadano", verified: false }),
+    );
+  });
   it("opens with the caller as owner and resolves names from agent cards", async () => {
     const { sessionId } = await open();
     const caller = rooms.t.withIdentity(owner);
@@ -40,7 +65,11 @@ describe("room UI API", () => {
       name: "Ana",
     });
     expect(view?.participantNames).toContainEqual(
-      expect.objectContaining({ name: clinic?.name, slug: CLINIC_AGENT_SLUG }),
+      expect.objectContaining({
+        name: clinic?.name,
+        slug: CLINIC_AGENT_SLUG,
+        verified: true,
+      }),
     );
     expect(
       await errorKind(
