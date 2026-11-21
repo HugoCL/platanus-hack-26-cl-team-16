@@ -2,12 +2,16 @@
 import rateLimiter from "@convex-dev/rate-limiter/test";
 import type { FunctionArgs } from "convex/server";
 import { convexTest } from "convex-test";
+import { afterEach, vi } from "vitest";
 import { internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import schema from "../../convex/schema";
+import * as providers from "../../shared/providers/llm";
 import { CLINIC_AGENT_SLUG, CONSUMER_AGENT_SLUG } from "../../shared/seedData";
 
 const modules = import.meta.glob("../../convex/**/*.ts");
+
+afterEach(() => vi.restoreAllMocks());
 
 export const REQUEST = "Necesito hora con un cardiólogo en Providencia";
 export const ROOM_OWNER = { subject: "room-owner" };
@@ -19,6 +23,11 @@ export async function seededRooms({
 }: {
   transactionLimits?: boolean;
 } = {}) {
+  const judge = vi.fn((): unknown => ({ decision: "allow", rule: "purpose" }));
+  const llm = providers.createFakeLlmProvider({ object: judge });
+  const createLlm = vi
+    .spyOn(providers, "createLlmProvider")
+    .mockReturnValue(llm);
   const t = convexTest({ schema, modules, transactionLimits });
   rateLimiter.register(t);
   await t.mutation(internal.seed.ensure, {});
@@ -40,7 +49,7 @@ export async function seededRooms({
       request: REQUEST,
       ...overrides,
     });
-  return { t, consumerId, clinicId, open };
+  return { t, consumerId, clinicId, open, judge, llm, createLlm };
 }
 
 export async function roomWithHuman(
