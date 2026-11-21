@@ -57,8 +57,7 @@ describe("E2 success criteria", () => {
     const expected = [openingNotice];
 
     for (const [i, sender] of viewers.entries()) {
-      const recipient = viewers[(i + 1) % viewers.length];
-      expected.push(await send(sender, recipient, text(`Message ${i + 1}`)));
+      expected.push(await send(sender, "all", text(`Message ${i + 1}`)));
       expect(await Promise.all(viewers.map(history))).toEqual(
         viewers.map(() => expected),
       );
@@ -67,9 +66,9 @@ describe("E2 success criteria", () => {
 
   it("3. the history returns every message in order, each with its verdict", async () => {
     const sent = [
-      await send(room.consumer, room.provider, text("Busco hora esta semana")),
+      await send(room.consumer, "all", text("Busco hora esta semana")),
       await send(room.provider, room.human, text("Tengo jueves o viernes")),
-      await send(room.human, room.provider, text("Prefiero el jueves")),
+      await send(room.human, "all", text("Prefiero el jueves")),
       await send(room.consumer, "all", text("Gracias")),
     ];
 
@@ -161,13 +160,13 @@ describe("the moderation gate", () => {
 
   it("asks the moderator with the content, sender, recipient, contract and history", async () => {
     const moderate = vi.spyOn(allowAllModerator, "moderate");
-    await send(room.consumer, room.provider, text("Hola"));
+    await send(room.consumer, "all", text("Hola"));
 
     expect(moderate).toHaveBeenCalledOnce();
     const input = moderate.mock.calls[0][0];
     expect(input.content).toEqual(text("Hola"));
     expect(input.sender).toMatchObject({ participantId: room.consumer });
-    expect(input.recipient).toBe(room.provider);
+    expect(input.recipient).toBe("all");
     expect(input.participants).toEqual(room.room.participants);
     expect(input.contract).toEqual(room.room.contract);
     expect(input.history.map((m) => m.content.kind)).toEqual(["system"]);

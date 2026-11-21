@@ -14,6 +14,7 @@ import type * as jobs from "../jobs.js";
 import type * as migrations from "../migrations.js";
 import type * as moderator from "../moderator.js";
 import type * as myFunctions from "../myFunctions.js";
+import type * as roomAgent from "../roomAgent.js";
 import type * as roomState from "../roomState.js";
 import type * as rooms from "../rooms.js";
 import type * as seed from "../seed.js";
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   migrations: typeof migrations;
   moderator: typeof moderator;
   myFunctions: typeof myFunctions;
+  roomAgent: typeof roomAgent;
   roomState: typeof roomState;
   rooms: typeof rooms;
   seed: typeof seed;

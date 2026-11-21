@@ -41,6 +41,8 @@ Both agents and the human see allowed messages; only the sender and humans see a
 
 Only `convex/gate.ts` writes to `messages` (the seed is the one exception), and a test fails if another module does. Platform notices, such as `session_opened`, go through the same module without asking the moderator. The moderator sits behind the shared `Moderator` interface in `shared/moderation.ts`: `moderate({ content, sender, recipient, participants, contract, history })` (history contains up to the latest 500 room messages, in order) returns `{ verdict, events }`, and the gate stores one `moderationEvents` row per event. Until E3, `currentModerator()` returns `allowAllModerator`, which allows everything; E3 replaces it there and nowhere else.
 
+An allowed message addressed to a hosted agent schedules a reply after the message is stored. The agent gets only the history it could see as a participant. The reply goes back to the original sender through the same gate and gets its own verdict. E2 uses a deterministic acknowledgment backed by the fake LLM; E8 supplies real room agents.
+
 ## Test
 
 ```sh
