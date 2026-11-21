@@ -25,6 +25,10 @@ The directory lives in `convex/directory.ts` and the page at http://localhost:30
 
 Each card is an `AgentDetail` (the full `AgentCard` with purpose and scope) plus `comuna` and `allowedIntents`, so it also validates as an `AgentSummary`. Draft cards are never listed.
 
+## MCP server (E5)
+
+External agents reach the directory through the MCP server at http://localhost:3000/api/mcp, with a per-agent API key from `pnpm mcp:key`. [docs/mcp.md](mcp.md) explains how to get a key and configure each client.
+
 ## Test
 
 ```sh
