@@ -17,12 +17,15 @@ const RUT_FORMATTED =
   /(?<![\d.])(\d{1,2}(?:\.\d{3}){2}|\d{7,8})-([\dk])(?![\dk])/gi;
 const RUT_AFTER_KEYWORD = /\bru[tn]\b[\s:#]*(\d{7,8})([\dk])(?![\dk])/gi;
 // A RUT with no dots, hyphen or label: 7 or 8 digits and the check digit,
-// standing alone, so not part of a longer number, a price or a phone. Prices
-// after "$" and Chilean phones after "+56" are set aside first as whole units.
-const RUT_COMPACT =
-  /(?<![\p{L}\d.,+$-])(\d{7,8})([\dk])(?![\p{L}\d]|[.,-]\d)/giu;
-const PRICE = /\$\p{Zs}*\d[\d.,]*/gu;
-const CHILEAN_PHONE = /\+\p{Zs}*56(?:[\p{Zs}()-]*\d){9}(?!\d)/gu;
+// standing alone, so not part of a longer number. Before looking for one, two
+// kinds of whole tokens are set aside: a price, "$" and digits with or without
+// dots, and a Chilean phone, "+56" and nine digits starting with 2 to 9. A
+// "+56" before anything else is dropped, so what follows is read on its own.
+// Everything else that passes modulo 11 is a RUT.
+const RUT_COMPACT = /(?<![\p{L}\d.,-])(\d{7,8})([\dk])(?![\p{L}\d]|[.,-]\d)/giu;
+const PRICE = /\$\p{Zs}*\d[\d.]*(?![\p{L}\d])/giu;
+const CHILEAN_PHONE =
+  /\+\p{Zs}*56[\p{Zs}()-]*(?:[2-9](?:[\p{Zs}()-]*\d){8}(?![\p{L}\d]))?/giu;
 const CHILEAN_MOBILE = /^9\d{8}$/;
 // A card number has 13 to 19 digits, unbroken or in groups split either by
 // spaces (any Unicode space) and hyphens, mixed freely, or by dots alone. Every
