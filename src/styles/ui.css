@@ -105,11 +105,18 @@
     }
   }
 
+  [data-slot="tabs-list"] {
+    gap: calc(var(--ui-spacing) * 1);
+    border-bottom: 0;
+  }
+
   [data-slot="tabs-tab"] {
+    margin-bottom: 0;
+    border-bottom: 0;
     border-radius: var(--sm-radius-full);
 
     &[data-selected] {
-      background: var(--ui-muted);
+      background: color-mix(in oklch, var(--ui-foreground) 8%, transparent);
       color: var(--ui-foreground);
     }
   }

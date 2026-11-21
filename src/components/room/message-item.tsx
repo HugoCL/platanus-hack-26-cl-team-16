@@ -106,7 +106,6 @@ function Bubble({
     body = (
       <GenUiBlock
         spec={content.spec}
-        senderName={sender?.name ?? "un agente"}
         answer={answers[content.spec.id]}
         canInteract={canAct && status !== "pending"}
         onRespond={onRespond}

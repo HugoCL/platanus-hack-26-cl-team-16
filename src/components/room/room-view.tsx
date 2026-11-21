@@ -141,14 +141,10 @@ export function DemoRoom() {
             contract={DEMO_CONTRACT}
             status={status}
             violations={violations}
-            role={role}
-            control={control}
-            canControl={canControl && !readOnly}
             panelOpen={panelOpen}
-            onTakeControl={() => setControl(true)}
             onTogglePanel={() => setPanelOpen((o) => !o)}
           />
-          <p className="m-0 flex items-center gap-1.5 border-b border-border bg-muted px-4 py-1.5 text-xs text-subtle-foreground">
+          <p className="m-0 flex items-center gap-1.5 border-b border-border px-4 py-1.5 text-xs text-subtle-foreground">
             <ShieldCheckIcon size={13} />
             Moderada · cada mensaje es revisado antes de entregarse
           </p>
@@ -349,11 +345,7 @@ function SessionHeader({
   contract,
   status,
   violations,
-  role,
-  control,
-  canControl,
   panelOpen,
-  onTakeControl,
   onTogglePanel,
 }: {
   self?: RoomParticipant;
@@ -361,11 +353,7 @@ function SessionHeader({
   contract: SessionContract;
   status: SessionStatus;
   violations: number;
-  role: Viewer["role"];
-  control: boolean;
-  canControl: boolean;
   panelOpen: boolean;
-  onTakeControl: () => void;
   onTogglePanel: () => void;
 }) {
   const tone = violationTone(violations, contract.maxViolations);
@@ -409,15 +397,6 @@ function SessionHeader({
           <span className="sr-only">Violaciones: </span>
           {violations} / {contract.maxViolations}
         </span>
-        <span className="inline-flex items-center gap-1 text-xs text-subtle-foreground">
-          <UserIcon size={13} />
-          {ROLE_LABELS[role]}
-        </span>
-        {canControl && !control ? (
-          <Button data-size="sm" data-variant="solid" onClick={onTakeControl}>
-            Tomar control
-          </Button>
-        ) : null}
         <Button
           data-size="sm"
           data-variant="ghost"
@@ -760,7 +739,7 @@ function ContractView({
           {contract.maxViolations} antes de terminar la sesión
         </p>
       </Section>
-      <p className="m-0 rounded-2xl bg-muted p-3 text-xs text-subtle-foreground">
+      <p className="m-0 text-xs text-subtle-foreground">
         Calculado al abrir la sesión cruzando la intención de tu agente con el
         scope del proveedor.
       </p>

@@ -64,13 +64,11 @@ const TYPE_META: Record<UiSpec["type"], { label: string; icon: ReactNode }> = {
 
 export function GenUiBlock({
   spec: raw,
-  senderName,
   answer,
   canInteract,
   onRespond,
 }: {
   spec: unknown;
-  senderName: string;
   answer?: GenUiAnswer;
   canInteract: boolean;
   onRespond: (response: UiResponse) => void;
@@ -112,6 +110,10 @@ export function GenUiBlock({
             <CheckIcon size={13} />
             Respondido {formatTime(answer.at)}
           </span>
+        ) : !canInteract ? (
+          <span className="text-xs text-subtle-foreground">
+            Solo el dueño puede responder
+          </span>
         ) : null}
       </header>
       <div className="px-4 pb-3">
@@ -129,10 +131,6 @@ export function GenUiBlock({
           <ModeratorAlertBlock spec={spec} />
         ) : null}
       </div>
-      <footer className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
-        Generado por {senderName} · validado
-        {!canInteract && !answer ? " · solo el dueño puede responder" : null}
-      </footer>
     </section>
   );
 }
