@@ -40,9 +40,13 @@ export function SiteHeader({
         </Link>
       </div>
       <div className="sm:hidden">
-        <Show when="signed-in">
-          <UserButton />
-        </Show>
+        {nav ? (
+          <Show when="signed-in">
+            <UserButton />
+          </Show>
+        ) : (
+          <HeaderAccount />
+        )}
       </div>
       <div className="flex items-center gap-2 max-sm:hidden">
         {nav && (
