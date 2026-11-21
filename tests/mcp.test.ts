@@ -7,13 +7,27 @@ import {
 } from "@modelcontextprotocol/client";
 import { getFunctionName } from "convex/server";
 import { convexTest } from "convex-test";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { internal } from "../convex/_generated/api";
+import { api, internal } from "../convex/_generated/api";
+import type { Id } from "../convex/_generated/dataModel";
+import { allowAllModerator } from "../convex/moderator";
 import schema from "../convex/schema";
 import { type ConvexCaller, createMcpEndpoint } from "../lib/mcp";
-import { AgentDetail, AgentSummary, MCP_TOOLS } from "../shared/mcp";
-import { CLINIC_AGENT_SLUG, CONSUMER_AGENT_SLUG } from "../shared/seedData";
+import { REFERENCE_ATTACK } from "../shared/fixtures/moderationSet";
+import {
+  AgentDetail,
+  AgentSummary,
+  MCP_TOOLS,
+  type McpToolName,
+} from "../shared/mcp";
+import { createModerator } from "../shared/moderator/moderator";
+import { createFakeLlmProvider } from "../shared/providers/llm";
+import {
+  CLINIC_AGENT_SLUG,
+  CONSUMER_AGENT_SLUG,
+  EXTERNAL_AGENT_SLUG,
+} from "../shared/seedData";
 
 const modules = import.meta.glob("../convex/**/*.ts");
 const MCP_URL = "http://localhost/api/mcp";
@@ -31,7 +45,7 @@ beforeEach(async () => {
   rateLimiter.register(t);
   await t.mutation(internal.seed.ensure, {});
   ({ apiKey } = await t.action(internal.agentKeys.issue, {
-    slug: CONSUMER_AGENT_SLUG,
+    slug: EXTERNAL_AGENT_SLUG,
   }));
   convexCalls = [];
   const convex = t as ConvexCaller;
@@ -39,6 +53,10 @@ beforeEach(async () => {
     query: (ref, ...args) => {
       convexCalls.push(getFunctionName(ref));
       return convex.query(ref, ...args);
+    },
+    mutation: (ref, ...args) => {
+      convexCalls.push(getFunctionName(ref));
+      return convex.mutation(ref, ...args);
     },
     action: (ref, ...args) => {
       convexCalls.push(getFunctionName(ref));
@@ -88,12 +106,11 @@ describe.each<[Negotiation, string]>([
     expect(client.getServerVersion()?.name).toBe("directorio-agentes");
   });
 
-  it("lists the directory tools with the schemas from shared/mcp.ts", async () => {
+  it("lists the tools with the schemas from shared/mcp.ts", async () => {
     const { tools } = await client.listTools();
-    expect(tools.map((tool) => tool.name).sort()).toEqual([
-      "get_agent",
-      "search_agents",
-    ]);
+    expect(tools.map((tool) => tool.name).sort()).toEqual(
+      Object.keys(MCP_TOOLS).sort(),
+    );
     for (const tool of tools) {
       const shared = MCP_TOOLS[tool.name as keyof typeof MCP_TOOLS];
       expect(tool.description).toBe(shared.description);
@@ -120,6 +137,12 @@ describe.each<[Negotiation, string]>([
     expect(Object.keys(get?.inputSchema.properties ?? {})).toEqual([
       "agentId",
       "slug",
+    ]);
+    const open = tools.find((tool) => tool.name === "open_session");
+    expect(Object.keys(open?.inputSchema.properties ?? {})).toEqual([
+      "targetAgentId",
+      "intent",
+      "mode",
     ]);
   });
 
@@ -288,5 +311,336 @@ describe("MCP endpoint over raw HTTP", () => {
     expect((await post({ ...proxy, origin: "http://localhost" })).status).toBe(
       403,
     );
+  });
+});
+
+describe("MCP room tools", () => {
+  const REQUEST = "Necesito hora con un cardiólogo en Providencia";
+  const NOT_IN_ROOM = "NotParticipant: you are not a participant in this room";
+  type Output<N extends McpToolName> = z.output<
+    (typeof MCP_TOOLS)[N]["output"]
+  >;
+
+  let client: Client;
+  let agents: Record<"external" | "consumer" | "clinic", Id<"agents">>;
+  let intent: { name: string; description: string };
+  beforeEach(async () => {
+    client = await connect("auto", apiKey);
+    const agentId = (slug: string) =>
+      t.run(async (ctx) => {
+        const agent = await ctx.db
+          .query("agents")
+          .withIndex("by_slug", (q) => q.eq("slug", slug))
+          .unique();
+        if (!agent) throw new Error(`missing ${slug}`);
+        return agent._id;
+      });
+    agents = {
+      external: await agentId(EXTERNAL_AGENT_SLUG),
+      consumer: await agentId(CONSUMER_AGENT_SLUG),
+      clinic: await agentId(CLINIC_AGENT_SLUG),
+    };
+    const clinic = await t.query(api.directory.get, {
+      slug: CLINIC_AGENT_SLUG,
+    });
+    intent = { name: clinic?.allowedIntents[0] ?? "", description: REQUEST };
+    return async () => {
+      await client.close();
+      await t.finishInProgressScheduledFunctions();
+    };
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  async function use<N extends McpToolName>(
+    name: N,
+    args: Record<string, unknown>,
+  ): Promise<Output<N>> {
+    const result = await client.callTool({ name, arguments: args });
+    expect(result.isError, JSON.stringify(result.content)).toBeFalsy();
+    return MCP_TOOLS[name].output.parse(result.structuredContent) as Output<N>;
+  }
+
+  async function refusal(name: McpToolName, args: Record<string, unknown>) {
+    const result = await client.callTool({ name, arguments: args });
+    expect(result.isError).toBe(true);
+    return JSON.stringify(result.content);
+  }
+
+  const text = (value: string) => ({ kind: "text" as const, text: value });
+
+  const roleIn = (
+    session: { participants: { role: string; participantId: string }[] },
+    role: string,
+  ) =>
+    session.participants.find((p) => p.role === role)
+      ?.participantId as Id<"participants">;
+
+  async function openRoom() {
+    const session = await use("open_session", {
+      targetAgentId: agents.clinic,
+      intent,
+    });
+    return {
+      sessionId: session.sessionId as Id<"sessions">,
+      session,
+      me: roleIn(session, "initiator"),
+      provider: roleIn(session, "recipient"),
+    };
+  }
+
+  async function hostedRoom() {
+    const session = await t.mutation(api.rooms.open, {
+      initiatorAgentId: agents.consumer,
+      providerAgentId: agents.clinic,
+      request: REQUEST,
+    });
+    return {
+      sessionId: session.sessionId as Id<"sessions">,
+      consumer: roleIn(session, "initiator"),
+      provider: roleIn(session, "recipient"),
+    };
+  }
+
+  const history = (sessionId: Id<"sessions">, viewer: Id<"participants">) =>
+    t.query(api.gate.history, { sessionId, viewerParticipantId: viewer });
+
+  it("open_session opens a moderated room with the key's agent as the initiator", async () => {
+    const { session, sessionId, me } = await openRoom();
+
+    expect(session).toMatchObject({ status: "active", contract: { intent } });
+    expect(session.participants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          participantId: me,
+          agentId: agents.external,
+          role: "initiator",
+        }),
+        expect.objectContaining({ agentId: agents.clinic, role: "recipient" }),
+      ]),
+    );
+    const record = await t.run((ctx) =>
+      ctx.db
+        .query("participants")
+        .withIndex("by_agentId_and_sessionId", (q) =>
+          q.eq("agentId", agents.external).eq("sessionId", sessionId),
+        )
+        .unique(),
+    );
+    expect(record?._id).toBe(me);
+    const { messages } = await use("wait_for_messages", {
+      sessionId,
+      timeoutMs: 0,
+    });
+    expect(messages.map((m) => m.content)).toMatchObject([
+      { kind: "system", code: "session_opened" },
+    ]);
+  });
+
+  it("takes the caller from the key and ignores an agentId in the arguments", async () => {
+    const openedByConsumer = async () =>
+      (await t.run((ctx) => ctx.db.query("sessions").collect())).filter(
+        (s) => s.initiatorAgentId === agents.consumer,
+      ).length;
+    const before = await openedByConsumer();
+
+    const session = await use("open_session", {
+      targetAgentId: agents.clinic,
+      intent,
+      initiatorAgentId: agents.consumer,
+      agentId: agents.consumer,
+    });
+
+    expect(session.participants).toMatchObject([
+      { agentId: agents.external, role: "initiator" },
+      { agentId: agents.clinic, role: "recipient" },
+    ]);
+    expect(await openedByConsumer()).toBe(before);
+  });
+
+  it("send_message goes through the gate and wait_for_messages returns the provider's reply", async () => {
+    const { sessionId, me, provider } = await openRoom();
+    const opened = await use("wait_for_messages", { sessionId, timeoutMs: 0 });
+
+    const { message } = await use("send_message", {
+      sessionId,
+      recipient: provider,
+      content: text("Busco hora esta semana"),
+    });
+
+    expect(message).toMatchObject({
+      senderParticipantId: me,
+      recipient: provider,
+      status: "allowed",
+    });
+    expect(await history(sessionId, provider)).toContainEqual(message);
+    const mine = await use("wait_for_messages", {
+      sessionId,
+      after: opened.cursor,
+    });
+    expect(mine.messages).toEqual([message]);
+    const reply = await use("wait_for_messages", {
+      sessionId,
+      after: mine.cursor,
+    });
+    expect(reply.messages).toMatchObject([
+      { senderParticipantId: provider, recipient: me, status: "allowed" },
+    ]);
+  });
+
+  it("criterion 3: the gate blocks the reference attack from an external agent as it does from a hosted one", async () => {
+    const moderate = vi
+      .spyOn(allowAllModerator, "moderate")
+      .mockImplementation((input) =>
+        createModerator({ llm: createFakeLlmProvider() }).moderate(input),
+      );
+    const { sessionId, me, provider } = await openRoom();
+
+    const { message } = await use("send_message", {
+      sessionId,
+      recipient: provider,
+      content: text(REFERENCE_ATTACK),
+    });
+
+    expect(message).toMatchObject({
+      senderParticipantId: me,
+      status: "blocked",
+      verdict: { decision: "block", rule: "injection" },
+    });
+    expect(moderate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sender: expect.objectContaining({
+          participantId: me,
+          agentId: agents.external,
+        }),
+        content: text(REFERENCE_ATTACK),
+      }),
+    );
+    const { messages } = await use("wait_for_messages", {
+      sessionId,
+      timeoutMs: 0,
+    });
+    expect(messages.slice(1)).toMatchObject([
+      message,
+      {
+        recipient: me,
+        content: {
+          kind: "ui",
+          spec: {
+            type: "moderator_alert",
+            rule: "injection",
+            blockedMessageId: message.messageId,
+          },
+        },
+      },
+    ]);
+    await t.finishInProgressScheduledFunctions();
+    expect(
+      (await history(sessionId, provider)).map((m) => m.content.kind),
+    ).toEqual(["system"]);
+
+    const hosted = await hostedRoom();
+    const fromHosted = await t.action(api.gate.send, {
+      sessionId: hosted.sessionId,
+      senderParticipantId: hosted.consumer,
+      recipient: hosted.provider,
+      content: text(REFERENCE_ATTACK),
+    });
+    expect(fromHosted).toMatchObject({
+      status: message.status,
+      verdict: message.verdict,
+    });
+  });
+
+  it("criterion 5: a key cannot read, write or close a room its agent is not in", async () => {
+    const moderate = vi.spyOn(allowAllModerator, "moderate");
+    const { sessionId, provider } = await hostedRoom();
+    const before = await history(sessionId, provider);
+
+    for (const [name, args] of [
+      ["wait_for_messages", { sessionId, timeoutMs: 0 }],
+      ["send_message", { sessionId, content: text("Hola") }],
+      [
+        "send_message",
+        { sessionId, recipient: provider, content: text("Hola") },
+      ],
+      ["close_session", { sessionId }],
+    ] as const) {
+      expect(await refusal(name, args)).toContain(NOT_IN_ROOM);
+    }
+
+    expect(await history(sessionId, provider)).toEqual(before);
+    expect((await t.query(api.rooms.get, { sessionId }))?.status).toBe(
+      "active",
+    );
+    expect(moderate).not.toHaveBeenCalled();
+    for (const missing of ["not-a-room", agents.clinic]) {
+      expect(
+        await refusal("wait_for_messages", {
+          sessionId: missing,
+          timeoutMs: 0,
+        }),
+      ).toContain(NOT_IN_ROOM);
+    }
+  });
+
+  it("send_message refuses a recipient from another room", async () => {
+    const { sessionId } = await openRoom();
+    const other = await hostedRoom();
+    const before = await history(other.sessionId, other.provider);
+
+    await refusal("send_message", {
+      sessionId,
+      recipient: other.provider,
+      content: text("Hola"),
+    });
+
+    expect(await history(other.sessionId, other.provider)).toEqual(before);
+  });
+
+  it("close_session closes the room, later sends are refused and a wait returns at once", async () => {
+    const { sessionId, provider } = await openRoom();
+
+    expect(await use("close_session", { sessionId, reason: "Listo" })).toEqual({
+      sessionId,
+      status: "closed",
+    });
+
+    expect(
+      await refusal("send_message", {
+        sessionId,
+        recipient: provider,
+        content: text("Hola"),
+      }),
+    ).toMatch(/RoomClosed/);
+    const read = await use("wait_for_messages", { sessionId, timeoutMs: 0 });
+    expect(read.messages.at(-1)?.content).toMatchObject({
+      code: "session_closed",
+    });
+    const started = Date.now();
+    expect(
+      await use("wait_for_messages", {
+        sessionId,
+        after: read.cursor,
+        timeoutMs: 20000,
+      }),
+    ).toEqual({ messages: [], cursor: read.cursor, sessionStatus: "closed" });
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+
+  it("wait_for_messages returns nothing when no message arrives before the timeout", async () => {
+    const { sessionId } = await openRoom();
+    const read = await use("wait_for_messages", { sessionId, timeoutMs: 0 });
+
+    const started = Date.now();
+    expect(
+      await use("wait_for_messages", {
+        sessionId,
+        after: read.cursor,
+        timeoutMs: 700,
+      }),
+    ).toEqual({ messages: [], cursor: read.cursor, sessionStatus: "active" });
+    expect(Date.now() - started).toBeGreaterThanOrEqual(700);
   });
 });

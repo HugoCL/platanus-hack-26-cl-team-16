@@ -5,7 +5,10 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
 import { sha256Hex } from "../../convex/agentKeys";
 import schema from "../../convex/schema";
-import { CONSUMER_AGENT_SLUG } from "../../shared/seedData";
+import {
+  CONSUMER_AGENT_SLUG,
+  EXTERNAL_AGENT_SLUG,
+} from "../../shared/seedData";
 
 const modules = import.meta.glob("../../convex/**/*.ts");
 
@@ -18,7 +21,7 @@ beforeEach(async () => {
 
 const issue = () =>
   t.action(internal.agentKeys.issue, {
-    slug: CONSUMER_AGENT_SLUG,
+    slug: EXTERNAL_AGENT_SLUG,
     label: "test",
   });
 const authenticate = (apiKey: string) =>
@@ -71,12 +74,23 @@ describe("agent API keys", () => {
     await expect(authenticate(apiKey)).resolves.toBeNull();
   });
 
-  it("refuses to issue a key for an unknown or inactive agent", async () => {
+  it("refuses to issue a key for an unknown, inactive or hosted agent", async () => {
     await expect(
       t.action(internal.agentKeys.issue, { slug: "no-existe" }),
     ).rejects.toThrow(/no agent with slug no-existe/);
     await expect(
       t.action(internal.agentKeys.issue, { slug: "cafe-los-dominicos" }),
-    ).rejects.toThrow(/cafe-los-dominicos is prospect, not active/);
+    ).rejects.toThrow(
+      /cafe-los-dominicos is prospect and hosted: keys are only for active external agents/,
+    );
+    await expect(
+      t.action(internal.agentKeys.issue, { slug: CONSUMER_AGENT_SLUG }),
+    ).rejects.toThrow(/mi-agente-juan is active and hosted/);
+  });
+
+  it("stops accepting a key once its agent is no longer external", async () => {
+    const { apiKey, agentId } = await issue();
+    await t.run((ctx) => ctx.db.patch(agentId, { kind: "hosted" }));
+    await expect(authenticate(apiKey)).resolves.toBeNull();
   });
 });

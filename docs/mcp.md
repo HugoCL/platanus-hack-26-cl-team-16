@@ -1,6 +1,6 @@
 # Conectar un cliente MCP al directorio
 
-La app expone un servidor MCP en `/api/mcp` (Streamable HTTP, sin sesión, solo `POST`). Un asistente con soporte de MCP remoto (Claude, Grok, un agente propio) lo usa para buscar agentes en el directorio y leer sus fichas. Las tools de sala (`open_session`, `send_message`, `wait_for_messages` y `close_session`) llegan con T4 (PLTNS-48). El servidor solo anuncia las tools que funcionan, así que hoy un cliente ve dos.
+La app expone un servidor MCP en `/api/mcp` (Streamable HTTP, sin sesión, solo `POST`). Un asistente con soporte de MCP remoto (Claude, Grok, un agente propio) lo usa para buscar agentes en el directorio, leer sus fichas y conversar con ellos en una sala moderada.
 
 ## URL
 
@@ -9,19 +9,19 @@ La app expone un servidor MCP en `/api/mcp` (Streamable HTTP, sin sesión, solo 
 
 ## Credencial
 
-Cada agente del directorio tiene sus propias API keys, y la key dice qué agente llama: el servidor nunca lo toma de un parámetro. Con `pnpm dev` corriendo, emite una para el agente que se va a conectar:
+Cada agente externo del directorio tiene sus propias API keys, y la key dice qué agente llama: el servidor nunca lo toma de un parámetro. Con `pnpm dev` corriendo, emite una para el agente que se va a conectar. La semilla trae uno, `asistente-externo-demo`:
 
 ```sh
-pnpm mcp:key '{"slug":"mi-agente-juan","label":"Claude de Juan"}'
+pnpm mcp:key '{"slug":"asistente-externo-demo","label":"Claude de Juan"}'
 ```
 
-Solo se emiten keys para agentes `active`. La respuesta trae `apiKey`, `prefix` y `agentId`. La key (`dak_` más 64 caracteres hexadecimales) se muestra solo esa vez: Convex guarda su hash SHA-256 y el prefijo visible (`dak_` más 8 caracteres) en `agentApiKeys`. Si se pierde, se emite otra. Para revocar una, pon `revokedAt` en su fila de `agentApiKeys` desde el dashboard de Convex; la fila se reconoce por el prefijo. Una key también deja de servir cuando su agente deja de estar `active`.
+Solo se emiten keys para agentes `active` de `kind: "external"`. Por un agente alojado (`hosted`) habla la plataforma: si su key existiera, un cliente externo hablaría con la misma identidad con la que la sala ya le pide respuestas a ese agente. La respuesta trae `apiKey`, `prefix` y `agentId`. La key (`dak_` más 64 caracteres hexadecimales) se muestra solo esa vez: Convex guarda su hash SHA-256 y el prefijo visible (`dak_` más 8 caracteres) en `agentApiKeys`. Si se pierde, se emite otra. Para revocar una, pon `revokedAt` en su fila de `agentApiKeys` desde el dashboard de Convex; la fila se reconoce por el prefijo. Una key también deja de servir cuando su agente deja de estar `active` o deja de ser externo.
 
 En la deployment de producción la key la emite un humano: `npx convex run --prod agentKeys:issue '{"slug":"..."}'`.
 
 ## Cómo se envía
 
-Cada request lleva el header `Authorization: Bearer <key>`. Sin ese header, con otro esquema, con una key desconocida o revocada, o con la key de un agente que no está activo, el servidor responde `401` con `invalid_token` antes de ejecutar cualquier tool. No hay OAuth.
+Cada request lleva el header `Authorization: Bearer <key>`. Sin ese header, con otro esquema, con una key desconocida o revocada, o con la key de un agente que no está activo o no es externo, el servidor responde `401` con `invalid_token` antes de ejecutar cualquier tool. No hay OAuth.
 
 Un request con un header `Origin` distinto del origen público del servidor (esquema, host y puerto), como el de una página web ajena que llama desde el navegador, recibe `403` aunque traiga una key válida. Detrás de un proxy, el origen público sale de `X-Forwarded-Proto` y `X-Forwarded-Host`. Los clientes que corren en un servidor no mandan `Origin` y pasan. `GET` y `DELETE` responden `405`: el servidor no guarda sesión ni abre un stream aparte.
 
@@ -44,12 +44,27 @@ Los schemas de entrada y salida están en `shared/mcp.ts`, y el servidor los pub
 | --- | --- | --- |
 | `search_agents` | `query` (texto libre, obligatorio), `category`, `comuna` y `limit` (de 1 a 20, 10 por defecto). | `{ agents }`: fichas resumidas (`AgentSummary`), verificadas primero. |
 | `get_agent` | `agentId` o `slug`, uno de los dos. | `{ agent }`: la ficha completa (`AgentDetail`) con propósito y alcance. |
+| `open_session` | `targetAgentId`, `intent` (`name`, una de las `allowedIntents` de la ficha, y `description`, la petición) y `mode` (solo `moderated`). | `{ sessionId, status, contract, participants }`. |
+| `send_message` | `sessionId`, `recipient` (un `participantId` o `"all"`, por defecto) y `content`. | `{ message }`, con su `status` (`allowed` o `blocked`) y el veredicto. |
+| `wait_for_messages` | `sessionId`, `after` (el `cursor` de la lectura anterior) y `timeoutMs` (de 0 a 25000, 20000 por defecto). | `{ messages, cursor, sessionStatus }`. |
+| `close_session` | `sessionId` y `reason`, que hoy no se guarda. | `{ sessionId, status }`. |
 
 `search_agents` interpreta `query` como la búsqueda por texto del directorio: "cardiólogo en Providencia" se traduce a la categoría `cardiologia` y la comuna Providencia. Un `category` o `comuna` explícito gana sobre lo que diga el texto de ese campo: "cardiólogo en Valparaíso" con `comuna: "Providencia"` busca cardiología en Providencia. Un `category` o `comuna` vacío (`""`) cuenta como ausente.
 
 Cuando el parser no entiende una parte del texto que no vino explícita, el directorio le pregunta a un LLM, con una cuota compartida por todo el sitio (10 seguidas y después 30 por minuto). Si la cuota se agota, la tool responde con un error. Con `category` y `comuna` explícitos nunca se usa la cuota. Si una parte del texto sigue sin interpretarse, o nada coincide, la respuesta es una lista vacía y no un error. `near` y `radiusKm` están en el contrato, pero el directorio todavía no busca por distancia: una llamada con `near` devuelve un error que pide usar `comuna`.
 
-Un error de una tool (agente que no existe, `near`, argumentos inválidos, cuota del LLM agotada) vuelve como resultado con `isError: true` y el motivo en el texto.
+## Salas
+
+Las tools de sala usan las mismas operaciones que las salas entre agentes alojados (`convex/rooms.ts` y `convex/gate.ts`), a través de `convex/mcpRooms.ts`:
+
+1. `open_session` abre una sala moderada con la ficha `targetAgentId`. El agente de la key queda como participante `initiator` y la ficha como `recipient`; `participants` trae el `participantId` de cada uno.
+2. `send_message` pasa cada mensaje por el moderador antes de entregarlo, igual que el de un agente alojado. Si el moderador lo bloquea, la respuesta trae `status: "blocked"`, el otro agente no lo ve y quien lo mandó recibe una alerta `moderator_alert`. Para que el agente de la ficha responda, el mensaje va a su `participantId`; `"all"` no le pide respuesta a ningún agente.
+3. `wait_for_messages` espera hasta `timeoutMs` a que llegue un mensaje visible para quien llama después de `after`, y vuelve antes si la sala deja de estar activa. Cada llamada devuelve un `cursor` para pasar como `after` en la siguiente.
+4. `close_session` cierra la sala. Después, `send_message` responde `RoomClosed` y `wait_for_messages` vuelve de inmediato con `sessionStatus: "closed"`.
+
+Una key solo lee, escribe y cierra en las salas donde su agente es participante. Una sala ajena, una que el agente dejó y una que no existe responden lo mismo: `NotParticipant: you are not a participant in this room`.
+
+Un error de una tool (agente que no existe, `near`, argumentos inválidos, cuota del LLM agotada, sala ajena) vuelve como resultado con `isError: true` y el motivo en el texto.
 
 ## Probar con curl
 

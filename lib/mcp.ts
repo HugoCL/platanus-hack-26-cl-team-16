@@ -11,13 +11,18 @@ import type {
   FunctionReturnType,
   OptionalRestArgs,
 } from "convex/server";
+import { ConvexError } from "convex/values";
 import type { z } from "zod";
 import { api } from "../convex/_generated/api";
 import {
+  type CloseSessionInput,
   type GetAgentInput,
   MCP_TOOLS,
   type McpToolName,
+  type OpenSessionInput,
   type SearchAgentsInput,
+  type SendMessageInput,
+  type WaitForMessagesInput,
 } from "../shared/mcp";
 
 export type ConvexCaller = {
@@ -25,6 +30,10 @@ export type ConvexCaller = {
     query: Q,
     ...args: OptionalRestArgs<Q>
   ): Promise<FunctionReturnType<Q>>;
+  mutation<M extends FunctionReference<"mutation">>(
+    mutation: M,
+    ...args: OptionalRestArgs<M>
+  ): Promise<FunctionReturnType<M>>;
   action<A extends FunctionReference<"action">>(
     action: A,
     ...args: OptionalRestArgs<A>
@@ -37,6 +46,7 @@ type ToolRun<N extends McpToolName> = (
 ) => Promise<z.input<Tool<N>["output"]>>;
 
 const BEARER = /^Bearer\s+(\S+)$/i;
+const POLL_MS = 500;
 
 // Next builds request.url from the address it listens on, so the public origin comes from the
 // proxy's forwarded headers when there are any.
@@ -69,7 +79,7 @@ function registerTool<N extends McpToolName>(
     { description, inputSchema: input, outputSchema: output },
     async (args) => {
       const structuredContent = output.parse(
-        await run(args as z.output<Tool<N>["input"]>),
+        await run(args as z.output<Tool<N>["input"]>).catch(readableError),
       );
       return {
         content: [{ type: "text", text: JSON.stringify(structuredContent) }],
@@ -77,6 +87,13 @@ function registerTool<N extends McpToolName>(
       };
     },
   );
+}
+
+function readableError(error: unknown): never {
+  if (error instanceof ConvexError && typeof error.data?.message === "string") {
+    throw new Error(`${error.data.kind}: ${error.data.message}`);
+  }
+  throw error;
 }
 
 // E1 has no distance search, so `near` is refused instead of ignored.
@@ -107,8 +124,69 @@ async function getAgent(
   return { agent };
 }
 
+// E2 only opens moderated rooms. The room tools forward the caller's key and let Convex resolve
+// the agent from it (convex/mcpRooms.ts).
+async function openSession(
+  convex: ConvexCaller,
+  apiKey: string,
+  { targetAgentId, intent, mode }: z.output<typeof OpenSessionInput>,
+) {
+  if (mode !== "moderated") {
+    throw new Error("only moderated sessions are available");
+  }
+  return convex.action(api.mcpRooms.open, {
+    apiKey,
+    targetAgentId,
+    intent: intent.name,
+    request: intent.description,
+  });
+}
+
+async function sendMessage(
+  convex: ConvexCaller,
+  apiKey: string,
+  input: z.output<typeof SendMessageInput>,
+) {
+  return {
+    message: await convex.action(api.mcpRooms.send, { apiKey, ...input }),
+  };
+}
+
+// Polls until a visible message arrives, the room stops being active or the timeout passes.
+async function waitForMessages(
+  convex: ConvexCaller,
+  apiKey: string,
+  { sessionId, after, timeoutMs }: z.output<typeof WaitForMessagesInput>,
+) {
+  const deadline = Date.now() + timeoutMs;
+  const read = (cursor?: number) =>
+    convex.query(api.mcpRooms.messages, { apiKey, sessionId, after: cursor });
+  let result = await read(after);
+  while (
+    result.messages.length === 0 &&
+    result.sessionStatus === "active" &&
+    Date.now() < deadline
+  ) {
+    await new Promise((resolve) =>
+      setTimeout(resolve, Math.min(POLL_MS, deadline - Date.now())),
+    );
+    result = await read(result.cursor);
+  }
+  return result;
+}
+
+// The contract's optional reason has nowhere to go: E2's close takes none.
+async function closeSession(
+  convex: ConvexCaller,
+  apiKey: string,
+  { sessionId }: z.output<typeof CloseSessionInput>,
+) {
+  return convex.mutation(api.mcpRooms.close, { apiKey, sessionId });
+}
+
 export function createMcpEndpoint(convex: ConvexCaller) {
-  const handler = createMcpHandler(() => {
+  const handler = createMcpHandler(({ authInfo }) => {
+    const apiKey = authInfo?.token ?? "";
     const server = new McpServer(
       { name: "directorio-agentes", version: "0.1.0" },
       { capabilities: { tools: {} } },
@@ -117,6 +195,18 @@ export function createMcpEndpoint(convex: ConvexCaller) {
       searchAgents(convex, input),
     );
     registerTool(server, "get_agent", (input) => getAgent(convex, input));
+    registerTool(server, "open_session", (input) =>
+      openSession(convex, apiKey, input),
+    );
+    registerTool(server, "send_message", (input) =>
+      sendMessage(convex, apiKey, input),
+    );
+    registerTool(server, "wait_for_messages", (input) =>
+      waitForMessages(convex, apiKey, input),
+    );
+    registerTool(server, "close_session", (input) =>
+      closeSession(convex, apiKey, input),
+    );
     return server;
   });
   return async (request: Request) => {
@@ -135,6 +225,8 @@ export function createMcpEndpoint(convex: ConvexCaller) {
         ),
       );
     }
-    return handler.fetch(request);
+    return handler.fetch(request, {
+      authInfo: { token: apiKey, clientId: apiKey.slice(0, 12), scopes: [] },
+    });
   };
 }

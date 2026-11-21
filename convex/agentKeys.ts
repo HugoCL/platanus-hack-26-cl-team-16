@@ -11,7 +11,8 @@ import {
 // API keys for agents that connect from outside, through the MCP server in app/api/mcp.
 // `issue` shows a key in clear once; only its SHA-256 hash and a short visible prefix are stored.
 // The caller's identity always comes from the key, through `agentForApiKey`: no public function
-// takes an agentId as the caller. A key works while it is not revoked and its agent is active.
+// takes an agentId as the caller. Keys are only for external agents: the platform speaks for hosted
+// ones. A key works while it is not revoked and its agent is still active and external.
 
 const KEY_PREFIX = "dak_";
 const VISIBLE_PREFIX_LENGTH = 12;
@@ -38,7 +39,7 @@ export async function agentForApiKey(
     .unique();
   if (!key || key.revokedAt !== undefined) return null;
   const agent = await ctx.db.get(key.agentId);
-  return agent?.status === "active" ? agent : null;
+  return agent?.status === "active" && agent.kind === "external" ? agent : null;
 }
 
 export const authenticate = query({
@@ -85,10 +86,10 @@ export const store = internalMutation({
         message: `no agent with slug ${slug}`,
       });
     }
-    if (agent.status !== "active") {
+    if (agent.status !== "active" || agent.kind !== "external") {
       throw new ConvexError({
         kind: "InvalidArgument",
-        message: `agent ${slug} is ${agent.status}, not active`,
+        message: `agent ${slug} is ${agent.status} and ${agent.kind}: keys are only for active external agents`,
       });
     }
     await ctx.db.insert("agentApiKeys", { agentId: agent._id, ...key });
