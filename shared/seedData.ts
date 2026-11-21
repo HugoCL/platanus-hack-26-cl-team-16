@@ -227,6 +227,7 @@ const provider = (
 
 export const CLINIC_AGENT_SLUG = "clinica-providencia-agenda";
 export const CONSUMER_AGENT_SLUG = "mi-agente-juan";
+export const EXTERNAL_AGENT_SLUG = "asistente-externo-demo";
 
 export const SEED_AGENTS: SeedAgent[] = [
   provider(
@@ -498,6 +499,22 @@ export const SEED_AGENTS: SeedAgent[] = [
       kind: "hosted",
       status: "active",
       verified: true,
+    },
+  },
+  {
+    card: {
+      slug: EXTERNAL_AGENT_SLUG,
+      name: "Asistente externo (demo)",
+      description:
+        "Asistente de ejemplo que vive fuera de la plataforma y se conecta por MCP.",
+      purpose:
+        "Buscar proveedores y negociar reservas o pedidos en nombre de su usuario.",
+      categories: ["asistente_personal"],
+      capabilities: [],
+      scope: scope(["rut", "nombre_paciente", "telefono", "nombre"], [], []),
+      kind: "external",
+      status: "active",
+      verified: false,
     },
   },
   {
