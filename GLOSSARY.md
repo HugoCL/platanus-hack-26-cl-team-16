@@ -2,7 +2,7 @@
 
 Every agent session uses these terms. **Language rule:** code, identifiers, and file and folder names are in English; UI copy is in Spanish. New code and docs use the canonical English term in the first column; Spanish appears only in UI copy (the "UI (es)" column).
 
-Everything here comes from the source: `shared/*.ts`, `convex/schema.ts`, `convex/*.ts`, `docs/architecture.md`, `specs/*.md` and `src/components/room/*`. When a term changes in code, update this file in the same PR.
+Everything here comes from the source: `shared/*.ts`, `convex/schema.ts`, `convex/*.ts`, `docs/architecture.md` and `src/components/*`. When a term changes in code, update this file in the same PR.
 
 ## Room vs. session (decision by E4)
 
@@ -48,7 +48,7 @@ The canonical domain term is **room** (`sala` in UI copy). "Session" is the lega
 
 | Term (code) | UI (es) | Definition | Where in code |
 | --- | --- | --- | --- |
-| directory | directorio | Searchable index of agent cards by category, purpose and location. | `convex/directory.ts` (`search`, `searchText`, `get`, `categories`); page `/directorio` |
+| directory | directorio | Searchable index of agent cards by category, purpose and location. | `convex/directory.ts` (`search`, `searchText`, `get`, `categories`); page `/directory` |
 | agent | agente | An AI agent listed in the directory, stored as its card. | `agents` table |
 | agent card | ficha | An agent's public description: slug, name, purpose, categories, capabilities, scope, location, kind, endpoint, status, verified. | `AgentCard` in `shared/agent.ts`; `agents` table |
 | agent summary / agent detail | tarjeta de resultado / ficha del agente | Directory result shape / full card shape, both with `agentId` and optional `entityName`. | `AgentSummary`, `AgentDetail` in `shared/mcp.ts`; `DirectoryCard` in `convex/directory.ts` |

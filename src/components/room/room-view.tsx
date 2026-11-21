@@ -240,7 +240,7 @@ function DemoToolbar({
     <div className="flex flex-wrap items-center gap-3 border-b border-border bg-card px-4 py-2 text-xs">
       <span className="font-medium">Demo sin backend</span>
       <span className="text-subtle-foreground">
-        Datos del seed · el guion sigue specs/sala-moderada.md §11
+        Datos del seed · conversación guionada
       </span>
       <div className="ml-auto flex items-center gap-2">
         <Select

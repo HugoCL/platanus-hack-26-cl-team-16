@@ -1,7 +1,7 @@
 import type { SessionContract, SessionStatus } from "@/shared/session";
 import type { RoomMessage, RoomParticipant, Viewer } from "./room-format";
 
-// The scripted demo of specs/sala-moderada.md §11, on the seed's clinic and consumer agents.
+// A scripted booking between the seed's consumer and clinic agents.
 // Until E2 lands, the room runs on this fixture instead of Convex.
 
 export const DEMO_SESSION_ID = "demo-session";

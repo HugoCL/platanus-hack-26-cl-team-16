@@ -4,7 +4,7 @@ headless Chromium, add a number, then check the agent directory.
 
 Run with `pnpm smoke`. It asserts the page renders, clicks `data-testid="add-number"` and waits
 until the Convex-backed `data-testid="numbers"` list changes, so the Convex backend is exercised
-end to end. Then it opens /directorio and waits for one data-testid="agent-card" per seed
+end to end. Then it opens /directory and waits for one data-testid="agent-card" per seed
 card. It writes artifacts/smoke.png (also when the check fails) and the dev server log to
 artifacts/dev.log, and prints the end of that log on failure.
 
@@ -126,18 +126,18 @@ def listed_seed_cards():
 
 
 def directory(page):
-    """Open /directorio and wait until it lists every listed seed card, up to one page.
+    """Open /directory and wait until it lists every listed seed card, up to one page.
     Returns the number of cards shown."""
     from playwright.sync_api import expect
 
     expected = min(listed_seed_cards(), DIRECTORY_PAGE_SIZE)
 
-    page.goto(f"{URL}/directorio", wait_until="networkidle", timeout=120_000)
+    page.goto(f"{URL}/directory", wait_until="networkidle", timeout=120_000)
     cards = page.get_by_test_id("agent-card")
     try:
         expect(cards).to_have_count(expected, timeout=30_000)
     except AssertionError:
-        raise AssertionError(f"/directorio shows {cards.count()} cards, expected {expected}")
+        raise AssertionError(f"/directory shows {cards.count()} cards, expected {expected}")
     return cards.count()
 
 
@@ -170,8 +170,8 @@ def check():
         return 1
     print(
         f"PASS: {URL} rendered the template page and Convex stored a number"
-        f" ({before} -> {after} shown: {shown}), /directorio listed {listed} cards,"
-        " screenshot of /directorio at artifacts/smoke.png"
+        f" ({before} -> {after} shown: {shown}), /directory listed {listed} cards,"
+        " screenshot of /directory at artifacts/smoke.png"
     )
     return 0
 

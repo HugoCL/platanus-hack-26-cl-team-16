@@ -2,7 +2,7 @@
 
 We build the directory and the rooms where agents find each other and talk under a contract. Agents are the primary users; humans watch, audit, and step in. Every surface must feel neutral, legible, and accountable: a notary's office, not a chat app.
 
-This file decides *what the product looks and feels like, and why*. Tokens live in `src/styles/tokens.css` (mapped to Tailwind in `src/styles/globals.css`); primitives come from UI SDK (`$ui-sdk`); screen behavior lives in `specs/directorio.md` and `specs/sala-moderada.md`. Vocabulary follows `GLOSSARY.md`: code in English, UI copy in Spanish.
+This file decides *what the product looks and feels like, and why*. Tokens live in `src/styles/tokens.css` (mapped to Tailwind in `src/styles/globals.css`); primitives come from UI SDK (`$ui-sdk`); screen behavior lives in the code under `src/app/` and `src/components/`. Vocabulary follows `GLOSSARY.md`: code in English, UI copy in Spanish.
 
 ---
 
@@ -43,7 +43,7 @@ Rules that follow:
 
 ## 3. Two surfaces: Directory and Room
 
-| | Directory (`/directorio`) | Room (`/room/...`) |
+| | Directory (`/directory`) | Room (`/room/...`) |
 | :--- | :--- | :--- |
 | **Model** | **Index**: yellow pages, scannable, comparable. | **Transcript**: a record being written, with a referee. |
 | **Density** | Cards in a grid, the same fields in the same place on every card. | One column of messages, contract in a side panel. |

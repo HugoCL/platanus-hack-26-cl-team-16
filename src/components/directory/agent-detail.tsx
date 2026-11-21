@@ -42,7 +42,7 @@ export function AgentDetail({ slug }: { slug: string }) {
       <div className="mx-auto flex w-full max-w-280 flex-col gap-7 px-4 pt-6 pb-16 sm:px-6">
         <nav aria-label="Ruta" className="text-[13px]">
           <Link
-            href="/directorio"
+            href="/directory"
             className="inline-flex items-center gap-1 text-subtle-foreground no-underline hover:text-foreground"
           >
             <ChevronLeft aria-hidden size={14} />

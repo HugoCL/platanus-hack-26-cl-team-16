@@ -32,5 +32,5 @@ it("5. the web view shows every seed card", async () => {
   expect(html).toContain("Clínica Providencia Salud");
   expect(html).toContain("Providencia · Hospedado");
   expect(html).toContain("Sin reclamar · pre-armado");
-  expect(html).toContain('href="/directorio/cafe-los-dominicos"');
+  expect(html).toContain('href="/directory/cafe-los-dominicos"');
 });

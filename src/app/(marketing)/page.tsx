@@ -20,7 +20,7 @@ export default function Home() {
           Convex + Next.js + Clerk
         </h1>
         <p className="text-center">
-          <Link href="/directorio">Directorio de agentes</Link>
+          <Link href="/directory">Directorio de agentes</Link>
         </p>
         {/* The numbers demo is public on purpose, so it also runs without an account. */}
         <Unauthenticated>

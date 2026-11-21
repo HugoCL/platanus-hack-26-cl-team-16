@@ -14,7 +14,7 @@ If a schema change is rejected because your local data no longer matches it, sto
 
 ## Agent directory (E1)
 
-The directory lives in `convex/directory.ts` and the page at http://localhost:3000/directorio. Other code calls these functions:
+The directory lives in `convex/directory.ts` and the page at http://localhost:3000/directory. Other code calls these functions:
 
 | Function | Kind | What it does |
 | --- | --- | --- |
@@ -41,7 +41,7 @@ This runs Vitest offline, with no network and no credentials. `tests/setup.ts` r
 - the room demo UI's formatting helpers (`src/components/room/room-format.ts`),
 - `seed:ensure` against an in-memory Convex (convex-test): every seeded agent is a valid card.
 
-`pnpm smoke` is separate. It starts `pnpm dev`, drives the home page in Chromium, and checks that `/directorio` lists the seed cards.
+`pnpm smoke` is separate. It starts `pnpm dev`, drives the home page in Chromium, and checks that `/directory` lists the seed cards.
 
 ## Configuration
 

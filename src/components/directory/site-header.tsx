@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 const NAV = [
-  { href: "/directorio", label: "Directorio", key: "directory" },
+  { href: "/directory", label: "Directorio", key: "directory" },
   { href: "/room/demo", label: "Sesiones", key: "rooms" },
 ] as const;
 
@@ -13,7 +13,7 @@ export function SiteHeader({
   return (
     <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-border px-4 py-3 sm:px-6">
       <Link
-        href="/directorio"
+        href="/directory"
         className="font-display text-2xl leading-none font-extrabold italic tracking-tight text-foreground no-underline"
       >
         [nombre].

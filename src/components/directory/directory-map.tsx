@@ -218,7 +218,7 @@ export function DirectoryMap({
                   {selected.purpose}
                 </span>
                 <Link
-                  href={`/directorio/${selected.slug}`}
+                  href={`/directory/${selected.slug}`}
                   className="inline-flex h-8 items-center self-start rounded-full border border-input px-3 text-[13px] font-medium text-foreground no-underline hover:bg-muted"
                 >
                   Ver ficha

@@ -64,7 +64,7 @@ function AgentResult({
   const prospect = isProspect(card);
   const Icon = categoryIcon(card.categories, categories);
   const intents = card.allowedIntents;
-  const href = `/directorio/${card.slug}`;
+  const href = `/directory/${card.slug}`;
   const meta = [
     card.comuna,
     distance === undefined ? undefined : formatKm(distance),
