@@ -19,26 +19,24 @@
     oklch(0.8 0.008 56)
   );
   --landing-line: var(--ui-border);
+  /* Wall colors at full strength: the spotlight mask dims them to ~40% away from the pointer. */
   --landing-wall-text: light-dark(
-    oklch(0.13 0.004 49 / 0.17),
-    oklch(1 0 0 / 0.11)
+    oklch(0.13 0.004 49 / 0.42),
+    oklch(1 0 0 / 0.28)
   );
   --landing-wall-bright: light-dark(
-    oklch(0.13 0.004 49 / 0.45),
-    oklch(1 0 0 / 0.32)
+    oklch(0.13 0.004 49 / 0.95),
+    oklch(1 0 0 / 0.8)
   );
   --landing-wall-rule: light-dark(
-    oklch(0.13 0.004 49 / 0.08),
-    oklch(1 0 0 / 0.06)
+    oklch(0.13 0.004 49 / 0.2),
+    oklch(1 0 0 / 0.15)
   );
   --landing-wall-mark-bg: light-dark(
-    color-mix(in oklch, var(--brand-yellow) 70%, transparent),
-    color-mix(in oklch, var(--brand-yellow) 16%, transparent)
+    var(--brand-yellow),
+    color-mix(in oklch, var(--brand-yellow) 40%, transparent)
   );
-  --landing-wall-mark-fg: light-dark(
-    oklch(0.13 0.004 49 / 0.75),
-    color-mix(in oklch, var(--brand-yellow) 85%, transparent)
-  );
+  --landing-wall-mark-fg: light-dark(var(--brand-ink), var(--brand-yellow));
   --landing-pad: clamp(1.25rem, 6vw, 6rem);
   --landing-ease-out: var(--ease-out);
   display: flex;
@@ -100,25 +98,63 @@
  * The wall is one canvas (listing-wall.tsx) under the hero. It fades in once drawn and fades out
  * at the top and bottom edges, so the header and the trust row sit on clean background.
  */
-.landing-wall {
+.landing-spotlight {
+  --x: 72%;
+  --y: 38%;
   position: absolute;
   inset: 0;
   z-index: -2;
-  width: 100%;
+  overflow: hidden;
+  mask-image:
+    radial-gradient(
+      circle 16rem at var(--x) var(--y),
+      black,
+      rgb(0 0 0 / 0.4) 100%
+    ),
+    linear-gradient(to bottom, transparent, black 10%, black 78%, transparent);
+  mask-composite: intersect;
+
+  @media (max-width: 40rem) {
+    --x: 90%;
+    --y: 10%;
+  }
+}
+
+.landing-wall {
+  display: flex;
   height: 100%;
+  padding-inline-start: 2px;
   opacity: 0;
   transition: opacity 600ms var(--landing-ease-out);
-  mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    black 10%,
-    black 78%,
-    transparent
-  );
 
   &[data-ready] {
     opacity: 1;
   }
+}
+
+/* Each track shows its column twice and slides by one copy, so the loop is seamless. */
+@keyframes landing-scroll {
+  to {
+    transform: translateY(-50%);
+  }
+}
+
+.landing-track {
+  flex: none;
+  animation: landing-scroll 140s linear infinite;
+  will-change: transform;
+
+  &[data-direction="down"] {
+    animation-direction: reverse;
+  }
+
+  & img {
+    display: block;
+  }
+}
+
+.landing-spotlight[data-paused] .landing-track {
+  animation-play-state: paused;
 }
 
 /*
@@ -733,6 +769,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .landing-track {
+    animation: none;
+  }
+
   .landing-cta:hover span + span {
     transform: none;
   }

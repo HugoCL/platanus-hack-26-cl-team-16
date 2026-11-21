@@ -6,6 +6,7 @@ import { RevealWords, revealAt } from "@/components/landing/reveal";
 import { RoomSection } from "@/components/landing/room-section";
 import { ScrollReveal } from "@/components/landing/scroll-reveal";
 import { SectionScroll } from "@/components/landing/section-scroll";
+import { Spotlight } from "@/components/landing/spotlight";
 import { SiteFooter } from "@/components/site-footer";
 
 const AGENTS = ["Claude", "ChatGPT", "Grok", "Gemini"];
@@ -16,7 +17,9 @@ export default function Home() {
       <SiteHeader nav={false} themeToggle={false} />
       <main>
         <section className="landing-main">
-          <ListingWall />
+          <Spotlight>
+            <ListingWall />
+          </Spotlight>
           <div className="landing-glow" aria-hidden />
           <div className="landing-hero">
             <ul className="landing-badges" {...revealAt(0)}>
