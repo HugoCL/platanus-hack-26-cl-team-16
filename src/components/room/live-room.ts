@@ -1,0 +1,71 @@
+import type { Session } from "@/shared/session";
+import type { GenUiAnswer } from "./genui-block";
+import {
+  type RoomMessage,
+  type RoomParticipant,
+  responseTargetId,
+  type Viewer,
+} from "./room-format";
+
+export function mapLiveRoom(
+  session: Session,
+  names: { participantId: string; name: string; slug?: string }[],
+  humanParticipantId: string,
+) {
+  const nameOf = (id: string) =>
+    names.find((p) => p.participantId === id)?.name;
+  const initiator = session.participants.find(
+    (p) => p.kind === "agent" && p.role === "initiator",
+  );
+  const ownParticipantIds = [
+    humanParticipantId,
+    ...(initiator ? [initiator.participantId] : []),
+  ];
+  const participants: RoomParticipant[] = session.participants.map((p) => ({
+    participantId: p.participantId,
+    name:
+      nameOf(p.participantId) ??
+      (p.kind === "human" ? p.displayName : "Agente"),
+    kind: p.kind,
+    side: ownParticipantIds.includes(p.participantId) ? "self" : "other",
+    ...(p.kind === "human" &&
+    p.participantId === humanParticipantId &&
+    initiator
+      ? { onBehalfOf: nameOf(initiator.participantId) ?? "Agente" }
+      : {}),
+  }));
+  const viewer: Viewer = { role: "owner", ownParticipantIds };
+  return {
+    participants,
+    viewer,
+    contract: session.contract,
+    status: session.status,
+  };
+}
+
+export function liveAnswers(messages: RoomMessage[]) {
+  const answers: Record<string, GenUiAnswer> = {};
+  for (const m of messages) {
+    if (m.content.kind === "ui_response" && m.status === "allowed") {
+      answers[responseTargetId(m.content.response)] = {
+        response: m.content.response,
+        at: m.sentAt,
+      };
+    }
+  }
+  return answers;
+}
+
+export function sendError(error: unknown) {
+  const kind = (error as { data?: { kind?: string } } | null)?.data?.kind;
+  switch (kind) {
+    case "RateLimited":
+      return "RateLimited: Demasiados mensajes. Espera un momento.";
+    case "RoomClosed":
+      return "RoomClosed: La sala está cerrada.";
+    case "InvalidArgument":
+      return "InvalidArgument: Revisa el mensaje o la respuesta.";
+    default:
+      return "No se pudo completar la acción. Inténtalo de nuevo.";
+  }
+}
