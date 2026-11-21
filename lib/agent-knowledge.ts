@@ -7,7 +7,9 @@ export function decodeWebsiteBody(
   contentType?: string,
 ): string {
   const charset = /\bcharset\s*=\s*["']?\s*([^\s"';>]+)/i;
-  const head = new TextDecoder().decode(bytes.subarray(0, 4096));
+  const head = new TextDecoder()
+    .decode(bytes.subarray(0, 4096))
+    .replace(/<!--[\s\S]*?(?:-->|$)/g, "");
   const meta = head.match(/<meta\b[^>]*>/gi) ?? [];
   const label =
     contentType?.match(charset)?.[1] ??

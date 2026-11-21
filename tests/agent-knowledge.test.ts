@@ -9,6 +9,16 @@ import {
 
 describe("website knowledge", () => {
   it.each([
+    '<!-- <meta charset="iso-8859-1"> -->',
+    '<!-- <meta charset="iso-8859-1">',
+    '<!-- <meta charset="iso-8859-1"> --><meta charset="utf-8">',
+  ])("ignores commented charset declarations in %s", (prefix) => {
+    const html = `${prefix}<p>Información pública: café y piñón</p>`;
+    expect(decodeWebsiteBody(new TextEncoder().encode(html), "text/html")).toBe(
+      html,
+    );
+  });
+  it.each([
     ["text/html; charset=ISO-8859-1", ""],
     ["text/html; charset=windows-1252", ""],
     ["text/html", '<meta charset="iso-8859-1">'],
