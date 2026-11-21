@@ -8,10 +8,17 @@ export function Spotlight({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const element = ref.current;
     if (!element) return;
+    let frame = 0;
+    let point = { x: 0, y: 0 };
     const move = (event: PointerEvent) => {
-      const box = element.getBoundingClientRect();
-      element.style.setProperty("--x", `${event.clientX - box.left}px`);
-      element.style.setProperty("--y", `${event.clientY - box.top}px`);
+      point = { x: event.clientX, y: event.clientY };
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        const box = element.getBoundingClientRect();
+        element.style.setProperty("--x", `${point.x - box.left}px`);
+        element.style.setProperty("--y", `${point.y - box.top}px`);
+      });
     };
     const observer = new IntersectionObserver(([entry]) =>
       element.toggleAttribute("data-paused", !entry.isIntersecting),
@@ -21,6 +28,7 @@ export function Spotlight({ children }: { children: React.ReactNode }) {
     return () => {
       observer.disconnect();
       window.removeEventListener("pointermove", move);
+      cancelAnimationFrame(frame);
     };
   }, []);
 
