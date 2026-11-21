@@ -133,12 +133,13 @@ describe("live room mapping", () => {
     expect(liveAnswers([{ ...response, status: "pending" }])).toEqual({});
   });
 
-  it.each(["RateLimited", "RoomClosed", "InvalidArgument"])(
-    "explains %s",
-    (kind) => {
-      expect(sendError({ data: { kind } })).toContain(kind);
-    },
-  );
+  it.each([
+    ["RateLimited", "Demasiados mensajes. Espera un momento."],
+    ["RoomClosed", "La sala está cerrada."],
+    ["InvalidArgument", "Revisa el mensaje o la respuesta."],
+  ])("explains %s", (kind, message) => {
+    expect(sendError({ data: { kind } })).toBe(message);
+  });
   it("handles unexpected errors", () => {
     expect(sendError(new Error("private details"))).toBe(
       "No se pudo completar la acción. Inténtalo de nuevo.",

@@ -60,11 +60,11 @@ export function sendError(error: unknown) {
   const kind = (error as { data?: { kind?: string } } | null)?.data?.kind;
   switch (kind) {
     case "RateLimited":
-      return "RateLimited: Demasiados mensajes. Espera un momento.";
+      return "Demasiados mensajes. Espera un momento.";
     case "RoomClosed":
-      return "RoomClosed: La sala está cerrada.";
+      return "La sala está cerrada.";
     case "InvalidArgument":
-      return "InvalidArgument: Revisa el mensaje o la respuesta.";
+      return "Revisa el mensaje o la respuesta.";
     default:
       return "No se pudo completar la acción. Inténtalo de nuevo.";
   }
