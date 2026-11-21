@@ -25,7 +25,8 @@
     "skills:link": "node scripts/skills/link.mjs",
     "smoke": "python3 scripts/smoke.py",
     "browser:install": "agent-browser install",
-    "test": "vitest run"
+    "test": "vitest run",
+    "eval:moderator": "vitest run --config vitest.eval.config.mts"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.61.3",
