@@ -11,6 +11,13 @@ import {
   DialogTitle,
 } from "@ui-sdk/react/dialog";
 import {
+  Drawer,
+  DrawerBackdrop,
+  DrawerClose,
+  DrawerContent,
+  DrawerTitle,
+} from "@ui-sdk/react/drawer";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -23,6 +30,7 @@ import { Textarea } from "@ui-sdk/react/textarea";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
+  BotIcon,
   PanelRightIcon,
   ShieldCheckIcon,
   UserIcon,
@@ -47,8 +55,11 @@ import { ReasonList } from "./moderation";
 import {
   auditMetrics,
   dataFieldLabel,
+  formatLatency,
   formatLongDay,
+  formatScore,
   formatTime,
+  initials,
   intentLabel,
   REASON_LABELS,
   type RoomMessage,
@@ -149,6 +160,7 @@ export function RoomView({
 }) {
   const role = viewer.role;
   const [panelOpen, setPanelOpen] = useState(true);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [control, setControl] = useState(false);
   const [auditFor, setAuditFor] = useState<string | null>(null);
   const [highlighted, setHighlighted] = useState<string | null>(null);
@@ -174,6 +186,7 @@ export function RoomView({
   const canControl = role !== "observer";
 
   function jumpTo(messageId: string) {
+    setSheetOpen(false);
     document
       .getElementById(`msg-${messageId}`)
       ?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -182,6 +195,16 @@ export function RoomView({
   }
 
   const auditMessage = messages.find((m) => m.messageId === auditFor);
+
+  const sidePanel = contract ? (
+    <SidePanel
+      contract={contract}
+      messages={messages}
+      participants={people}
+      role={role}
+      onJump={jumpTo}
+    />
+  ) : null;
 
   return (
     <div className="flex h-dvh flex-col bg-background">
@@ -204,7 +227,11 @@ export function RoomView({
               status={status}
               violations={violations}
               panelOpen={panelOpen}
-              onTogglePanel={() => setPanelOpen((o) => !o)}
+              onTogglePanel={() => {
+                if (window.matchMedia("(min-width: 64rem)").matches)
+                  setPanelOpen((o) => !o);
+                else setSheetOpen(true);
+              }}
             />
           ) : (
             <p className="px-4">
@@ -230,6 +257,11 @@ export function RoomView({
                   {newDay ? <DayDivider label={day} /> : null}
                   <MessageItem
                     message={message}
+                    continued={
+                      !newDay &&
+                      message.senderParticipantId !== null &&
+                      prev?.senderParticipantId === message.senderParticipantId
+                    }
                     sender={
                       message.senderParticipantId
                         ? participants.get(message.senderParticipantId)
@@ -276,17 +308,22 @@ export function RoomView({
             aria-label="Contrato y auditoría"
             className="hidden w-[340px] shrink-0 flex-col overflow-y-auto lg:flex"
           >
-            <SidePanel
-              contract={contract}
-              otherName={other?.name ?? "el proveedor"}
-              messages={messages}
-              participants={people}
-              role={role}
-              onJump={jumpTo}
-            />
+            {sidePanel}
           </aside>
         ) : null}
       </div>
+      <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
+        <DrawerBackdrop />
+        <DrawerContent className="max-h-[85dvh] overflow-y-auto">
+          <div className="flex items-center justify-between gap-2 px-4 pt-3">
+            <DrawerTitle className="font-medium text-sm">
+              Contrato y auditoría
+            </DrawerTitle>
+            <DrawerClose data-size="sm">Cerrar</DrawerClose>
+          </div>
+          {sidePanel}
+        </DrawerContent>
+      </Drawer>
       <Dialog
         open={auditFor !== null}
         onOpenChange={(open) => {
@@ -298,7 +335,7 @@ export function RoomView({
           <DialogTitle>Auditoría del mensaje</DialogTitle>
           <DialogDescription>
             {auditMessage
-              ? `${participants.get(auditMessage.senderParticipantId ?? "")?.name ?? "Sistema"} · ${formatTime(auditMessage.sentAt)} · ${auditMessage.audit?.model ?? MODERATOR_MODEL} · ${auditMessage.audit?.latencyMs ?? "—"} ms`
+              ? `${participants.get(auditMessage.senderParticipantId ?? "")?.name ?? "Sistema"} · ${formatTime(auditMessage.sentAt)} · ${auditMessage.audit?.model ?? MODERATOR_MODEL} · ${auditMessage.audit ? formatLatency(auditMessage.audit.latencyMs) : "—"}`
               : null}
           </DialogDescription>
           {auditMessage?.reasons?.length ? (
@@ -328,7 +365,7 @@ function DemoToolbar({
       <span className="hidden opacity-80 sm:inline">
         Sin backend: datos del seed y una conversación guionada
       </span>
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
         <Select
           value={role}
           onValueChange={(value) => {
@@ -363,12 +400,7 @@ function Avatar({
   participant?: RoomParticipant;
   size?: number;
 }) {
-  const initials = (participant?.name ?? "?")
-    .split(/\s+/)
-    .filter((w) => /^[A-ZÁÉÍÓÚÑ]/.test(w))
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join("");
+  const letters = initials(participant?.name ?? "");
   return (
     <span
       aria-hidden="true"
@@ -379,7 +411,11 @@ function Avatar({
           : "bg-muted text-foreground"
       }`}
     >
-      {participant?.kind === "human" ? <UserIcon size={14} /> : initials}
+      {participant?.kind === "human" ? (
+        <UserIcon size={14} />
+      ) : (
+        letters || <BotIcon size={14} />
+      )}
     </span>
   );
 }
@@ -476,7 +512,9 @@ function SessionHeader({
         </span>
         <div className="flex min-w-0 flex-col gap-0.5">
           <h1 className="m-0 flex min-w-0 items-center gap-1 text-lg leading-tight font-semibold tracking-tight">
-            <span className="truncate">{other?.name}</span>
+            <span className="truncate" title={other?.name}>
+              {other?.name}
+            </span>
             {other?.verified && <VerifiedBadge />}
           </h1>
           <p className="m-0 truncate text-sm text-subtle-foreground">
@@ -488,7 +526,7 @@ function SessionHeader({
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-5 text-xs">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
         <span
           data-testid="session-status"
           className="inline-flex items-center gap-1.5 font-medium"
@@ -503,7 +541,7 @@ function SessionHeader({
           data-testid="violations"
           className="inline-flex items-center gap-2 text-subtle-foreground"
         >
-          Violaciones
+          <span className="max-sm:sr-only">Violaciones</span>
           <span aria-hidden="true" className="flex gap-0.5">
             {segments.map((segment) => (
               <span
@@ -519,15 +557,25 @@ function SessionHeader({
         <Button
           data-size="sm"
           data-variant="ghost"
-          aria-label={panelOpen ? "Ocultar contrato" : "Mostrar contrato"}
-          aria-pressed={panelOpen}
+          aria-label="Contrato y auditoría"
+          aria-expanded={panelOpen}
           className="hidden lg:inline-flex"
           onClick={onTogglePanel}
         >
           <PanelRightIcon size={16} />
         </Button>
+        <Button
+          data-size="sm"
+          data-variant="ghost"
+          aria-label="Contrato y auditoría"
+          aria-haspopup="dialog"
+          className="lg:hidden"
+          onClick={onTogglePanel}
+        >
+          <PanelRightIcon size={16} />
+        </Button>
+        <ThemeToggle variant="icon" />
       </div>
-      <ThemeToggle variant="icon" />
     </header>
   );
 }
@@ -761,14 +809,12 @@ function Composer({
 
 function SidePanel({
   contract,
-  otherName,
   messages,
   participants,
   role,
   onJump,
 }: {
   contract: SessionContract;
-  otherName: string;
   messages: RoomMessage[];
   participants: RoomParticipant[];
   role: Viewer["role"];
@@ -782,7 +828,7 @@ function SidePanel({
         <TabsTab value="participantes">Participantes</TabsTab>
       </TabsList>
       <TabsPanel value="contrato">
-        <ContractView contract={contract} otherName={otherName} />
+        <ContractView contract={contract} />
       </TabsPanel>
       <TabsPanel value="auditoria">
         <AuditView messages={messages} onJump={onJump} />
@@ -828,9 +874,9 @@ function Terms({
       {items.map((item) => (
         <li
           key={item.code ?? item.label}
-          className="flex items-baseline justify-between gap-3 py-1"
+          className="flex flex-wrap items-baseline justify-between gap-x-3 py-1"
         >
-          <span className="flex items-center gap-2">
+          <span className="flex min-w-0 items-center gap-2">
             {marker ? (
               <span
                 aria-hidden="true"
@@ -840,7 +886,7 @@ function Terms({
             {item.label}
           </span>
           {item.code ? (
-            <code className="font-mono text-xs text-subtle-foreground">
+            <code className="min-w-0 font-mono text-xs break-all text-subtle-foreground">
               {item.code}
             </code>
           ) : null}
@@ -850,14 +896,7 @@ function Terms({
   );
 }
 
-function ContractView({
-  contract,
-  otherName,
-}: {
-  contract: SessionContract;
-  otherName: string;
-}) {
-  const short = otherName.replace(/^Agendamiento\s+/, "la ");
+function ContractView({ contract }: { contract: SessionContract }) {
   const fields = (codes: string[]) =>
     codes.map((code) => ({ label: dataFieldLabel(code), code }));
   return (
@@ -890,10 +929,10 @@ function ContractView({
           items={contract.forbiddenTopics.map((label) => ({ label }))}
         />
       </Section>
-      <Section title={`Qué comparte ${short}`}>
+      <Section title="Qué comparte el proveedor">
         <Terms items={fields(contract.recipientShares)} />
       </Section>
-      <Section title={`Qué pide ${short}`}>
+      <Section title="Qué pide el proveedor">
         <Terms items={fields(contract.recipientRequests)} />
       </Section>
       <Section title="Máximo de violaciones">
@@ -933,7 +972,7 @@ function AuditView({
             "Latencia media",
             metrics.averageLatencyMs === null
               ? "—"
-              : `${metrics.averageLatencyMs} ms`,
+              : formatLatency(metrics.averageLatencyMs),
           ],
         ].map(([label, value]) => (
           <div key={label} className="flex flex-col px-3 py-2.5 first:pl-0">
@@ -972,7 +1011,7 @@ function AuditView({
                   {AUDIT_ACTION[m.status]} · {formatTime(m.sentAt)}
                 </span>
                 <span className="font-mono tabular-nums text-subtle-foreground">
-                  {m.audit?.latencyMs ?? "—"} ms
+                  {m.audit ? formatLatency(m.audit.latencyMs) : "—"}
                 </span>
               </span>
               {m.reasons?.length ? (
@@ -980,7 +1019,7 @@ function AuditView({
                   {m.reasons
                     .map(
                       (r) =>
-                        `${r.code}${r.score !== undefined ? ` ${r.score.toFixed(2)}` : ""}`,
+                        `${r.code}${r.score !== undefined ? ` ${formatScore(r.score)}` : ""}`,
                     )
                     .join(" · ")}
                 </span>
