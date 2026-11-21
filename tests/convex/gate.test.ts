@@ -505,3 +505,142 @@ describe("long rooms", () => {
     expect(all.at(-1)).toEqual(sent);
   });
 });
+
+describe("UI responses", () => {
+  const picker = {
+    kind: "ui",
+    spec: {
+      type: "slot_picker",
+      id: "horarios",
+      title: "Elige un horario",
+      timezone: "America/Santiago",
+      slots: [
+        {
+          id: "lunes-0900",
+          start: "2026-11-24T09:00:00-03:00",
+          end: "2026-11-24T09:30:00-03:00",
+        },
+      ],
+    },
+  };
+  const choose = (inReplyTo: string) => ({
+    kind: "ui_response",
+    inReplyTo,
+    response: {
+      type: "slot_selected",
+      pickerId: "horarios",
+      slotId: "lunes-0900",
+    },
+  });
+
+  it("accepts a reply to a picker sent to the sender and shows it to the moderator", async () => {
+    const sent = await send(room.provider, room.human, picker);
+    const moderate = vi.spyOn(rules, "checkRules");
+    const reply = await send(room.human, room.provider, choose(sent.messageId));
+    expect(reply.status).toBe("allowed");
+    expect(moderate.mock.calls[0][0].history.map((m) => m.messageId)).toContain(
+      sent.messageId,
+    );
+  });
+
+  it("shows the picker to the moderator when it left the history window", async () => {
+    const sent = await send(room.provider, room.human, picker);
+    await rooms.t.run(async (ctx) => {
+      for (let i = 0; i < 500; i++) {
+        await ctx.db.insert("messages", {
+          sessionId: room.sessionId,
+          senderParticipantId: room.consumer,
+          recipient: room.provider,
+          content: { kind: "text", text: `relleno ${i}` },
+          moderation: { status: "allowed", reasons: [] },
+        });
+      }
+    });
+    const moderate = vi.spyOn(rules, "checkRules");
+    await send(room.human, room.provider, choose(sent.messageId));
+    expect(moderate.mock.calls[0][0].history.map((m) => m.messageId)).toContain(
+      sent.messageId,
+    );
+  });
+
+  it("rejects a reply to a message that does not exist", async () => {
+    expect(
+      await errorKind(send(room.human, room.provider, choose("no-existe"))),
+    ).toBe("InvalidArgument");
+  });
+
+  it("rejects a reply to a picker from another room", async () => {
+    const other = await roomWithHuman(rooms);
+    const sent = await rooms.t.action(internal.gate.sendAsParticipant, {
+      sessionId: other.sessionId,
+      senderParticipantId: other.provider,
+      recipient: other.human,
+      content: picker as never,
+    });
+    expect(
+      await errorKind(send(room.human, room.provider, choose(sent.messageId))),
+    ).toBe("InvalidArgument");
+  });
+
+  it("rejects a reply to a picker sent to someone else", async () => {
+    const sent = await send(room.provider, room.consumer, picker);
+    expect(
+      await errorKind(send(room.human, room.provider, choose(sent.messageId))),
+    ).toBe("InvalidArgument");
+  });
+
+  it("rejects a reply to a text message", async () => {
+    const sent = await send(room.provider, room.human, text("Hola"));
+    expect(
+      await errorKind(send(room.human, room.provider, choose(sent.messageId))),
+    ).toBe("InvalidArgument");
+  });
+
+  it("rejects a reply to a blocked picker", async () => {
+    rooms.judge.mockReturnValueOnce({
+      decision: "block",
+      rule: "scope",
+      reason: "x",
+    });
+    const sent = await send(room.provider, room.human, picker);
+    expect(sent.status).toBe("blocked");
+    expect(
+      await errorKind(send(room.human, room.provider, choose(sent.messageId))),
+    ).toBe("InvalidArgument");
+  });
+});
+
+describe("participants who left", () => {
+  it("rejects a message from a participant who left the room", async () => {
+    await rooms.t.run((ctx) =>
+      ctx.db.patch(room.human, { leftAt: Date.now() }),
+    );
+    expect(await errorKind(send(room.human, room.provider, text("Hola")))).toBe(
+      "NotParticipant",
+    );
+  });
+});
+
+describe("redacted messages", () => {
+  it("delivers the redacted text instead of the original body", async () => {
+    await rooms.t.run((ctx) =>
+      ctx.db.insert("messages", {
+        sessionId: room.sessionId,
+        senderParticipantId: room.consumer,
+        recipient: room.provider,
+        content: { kind: "text", text: "Mi RUT es 12.345.678-9" },
+        moderation: {
+          status: "redacted",
+          redactedText: "Mi RUT es [retirado]",
+          reasons: [],
+        },
+      }),
+    );
+    for (const viewer of [room.consumer, room.provider, room.human]) {
+      expect((await history(viewer)).at(-1)?.content).toEqual({
+        kind: "text",
+        text: "Mi RUT es [retirado]",
+      });
+    }
+  });
+});

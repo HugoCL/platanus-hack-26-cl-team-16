@@ -94,6 +94,7 @@ export async function sendThroughGate(
     sessionId: args.sessionId,
     senderParticipantId: args.senderParticipantId,
     recipient: args.recipient,
+    inReplyTo: content.kind === "ui_response" ? content.inReplyTo : undefined,
   });
 
   const outcome = await moderate({
@@ -120,6 +121,7 @@ export const moderationContext = internalQuery({
     sessionId: v.id("sessions"),
     senderParticipantId: v.id("participants"),
     recipient: recipientValidator,
+    inReplyTo: v.optional(v.string()),
   },
   handler: async (
     ctx,
@@ -130,12 +132,19 @@ export const moderationContext = internalQuery({
     participants: Participant[];
     history: Message[];
   }> => {
-    const { session, sender } = await checkSend(ctx, args);
+    const { session, sender, replyTarget } = await checkSend(ctx, args);
+    const history = await recentMessages(ctx, args.sessionId);
+    if (
+      replyTarget &&
+      !history.some((m) => m.messageId === replyTarget.messageId)
+    ) {
+      history.unshift(replyTarget);
+    }
     return {
       contract: session.contract,
       sender,
       participants: session.participants,
-      history: await recentMessages(ctx, args.sessionId),
+      history,
     };
   },
 });
@@ -158,7 +167,13 @@ export const commit = internalMutation({
     events: v.array(eventValidator),
   },
   handler: async (ctx, args): Promise<Message> => {
-    const { session, sender } = await checkSend(ctx, args);
+    const { session, sender } = await checkSend(ctx, {
+      ...args,
+      inReplyTo:
+        args.content.kind === "ui_response"
+          ? args.content.inReplyTo
+          : undefined,
+    });
     const agentTurn = sender.kind === "agent";
     const turnCount = session.turnCount + (agentTurn ? 1 : 0);
     const exhausted = turnCount >= session.contract.maxTurns;
@@ -461,6 +476,7 @@ async function checkSend(
     sessionId: Id<"sessions">;
     senderParticipantId: Id<"participants">;
     recipient: Doc<"messages">["recipient"];
+    inReplyTo?: string;
   },
 ) {
   const session = await loadSession(ctx, args.sessionId);
@@ -491,5 +507,36 @@ async function checkSend(
       gateError("InvalidArgument", "the recipient is not in this room");
     }
   }
-  return { session: { ...session, contract: session.contract }, sender };
+  return {
+    session: { ...session, contract: session.contract },
+    sender,
+    replyTarget:
+      args.inReplyTo === undefined
+        ? null
+        : await replyTarget(ctx, args.sessionId, sender, args.inReplyTo),
+  };
+}
+
+async function replyTarget(
+  ctx: QueryCtx,
+  sessionId: Id<"sessions">,
+  sender: Participant,
+  inReplyTo: string,
+): Promise<Message> {
+  const id = ctx.db.normalizeId("messages", inReplyTo);
+  const target = id ? await ctx.db.get(id) : null;
+  if (
+    !target ||
+    target.sessionId !== sessionId ||
+    target.content.kind !== "ui" ||
+    (target.moderation.status !== "allowed" &&
+      target.moderation.status !== "redacted") ||
+    (target.recipient !== "all" && target.recipient !== sender.participantId)
+  ) {
+    gateError(
+      "InvalidArgument",
+      "inReplyTo must name a delivered UI block sent to the sender in this room",
+    );
+  }
+  return toMessage(target);
 }
