@@ -71,6 +71,8 @@ The line names a user-scoped `gstack` skill. This repo vendors the Capy wrapper 
 
 None are required to run the template. VMs stay on their local Convex deployment (`pnpm dev` runs it with no login). For real Clerk accounts, add these as Shared variables on the project's Environment variables page (never commit them): `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY`. Shared variables reach every machine in the project, reviews and snapshot builds included. Personal variables reach only threads you start, and thread variables reach only one running thread. A changed shared or personal value applies at the machine's next boot.
 
+The app's providers read these only when called, so none is needed to build, test or run `pnpm dev`: `AI_GATEWAY_API_KEY` (Vercel AI Gateway; the Anthropic key lives in the gateway), `FIRECRAWL_API_KEY`, and optionally `GOOGLE_PLACES_API_KEY` and `OVERPASS_URL`. Code that runs in Convex reads them from the deployment's environment, which a human sets with `npx convex env set`. See `docs/architecture.md` section 6.
+
 Do not add `CONVEX_DEPLOYMENT`, `NEXT_PUBLIC_CONVEX_URL` or `CLERK_JWT_ISSUER_DOMAIN`. They make every VM try to log in to Convex or point the page at the cloud deployment. `pnpm dev` also removes every Convex deployment variable (`CONVEX_DEPLOYMENT`, `CONVEX_SELF_HOSTED_*`) from the environment on purpose, unless a deploy key is set.
 
 `CONVEX_DEPLOY_KEY` (or its alias `CONVEX_DEPLOYMENT_TOKEN`) is an option if every thread must use a cloud dev deployment; `pnpm dev` refuses a production key. The trade-off: parallel threads then push to one shared dev deployment and overwrite each other. See `AGENTS.md` for the account switch.

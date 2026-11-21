@@ -22,6 +22,8 @@ Next.js 16 (App Router, Turbopack), Convex, Clerk, Tailwind 4, [UI SDK](https://
 
 Code lives in `app/` (UI), `components/`, and `convex/` (backend). Before touching `convex/`, read `convex/_generated/ai/guidelines.md`.
 
+Architecture (Spanish) and the contracts every track builds on: `docs/architecture.md`; the zod schemas in `shared/` are the source of truth for `convex/schema.ts`.
+
 ## UI: UI SDK primitives, your design system
 
 The UI uses [UI SDK](https://ui-sdk.dev) (Vercel): unstyled, accessible primitives built from behaviors (focus, keyboard, selection, popups, ARIA). There is no shadcn and no component kit. Each team's agents design the system on top of the primitives.
