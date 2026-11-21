@@ -1,0 +1,34 @@
+{
+  "$schema": "https://api.capy.ai/schemas/setup.v1.json",
+  "format_version": 1,
+  "scripts": {
+    "initialize": "set -e; case \"$(pnpm --version 2>/dev/null)\" in 11.*) ;; *) sudo npm install -g --force pnpm@11.22.0 ;; esac; pnpm install --frozen-lockfile; sudo apt-get update -qq; sudo apt-get install -y --no-install-recommends python3-venv libatomic1 unzip; python3 scripts/smoke.py --bootstrap-only --with-deps; if [ \"$(uname -m)\" = x86_64 ]; then pnpm exec agent-browser install --with-deps; else echo \"agent-browser: no Chrome for Testing build for $(uname -m) Linux, set AGENT_BROWSER_EXECUTABLE_PATH to Playwright Chromium\"; fi; mkdir -p \"$HOME/.local/bin\"; printf '#!/bin/sh\\nexec \"%s/node_modules/.bin/agent-browser\" \"$@\"\\n' \"$PWD\" > \"$HOME/.local/bin/agent-browser\"; chmod +x \"$HOME/.local/bin/agent-browser\"; G=\"$HOME/.local/share/gstack\"; if [ ! -x \"$G/bin/gstack-capy-install\" ]; then rm -rf \"$G\"; git clone --single-branch --depth 1 https://github.com/garrytan/gstack.git \"$G\"; fi; \"$G/bin/gstack-capy-install\" --require claude,codex,patch",
+    "refresh": "pnpm install --frozen-lockfile"
+  },
+  "timeouts": {
+    "initialize": 2400
+  },
+  "startup": [],
+  "commands": [
+    {
+      "name": "smoke",
+      "command": "pnpm smoke",
+      "icon": "task"
+    },
+    {
+      "name": "skills-check",
+      "command": "pnpm skills:check",
+      "icon": "task"
+    },
+    {
+      "name": "typecheck",
+      "command": "pnpm typecheck",
+      "icon": "task"
+    },
+    {
+      "name": "lint",
+      "command": "pnpm lint",
+      "icon": "search"
+    }
+  ]
+}

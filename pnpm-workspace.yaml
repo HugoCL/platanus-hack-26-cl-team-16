@@ -1,0 +1,35 @@
+# Build scripts allowed under strictDepBuilds. Each entry is a deliberate exception.
+allowBuilds:
+  esbuild: true
+  "@tailwindcss/oxide": true
+  # postinstall only prints a telemetry notice
+  "@clerk/shared": true
+  # postinstall links the platform-native binary instead of the Node shim
+  agent-browser: true
+
+# pnpm 11 defaults this on locally and off when CI is set. Pin it so a CI=1 shell
+# and a normal shell agree on node_modules (otherwise verifyDepsBeforeRun fails).
+enableGlobalVirtualStore: false
+
+# Supply-chain hardening, copied from the maintainer's global pnpm config so every clone gets it.
+# Fail the install when a dependency has an unreviewed build script.
+strictDepBuilds: true
+dangerouslyAllowAllBuilds: false
+# Refuse transitive dependencies that come from git or tarball URLs.
+blockExoticSubdeps: true
+# Only install releases that are at least 3 days old (minutes), and fail instead of falling back.
+minimumReleaseAge: 4320
+minimumReleaseAgeStrict: true
+minimumReleaseAgeIgnoreMissingTime: false
+# Fail when a package loses provenance or trusted publishing compared to an older release.
+trustPolicy: no-downgrade
+# Re-validate the lockfile instead of trusting it as is.
+trustLockfile: false
+# Fail a script when node_modules is out of date with the lockfile.
+verifyDepsBeforeRun: error
+# Verify the integrity of packages read from the store.
+verifyStoreIntegrity: true
+# Require valid TLS certificates for registry requests.
+strictSsl: true
+# Save exact versions instead of ^ ranges.
+saveExact: true

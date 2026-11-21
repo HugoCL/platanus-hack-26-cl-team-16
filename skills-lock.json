@@ -1,0 +1,998 @@
+{
+  "version": 2,
+  "skills": {
+    "agent-browser": {
+      "source": "vercel-labs/agent-browser",
+      "ref": "4605d82cfc20dbd051f57a631b5b7130e32141a5",
+      "commit": "4605d82cfc20dbd051f57a631b5b7130e32141a5",
+      "sourceType": "github",
+      "skillPath": "skills/agent-browser/SKILL.md",
+      "computedHash": "a0dfac7503f69bcf529b2660fc79964064c4f179eb65695904ddc45fc0d99d20",
+      "installMode": "copy"
+    },
+    "agent-desktop-linux": {
+      "source": "vercel-labs/agent-desktop",
+      "ref": "e8934a5e95e1d212c74ead95cd3e4701c04eca31",
+      "commit": "e8934a5e95e1d212c74ead95cd3e4701c04eca31",
+      "sourceType": "github",
+      "skillPath": "skills/agent-desktop-linux/SKILL.md",
+      "computedHash": "c0eba7e91c042942600e71edf69a19dfe9118ee5fb7f85baac6a19bf297295d6",
+      "installMode": "copy"
+    },
+    "agent-desktop-macos": {
+      "source": "vercel-labs/agent-desktop",
+      "ref": "e8934a5e95e1d212c74ead95cd3e4701c04eca31",
+      "commit": "e8934a5e95e1d212c74ead95cd3e4701c04eca31",
+      "sourceType": "github",
+      "skillPath": "skills/agent-desktop-macos/SKILL.md",
+      "computedHash": "9bd2089004e16bf109f1665ed5a5dcfb772d23c9a5d40eb59f14935c70259155",
+      "installMode": "copy"
+    },
+    "ai-sdk": {
+      "source": "vercel/ai",
+      "ref": "a8f0e9dc55d73f2237759abd263da6ae674de523",
+      "commit": "a8f0e9dc55d73f2237759abd263da6ae674de523",
+      "sourceType": "github",
+      "skillPath": "skills/ai-sdk/SKILL.md",
+      "computedHash": "59cd2dc82c5458f2819992fc3d27204ed16edfc9170870c6f8f04c44bac17772",
+      "installMode": "copy"
+    },
+    "architect": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/architect/SKILL.md",
+      "computedHash": "75d659d5af17927d4d01b95feb82e3f88f5c00cbcc7efb27ccf5b35f8d2a4f27",
+      "installMode": "copy"
+    },
+    "arena": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/arena/SKILL.md",
+      "computedHash": "63fe603dad8291d3d320cfa491a4cf7e1753903dbf599ca3146fcced96ce6ca0",
+      "installMode": "copy"
+    },
+    "automate-me": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/automate-me/SKILL.md",
+      "computedHash": "dffea8455f9aca1ba53b7f348c19965db953f5fe3793cc9a7e1c46f7aa45b973",
+      "installMode": "copy"
+    },
+    "babysit-pr": {
+      "source": "t3dotgg/tstack",
+      "ref": "11e37a74d0a6868c121cd0910ab2b3bd9873b92a",
+      "commit": "11e37a74d0a6868c121cd0910ab2b3bd9873b92a",
+      "sourceType": "github",
+      "skillPath": "skills/babysit-pr/SKILL.md",
+      "computedHash": "b6f349b95dbf4cce64cf61608b4ed9a98ce3725afe29676e6614efc8dccb5c29",
+      "installMode": "copy"
+    },
+    "benchmark-checklist": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/benchmark-checklist/SKILL.md",
+      "computedHash": "adc8a48e433402b97a9b6f9393496ee0c02ae437cfc1aba709411c56fd6fb778",
+      "installMode": "copy"
+    },
+    "blast-radius": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/blast-radius/SKILL.md",
+      "computedHash": "f9ec7353939c4449f2edb1cd195049f477b9ba6c0a869de75c7b440e27295f01",
+      "installMode": "copy"
+    },
+    "bro": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/bro/SKILL.md",
+      "computedHash": "f20a76d629ff552e85205507bcab051cc33667943f2c5bb5879b0475f26c7429",
+      "installMode": "copy"
+    },
+    "clerk": {
+      "source": "clerk/skills",
+      "ref": "78092a74297dac3fb2c64efab3dbe86b581eaea8",
+      "commit": "78092a74297dac3fb2c64efab3dbe86b581eaea8",
+      "sourceType": "github",
+      "skillPath": "skills/clerk/SKILL.md",
+      "computedHash": "c0323176ad5c969b0f0e2f94e28d1e01bb50e0527be6443f5ee3f7ed12ab3593",
+      "installMode": "copy"
+    },
+    "clerk-cli": {
+      "source": "clerk/skills",
+      "ref": "78092a74297dac3fb2c64efab3dbe86b581eaea8",
+      "commit": "78092a74297dac3fb2c64efab3dbe86b581eaea8",
+      "sourceType": "github",
+      "skillPath": "skills/clerk-cli/SKILL.md",
+      "computedHash": "07301cc5c51149319c570fe03190295ddf559adcde445316bc240c03ee3aaae2",
+      "installMode": "copy"
+    },
+    "clerk-nextjs-patterns": {
+      "source": "clerk/skills",
+      "ref": "78092a74297dac3fb2c64efab3dbe86b581eaea8",
+      "commit": "78092a74297dac3fb2c64efab3dbe86b581eaea8",
+      "sourceType": "github",
+      "skillPath": "skills/clerk-nextjs-patterns/SKILL.md",
+      "computedHash": "5775102acceae0b132c1818a51147623da645880aa27ee2d9e3aa2a6358af357",
+      "installMode": "copy"
+    },
+    "clerk-orgs": {
+      "source": "clerk/skills",
+      "ref": "78092a74297dac3fb2c64efab3dbe86b581eaea8",
+      "commit": "78092a74297dac3fb2c64efab3dbe86b581eaea8",
+      "sourceType": "github",
+      "skillPath": "skills/clerk-orgs/SKILL.md",
+      "computedHash": "a850fc9d7eae6d0a8d6e5f552604970991107ab514fbeed2195632bea7c3139c",
+      "installMode": "copy"
+    },
+    "clerk-setup": {
+      "source": "clerk/skills",
+      "ref": "78092a74297dac3fb2c64efab3dbe86b581eaea8",
+      "commit": "78092a74297dac3fb2c64efab3dbe86b581eaea8",
+      "sourceType": "github",
+      "skillPath": "skills/clerk-setup/SKILL.md",
+      "computedHash": "cd3941863d327bd9e7b577eb077606d66add94ea17737abcb08d55739f7027fe",
+      "installMode": "copy"
+    },
+    "clerk-testing": {
+      "source": "clerk/skills",
+      "ref": "78092a74297dac3fb2c64efab3dbe86b581eaea8",
+      "commit": "78092a74297dac3fb2c64efab3dbe86b581eaea8",
+      "sourceType": "github",
+      "skillPath": "skills/clerk-testing/SKILL.md",
+      "computedHash": "f1eb34182c114b18d16f66117f8ad0eba9a1ed3c226b984c6a82ff09c8c02fef",
+      "installMode": "copy"
+    },
+    "clerk-webhooks": {
+      "source": "clerk/skills",
+      "ref": "78092a74297dac3fb2c64efab3dbe86b581eaea8",
+      "commit": "78092a74297dac3fb2c64efab3dbe86b581eaea8",
+      "sourceType": "github",
+      "skillPath": "skills/clerk-webhooks/SKILL.md",
+      "computedHash": "b50cef6155462607f633da76c99f761a80eeae52819c6ba0b4ce0293561f165f",
+      "installMode": "copy"
+    },
+    "control-cli": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "cursor-team-kit/skills/control-cli/SKILL.md",
+      "computedHash": "5d995de261563ebd1686c6156bf8ec5009438c27c980384073017bdde4ae1b87",
+      "installMode": "copy"
+    },
+    "control-ui": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "cursor-team-kit/skills/control-ui/SKILL.md",
+      "computedHash": "6f0bd87953f7393fad7bf47889392fe2a10590394a2348bc168fc7d90b1da56a",
+      "installMode": "copy"
+    },
+    "convex": {
+      "source": "convex/agent-skills",
+      "ref": "b32286cad1672916953ece2692535f72013f55d2",
+      "commit": "b32286cad1672916953ece2692535f72013f55d2",
+      "sourceType": "github",
+      "skillPath": "skills/convex/SKILL.md",
+      "computedHash": "22939725331c04868bc7bb56e49623cf9ee5b2c59b805ee3a5633be8ee9a369a",
+      "installMode": "copy"
+    },
+    "convex-agent": {
+      "source": "convex/agent-skills",
+      "ref": "b32286cad1672916953ece2692535f72013f55d2",
+      "commit": "b32286cad1672916953ece2692535f72013f55d2",
+      "sourceType": "github",
+      "skillPath": "skills/convex-agent/SKILL.md",
+      "computedHash": "9feb0bb490256422125c6a50b820e51c7515e278af886c52884999e36a0c6d21",
+      "installMode": "copy"
+    },
+    "convex-authz": {
+      "source": "convex/agent-skills",
+      "ref": "b32286cad1672916953ece2692535f72013f55d2",
+      "commit": "b32286cad1672916953ece2692535f72013f55d2",
+      "sourceType": "github",
+      "skillPath": "skills/convex-authz/SKILL.md",
+      "computedHash": "3753d9ba8b771c0ef320f6af44b32cf1209f5205a732484b59d4515c02854f9c",
+      "installMode": "copy"
+    },
+    "convex-crons": {
+      "source": "convex/agent-skills",
+      "ref": "b32286cad1672916953ece2692535f72013f55d2",
+      "commit": "b32286cad1672916953ece2692535f72013f55d2",
+      "sourceType": "github",
+      "skillPath": "skills/convex-crons/SKILL.md",
+      "computedHash": "0a4db16137d7250bd2997fc607269f0e95c284d6307ddc80ea013e76f4436fbd",
+      "installMode": "copy"
+    },
+    "convex-deploy-guard": {
+      "source": "convex/agent-skills",
+      "ref": "b32286cad1672916953ece2692535f72013f55d2",
+      "commit": "b32286cad1672916953ece2692535f72013f55d2",
+      "sourceType": "github",
+      "skillPath": "skills/convex-deploy-guard/SKILL.md",
+      "computedHash": "cec9fc3bb4ad003b771d54b3c35ef2c5621cc60c5f88e6d54c4b11441653861e",
+      "installMode": "copy"
+    },
+    "convex-design": {
+      "source": "convex/agent-skills",
+      "ref": "b32286cad1672916953ece2692535f72013f55d2",
+      "commit": "b32286cad1672916953ece2692535f72013f55d2",
+      "sourceType": "github",
+      "skillPath": "skills/convex-design/SKILL.md",
+      "computedHash": "a66704a84f440c21c0eb5893d4c79da60d27f24ae0464d7dd809e141e20f22a5",
+      "installMode": "copy"
+    },
+    "convex-docs": {
+      "source": "convex/agent-skills",
+      "ref": "b32286cad1672916953ece2692535f72013f55d2",
+      "commit": "b32286cad1672916953ece2692535f72013f55d2",
+      "sourceType": "github",
+      "skillPath": "skills/convex-docs/SKILL.md",
+      "computedHash": "34e22f7f46deed8d80e68a95d98c45db710360267b4a0fa7187995894db431e6",
+      "installMode": "copy"
+    },
+    "convex-env": {
+      "source": "convex/agent-skills",
+      "ref": "b32286cad1672916953ece2692535f72013f55d2",
+      "commit": "b32286cad1672916953ece2692535f72013f55d2",
+      "sourceType": "github",
+      "skillPath": "skills/convex-env/SKILL.md",
+      "computedHash": "38a35aaf84d724934def32400ccbde8010cba8ac4ad716d0a9bbbf9e0cfb904d",
+      "installMode": "copy"
+    },
+    "convex-expert": {
+      "source": "convex/agent-skills",
+      "ref": "b32286cad1672916953ece2692535f72013f55d2",
+      "commit": "b32286cad1672916953ece2692535f72013f55d2",
+      "sourceType": "github",
+      "skillPath": "skills/convex-expert/SKILL.md",
+      "computedHash": "b99c28ca1bfa803b4889a1f390a41a7372a93a6a98d4e869ae1d2448f4a06133",
+      "installMode": "copy"
+    },
+    "convex-reviewer": {
+      "source": "convex/agent-skills",
+      "ref": "b32286cad1672916953ece2692535f72013f55d2",
+      "commit": "b32286cad1672916953ece2692535f72013f55d2",
+      "sourceType": "github",
+      "skillPath": "skills/convex-reviewer/SKILL.md",
+      "computedHash": "87bb20b72bc424876773f06fa11fd5f147396b472a7e49924deb003a15ede369",
+      "installMode": "copy"
+    },
+    "convex-seed": {
+      "source": "convex/agent-skills",
+      "ref": "b32286cad1672916953ece2692535f72013f55d2",
+      "commit": "b32286cad1672916953ece2692535f72013f55d2",
+      "sourceType": "github",
+      "skillPath": "skills/convex-seed/SKILL.md",
+      "computedHash": "d247f3d19f4c7e6dc844c4be42a012f36d3c030753aec14a264ad666077bc501",
+      "installMode": "copy"
+    },
+    "convex-test": {
+      "source": "convex/agent-skills",
+      "ref": "b32286cad1672916953ece2692535f72013f55d2",
+      "commit": "b32286cad1672916953ece2692535f72013f55d2",
+      "sourceType": "github",
+      "skillPath": "skills/convex-test/SKILL.md",
+      "computedHash": "5b627fefb022a06c8c5765c11556eff85fa00428d1b5b286fab77a512bc03136",
+      "installMode": "copy"
+    },
+    "convex-verify": {
+      "source": "convex/agent-skills",
+      "ref": "b32286cad1672916953ece2692535f72013f55d2",
+      "commit": "b32286cad1672916953ece2692535f72013f55d2",
+      "sourceType": "github",
+      "skillPath": "skills/convex-verify/SKILL.md",
+      "computedHash": "5bb7da26480ce5a94475c81b9ec85e6935757c959873ab62dc9a0a67f13d1b2a",
+      "installMode": "copy"
+    },
+    "correct": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/correct/SKILL.md",
+      "computedHash": "63f55b279f1298d3cabe91999063920cdc2a2f16a671cb8fbd87ddecc7fde216",
+      "installMode": "copy"
+    },
+    "council": {
+      "source": "t3dotgg/tstack",
+      "ref": "11e37a74d0a6868c121cd0910ab2b3bd9873b92a",
+      "commit": "11e37a74d0a6868c121cd0910ab2b3bd9873b92a",
+      "sourceType": "github",
+      "skillPath": "skills/council/SKILL.md",
+      "computedHash": "2b07ab25fa4a1bb07c70b89b8eaf4a5bb43c673faead94aa7f3e608e19577e4e",
+      "installMode": "copy"
+    },
+    "create-formal-verification-skill": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/create-formal-verification-skill/SKILL.md",
+      "computedHash": "24ff958480cc5852a2738b6dc49ad1709294fc566372c96c5101618ffb8b16cf",
+      "installMode": "copy"
+    },
+    "create-verification-skill": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/create-verification-skill/SKILL.md",
+      "computedHash": "31c6b5b22baa59f8963c21acef73ff225d557dc76b01465ea41abc870607c9de",
+      "installMode": "copy"
+    },
+    "deslop": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "cursor-team-kit/skills/deslop/SKILL.md",
+      "computedHash": "104e1041830c5ad58da3805289a77dbba4eee7dd96d4547b3eaeecbd761618d8",
+      "installMode": "copy"
+    },
+    "dispatching-parallel-agents": {
+      "source": "obra/superpowers",
+      "ref": "22f0b463e7a5e579904dd6211a520321035526f7",
+      "commit": "22f0b463e7a5e579904dd6211a520321035526f7",
+      "sourceType": "github",
+      "skillPath": "skills/dispatching-parallel-agents/SKILL.md",
+      "computedHash": "d799e464fdfb0edc80b3b7ad7cce03e64ee07fc5db231c988688a81438503659",
+      "installMode": "copy"
+    },
+    "figure-it-out": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/figure-it-out/SKILL.md",
+      "computedHash": "0dbfd568f36ab2a597878fcd38fd4c44565e640e994e8e654ba828b2eee5aec5",
+      "installMode": "copy"
+    },
+    "file-pr": {
+      "source": "t3dotgg/tstack",
+      "ref": "11e37a74d0a6868c121cd0910ab2b3bd9873b92a",
+      "commit": "11e37a74d0a6868c121cd0910ab2b3bd9873b92a",
+      "sourceType": "github",
+      "skillPath": "skills/file-pr/SKILL.md",
+      "computedHash": "9f4f1174623e51b7d4582d53c387459af71032aa0cba70470bd0bb2a85820443",
+      "installMode": "copy"
+    },
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "ref": "e4bb5d960d87126ff3b3a8af1a104b7db67560ba",
+      "commit": "e4bb5d960d87126ff3b3a8af1a104b7db67560ba",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "computedHash": "83485963700bcf11d5bf78118facb301676b69d918fee2e45a95e7f1a2840f6c",
+      "installMode": "copy"
+    },
+    "full-send": {
+      "source": "t3dotgg/tstack",
+      "ref": "11e37a74d0a6868c121cd0910ab2b3bd9873b92a",
+      "commit": "11e37a74d0a6868c121cd0910ab2b3bd9873b92a",
+      "sourceType": "github",
+      "skillPath": "skills/full-send/SKILL.md",
+      "computedHash": "dd66dd22c76558f50c722c26432e713468a68599fb0db0eb2d9e50bbebdbd3f8",
+      "installMode": "copy"
+    },
+    "full-stop": {
+      "source": "t3dotgg/tstack",
+      "ref": "11e37a74d0a6868c121cd0910ab2b3bd9873b92a",
+      "commit": "11e37a74d0a6868c121cd0910ab2b3bd9873b92a",
+      "sourceType": "github",
+      "skillPath": "skills/full-stop/SKILL.md",
+      "computedHash": "97cd08646e1f9bbb89bf18bf131982ee66df7834cce071bc5385e8fc4f5a60a9",
+      "installMode": "copy"
+    },
+    "gstack": {
+      "source": "garrytan/gstack",
+      "ref": "bd0428974aaf2caa89e878e593c6505b35ad82ab",
+      "commit": "bd0428974aaf2caa89e878e593c6505b35ad82ab",
+      "sourceType": "github",
+      "skillPath": "capy/skill/gstack/SKILL.md",
+      "computedHash": "b2514903745ac8abe111ec1267a8abd932dcbad9486348d1c1be0d5187aff2d0",
+      "installMode": "copy"
+    },
+    "how": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/how/SKILL.md",
+      "computedHash": "fab130770d271c14ca5d47504b2083f7ab2d1f5c25540310db9b58eff81cd997",
+      "installMode": "copy"
+    },
+    "in-your-own-words": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/in-your-own-words/SKILL.md",
+      "computedHash": "eaacabc9a2c7a1a674334a4e01e5900a6f7a764d405237ce17d4e4200cf528be",
+      "installMode": "copy"
+    },
+    "interrogate": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/interrogate/SKILL.md",
+      "computedHash": "fe59a688c7c4074c0c0550df1c336f39c944cc11807028128f3994b8603875c4",
+      "installMode": "copy"
+    },
+    "ketchup": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/ketchup/SKILL.md",
+      "computedHash": "f2f883bf6e1e1e9de3936d21faa3c64da9f8e9c103499f6dee8c3eb6d455083e",
+      "installMode": "copy"
+    },
+    "ketchup-video": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/ketchup-video/SKILL.md",
+      "computedHash": "2cf5134c32cd8dd4d76f4c69bc0fc2036254cd77f6de1b6ec440ce8653fdd6be",
+      "installMode": "copy"
+    },
+    "leaving-pr-comments": {
+      "source": "t3dotgg/tstack",
+      "ref": "11e37a74d0a6868c121cd0910ab2b3bd9873b92a",
+      "commit": "11e37a74d0a6868c121cd0910ab2b3bd9873b92a",
+      "sourceType": "github",
+      "skillPath": "skills/leaving-pr-comments/SKILL.md",
+      "computedHash": "aa96b3df788cf8125aa202ad54bebbd91878a0218eae94c8035536d7bda026a2",
+      "installMode": "copy"
+    },
+    "maintain-formal-verification-skill": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/maintain-formal-verification-skill/SKILL.md",
+      "computedHash": "c383b2f2322065c1c2b3adf9ae4532a846af1d5cedb49e3c6d1b8b2432e7910d",
+      "installMode": "copy"
+    },
+    "maintain-verification-skill": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/maintain-verification-skill/SKILL.md",
+      "computedHash": "faab042b93816a301022006190fea0bc74f3f0d531c679fcce51c34329f00ce3",
+      "installMode": "copy"
+    },
+    "make-bot-ui": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/make-bot-ui/SKILL.md",
+      "computedHash": "f2198d384fe57797192ed30cd3591d3882e4ba93cb0415847d89826a95f88a11",
+      "installMode": "copy"
+    },
+    "make-pr-easy-to-review": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "cursor-team-kit/skills/make-pr-easy-to-review/SKILL.md",
+      "computedHash": "192b5123bc85091be3c195a53e4c9bacd2ccaf23e13e11cf697fb7e3be8c331d",
+      "installMode": "copy"
+    },
+    "modernize": {
+      "source": "t3dotgg/tstack",
+      "ref": "11e37a74d0a6868c121cd0910ab2b3bd9873b92a",
+      "commit": "11e37a74d0a6868c121cd0910ab2b3bd9873b92a",
+      "sourceType": "github",
+      "skillPath": "skills/modernize/SKILL.md",
+      "computedHash": "01aceb93a7408157fc0038bc3e84e698e163ff4330a6da9f6358487ce8af3ddd",
+      "installMode": "copy"
+    },
+    "no-comments": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/no-comments/SKILL.md",
+      "computedHash": "f3479cfe3a44633cf6973aa33810bd52c72ce0aada00bff9aaaef512c67245c0",
+      "installMode": "copy"
+    },
+    "ponytail": {
+      "source": "DietrichGebert/ponytail",
+      "ref": "96608e078b2d5ea607c5c3b8b5a54d1c1fba6846",
+      "commit": "96608e078b2d5ea607c5c3b8b5a54d1c1fba6846",
+      "sourceType": "github",
+      "skillPath": "skills/ponytail/SKILL.md",
+      "computedHash": "56d72677aca02689ac89bd48734e8c19b40ab86716d1257eaf5f1238b43cda6b",
+      "installMode": "copy"
+    },
+    "ponytail-audit": {
+      "source": "DietrichGebert/ponytail",
+      "ref": "96608e078b2d5ea607c5c3b8b5a54d1c1fba6846",
+      "commit": "96608e078b2d5ea607c5c3b8b5a54d1c1fba6846",
+      "sourceType": "github",
+      "skillPath": "skills/ponytail-audit/SKILL.md",
+      "computedHash": "20dca08a5d047285c61702d496317eb84f501bbd573a45f3c8f93fdb3cecde4c",
+      "installMode": "copy"
+    },
+    "ponytail-debt": {
+      "source": "DietrichGebert/ponytail",
+      "ref": "96608e078b2d5ea607c5c3b8b5a54d1c1fba6846",
+      "commit": "96608e078b2d5ea607c5c3b8b5a54d1c1fba6846",
+      "sourceType": "github",
+      "skillPath": "skills/ponytail-debt/SKILL.md",
+      "computedHash": "6bcafbbd5d7ab3c09fbe1b040c2c8f3d0aae3c7e6e24339be253af354ab5cacd",
+      "installMode": "copy"
+    },
+    "ponytail-gain": {
+      "source": "DietrichGebert/ponytail",
+      "ref": "96608e078b2d5ea607c5c3b8b5a54d1c1fba6846",
+      "commit": "96608e078b2d5ea607c5c3b8b5a54d1c1fba6846",
+      "sourceType": "github",
+      "skillPath": "skills/ponytail-gain/SKILL.md",
+      "computedHash": "8dc7d5a5314e0720ff2e2b740486314b4607765181ede820f6b7e86a3d5fd814",
+      "installMode": "copy"
+    },
+    "ponytail-help": {
+      "source": "DietrichGebert/ponytail",
+      "ref": "96608e078b2d5ea607c5c3b8b5a54d1c1fba6846",
+      "commit": "96608e078b2d5ea607c5c3b8b5a54d1c1fba6846",
+      "sourceType": "github",
+      "skillPath": "skills/ponytail-help/SKILL.md",
+      "computedHash": "decfe28950443ddc04cf06badab1ebe325d149bc7dccdd3ce43ff8be27d92103",
+      "installMode": "copy"
+    },
+    "ponytail-review": {
+      "source": "DietrichGebert/ponytail",
+      "ref": "96608e078b2d5ea607c5c3b8b5a54d1c1fba6846",
+      "commit": "96608e078b2d5ea607c5c3b8b5a54d1c1fba6846",
+      "sourceType": "github",
+      "skillPath": "skills/ponytail-review/SKILL.md",
+      "computedHash": "fe7b781db99ce79d931cdc798b3fbccd84b82538de4a3fc5f6d9d466946d1458",
+      "installMode": "copy"
+    },
+    "poteto-help": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/poteto-help/SKILL.md",
+      "computedHash": "17f3fd74d448a5c485677076974bdf312f34b14fbf20ed250782a68f6c776b33",
+      "installMode": "copy"
+    },
+    "poteto-mode": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/poteto-mode/SKILL.md",
+      "computedHash": "242e3e3fb18685b92be57cd105828c146006d1e56d4585b9d39c2eccfd7a3c84",
+      "installMode": "copy"
+    },
+    "principle-attack-the-premise": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/principle-attack-the-premise/SKILL.md",
+      "computedHash": "1c60462f3a3ea72bca5383137ec261feae13cbac8c2d68c65188c710d08d63f8",
+      "installMode": "copy"
+    },
+    "principle-boundary-discipline": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/principle-boundary-discipline/SKILL.md",
+      "computedHash": "a71373be3a3262d674bc2072f04163be9e1c2c87771068bfd027f757266facee",
+      "installMode": "copy"
+    },
+    "principle-build-the-lever": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/principle-build-the-lever/SKILL.md",
+      "computedHash": "c57e1d33f94e632e538d890ededbd9bc78a11677334211d85922ee86ba352f36",
+      "installMode": "copy"
+    },
+    "principle-encode-lessons-in-structure": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/principle-encode-lessons-in-structure/SKILL.md",
+      "computedHash": "164c25e039539bc5cc04f109f3596d723e40c68f9745cd35129b34d4fe3e706e",
+      "installMode": "copy"
+    },
+    "principle-exhaust-the-design-space": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/principle-exhaust-the-design-space/SKILL.md",
+      "computedHash": "223970dbf26021ca33726e793017dbbeac919edfbd6873d5e9d5eff2babb9bec",
+      "installMode": "copy"
+    },
+    "principle-experience-first": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/principle-experience-first/SKILL.md",
+      "computedHash": "7e4608c81af0efa3aaa472ae90d6bb790db47d4678419f0fdda75f81f451a520",
+      "installMode": "copy"
+    },
+    "principle-explain-the-number": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/principle-explain-the-number/SKILL.md",
+      "computedHash": "12bf1fd4f702f425991e6c8f321d9481f7df1d41c6e9768c4ee94b9e8b6a11a7",
+      "installMode": "copy"
+    },
+    "principle-fix-root-causes": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/principle-fix-root-causes/SKILL.md",
+      "computedHash": "caa4470c10bb7e5c58fac5da77154c5536a89e4549e292f8ecff8ac61b2b4546",
+      "installMode": "copy"
+    },
+    "principle-foundational-thinking": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/principle-foundational-thinking/SKILL.md",
+      "computedHash": "c5428edcaddf914cac196eb49fb4f344103b1feef9eb9ba315213cf128727b2a",
+      "installMode": "copy"
+    },
+    "principle-guard-the-context-window": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/principle-guard-the-context-window/SKILL.md",
+      "computedHash": "d0b6808ab070ab9d020c718687d3f96324833144537d1e635762c90861fe8821",
+      "installMode": "copy"
+    },
+    "principle-laziness-protocol": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/principle-laziness-protocol/SKILL.md",
+      "computedHash": "23fb5314b8b2bfb6c2b783892e791aca6c59c69313b714eecc11704e4a2d38cb",
+      "installMode": "copy"
+    },
+    "principle-make-operations-idempotent": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/principle-make-operations-idempotent/SKILL.md",
+      "computedHash": "bd489510037de30e8b5924bc3eb60fd93f65621992295698ac9e7bea3f4e68b9",
+      "installMode": "copy"
+    },
+    "principle-migrate-callers-then-delete-legacy-apis": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/principle-migrate-callers-then-delete-legacy-apis/SKILL.md",
+      "computedHash": "23afe0ad1c7daa04d8dd306be2f132809dfb18fa7b783d85f749fe83b71d8784",
+      "installMode": "copy"
+    },
+    "principle-minimize-reader-load": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/principle-minimize-reader-load/SKILL.md",
+      "computedHash": "97f5f52cf69ce89e0fb1fc9c1e150cf2e7cb75fe6e48b1bee29d62d253bccfed",
+      "installMode": "copy"
+    },
+    "principle-model-the-domain": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/principle-model-the-domain/SKILL.md",
+      "computedHash": "a9c5c59b7a3a4f9b60c1b462ebedad84c26c6cf3848af995269dc8eae7391157",
+      "installMode": "copy"
+    },
+    "principle-never-block-on-the-human": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/principle-never-block-on-the-human/SKILL.md",
+      "computedHash": "ab707816f6a0d48148bff1d7e27c56d76b23ef77fe642c094fbb7812e00474d7",
+      "installMode": "copy"
+    },
+    "principle-outcome-oriented-execution": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/principle-outcome-oriented-execution/SKILL.md",
+      "computedHash": "684e3f3887348aed42daa9e51cee47009c84187569c55f3365d16cfef070ff24",
+      "installMode": "copy"
+    },
+    "principle-prove-it-works": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/principle-prove-it-works/SKILL.md",
+      "computedHash": "e1903c637f60b63a8ded3ca9ec60d132190f0473085581be7fcf1fb8cb18bb49",
+      "installMode": "copy"
+    },
+    "principle-redesign-from-first-principles": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/principle-redesign-from-first-principles/SKILL.md",
+      "computedHash": "c6b2348402c9c1a4d3b43ab695ad8dbb6a92b19e02e08f6395146ab9b1b61ce9",
+      "installMode": "copy"
+    },
+    "principle-separate-before-serializing-shared-state": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/principle-separate-before-serializing-shared-state/SKILL.md",
+      "computedHash": "7be23154bac7c6858b373fb5525e847028c06487a91f502ad8a9ac96b9d5b408",
+      "installMode": "copy"
+    },
+    "principle-sequence-verifiable-units": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/principle-sequence-verifiable-units/SKILL.md",
+      "computedHash": "a42555063ab83a206c893b22ccbb2b5aed20a3d10dc770d0d99801525d15012b",
+      "installMode": "copy"
+    },
+    "principle-subtract-before-you-add": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/principle-subtract-before-you-add/SKILL.md",
+      "computedHash": "97e61b7e5e8fa4aa1673b1d1d3a5508f5f36cc2f888866caf68992469569171e",
+      "installMode": "copy"
+    },
+    "principle-test-behavior-not-implementation": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/principle-test-behavior-not-implementation/SKILL.md",
+      "computedHash": "b93367ed8c011dcdff2af67197a669d6b2270972f5a2c606d4fd7c6188752417",
+      "installMode": "copy"
+    },
+    "principle-type-system-discipline": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/principle-type-system-discipline/SKILL.md",
+      "computedHash": "f8182ea7c103809db288517b608c868dc304dd5ccc63c0bfb5fb9f7fd9632751",
+      "installMode": "copy"
+    },
+    "recall": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/recall/SKILL.md",
+      "computedHash": "a91c25543e63dfdb47054558feaa317edfc39d35e1ceeb9bffa56ebd2afbae38",
+      "installMode": "copy"
+    },
+    "reflect": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/reflect/SKILL.md",
+      "computedHash": "711e7161356911762c9d5bc9356178bf0e3bb07f21fc9a0dec7fb807fbfda272",
+      "installMode": "copy"
+    },
+    "setup-pstack": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/setup-pstack/SKILL.md",
+      "computedHash": "611d7076909fa2d07c53c6657b206637be16d8cb65832f1174fd9d50e07bb186",
+      "installMode": "copy"
+    },
+    "sharpen": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/sharpen/SKILL.md",
+      "computedHash": "27a8957e6dbd9c1f50228592b1aa1ef5598aef14d4c2047213a740ecdbfc217f",
+      "installMode": "copy"
+    },
+    "show-me-your-work": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/show-me-your-work/SKILL.md",
+      "computedHash": "8f57b3c96b6d2f9cc3bfcc576ff48956a44163541e845f5917678d59f5c7544d",
+      "installMode": "copy"
+    },
+    "sol-loop": {
+      "source": "t3dotgg/tstack",
+      "ref": "11e37a74d0a6868c121cd0910ab2b3bd9873b92a",
+      "commit": "11e37a74d0a6868c121cd0910ab2b3bd9873b92a",
+      "sourceType": "github",
+      "skillPath": "skills/sol-loop/SKILL.md",
+      "computedHash": "579718e954d9edc00de37bdc4666475bcebb5c398b4d8f608f8251a1599bc6f6",
+      "installMode": "copy"
+    },
+    "statechart": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/statechart/SKILL.md",
+      "computedHash": "d690e6c30285a4ac01e3660c7b3d973593ab82ccbfd04b8307ffec66d9b600af",
+      "installMode": "copy"
+    },
+    "swarm": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/swarm/SKILL.md",
+      "computedHash": "408a314c838839b68664a0b4b8f163f6f29e1d96c9355bc898132f9ff0fcf124",
+      "installMode": "copy"
+    },
+    "takeover": {
+      "source": "t3dotgg/tstack",
+      "ref": "11e37a74d0a6868c121cd0910ab2b3bd9873b92a",
+      "commit": "11e37a74d0a6868c121cd0910ab2b3bd9873b92a",
+      "sourceType": "github",
+      "skillPath": "skills/takeover/SKILL.md",
+      "computedHash": "3cd3b50b50005459839f9c77614a3e707121f3aad20b7b23c203813b6cf7b4fc",
+      "installMode": "copy"
+    },
+    "tdd": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/tdd/SKILL.md",
+      "computedHash": "c88ebf09cd7df89476eca9afb62748d73ca00346cfb044852c0bbb4066e78e27",
+      "installMode": "copy"
+    },
+    "teach": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/teach/SKILL.md",
+      "computedHash": "3c3934fa3bb690ffe9c7f9ba5c939253eb25bad117a65c930d70f137f77af0ec",
+      "installMode": "copy"
+    },
+    "technical-writing": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/technical-writing/SKILL.md",
+      "computedHash": "4a8b50628c064dc9cd1c6e7d4e7325c21ffd3572f52775d3a0381fd8a69259f7",
+      "installMode": "copy"
+    },
+    "thermo-nuclear-code-quality-review": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "cursor-team-kit/skills/thermo-nuclear-code-quality-review/SKILL.md",
+      "computedHash": "705eb32106f0fec9c9e9b4afccb6156f17f6e8829368e54cd5b53f10e4374340",
+      "installMode": "copy"
+    },
+    "to-tickets": {
+      "source": "mattpocock/skills",
+      "ref": "abeeaf95660ba9e8b7c753eb38f441ca707a8823",
+      "commit": "abeeaf95660ba9e8b7c753eb38f441ca707a8823",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/to-tickets/SKILL.md",
+      "computedHash": "17496514c92954f68eacdf2b1221e2ddb39fa231b83f03c70bc7d4422f704b2d",
+      "installMode": "copy"
+    },
+    "typescript-best-practices": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/typescript-best-practices/SKILL.md",
+      "computedHash": "fb35e49d1b6a48fa42d81fff0e4e9834b8f98e0ebcf188203680f1f4265df690",
+      "installMode": "copy"
+    },
+    "ui-sdk": {
+      "source": "vercel-labs/ui",
+      "ref": "5152971c75058ab263e6acb1e6d15fcedd9d7ce5",
+      "commit": "5152971c75058ab263e6acb1e6d15fcedd9d7ce5",
+      "sourceType": "github",
+      "skillPath": "packages/core/skills/ui-sdk/SKILL.md",
+      "computedHash": "7353586d36e12a3895bcec7d6d589ad26a18e7acff95b014ea63ccb12cfafc38",
+      "installMode": "copy"
+    },
+    "unslop": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/unslop/SKILL.md",
+      "computedHash": "4bbcb6719a8f0f6f7fb46752e1c360791d7758a837708e300a06fc7d6907938c",
+      "installMode": "copy"
+    },
+    "webapp-testing": {
+      "source": "anthropics/skills",
+      "ref": "e4bb5d960d87126ff3b3a8af1a104b7db67560ba",
+      "commit": "e4bb5d960d87126ff3b3a8af1a104b7db67560ba",
+      "sourceType": "github",
+      "skillPath": "skills/webapp-testing/SKILL.md",
+      "computedHash": "48cd9a742a59250edec6db89cf081ef5465f365e2133f6d6c5e29c380b754b7d",
+      "installMode": "copy"
+    },
+    "why": {
+      "source": "cursor/plugins",
+      "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "commit": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
+      "sourceType": "github",
+      "skillPath": "harness/pstack/claude-code/skills/why/SKILL.md",
+      "computedHash": "2050d10fff1d0fa6e19c0a96552a641af6a24f012614955a6dcf3763bf54ac3c",
+      "installMode": "copy"
+    }
+  },
+  "extras": {
+    ".agents/agents/comment-sicko.md": "0fb37221ab2a9159714d38f1528898e82b9758b5750f244bbe2e575bb593a1de",
+    ".agents/agents/poteto-agent.md": "369065b46c217a5898cb1a400652c3399449252f4d5dbf8937eb8d4922d3cf6b",
+    ".agents/docs/harness/claude-code.md": "289a9127a3597d7b3fbbe10c40aea4aea3f15cd5361a75be43806a07b96f634f"
+  },
+  "licenses": {
+    "agent-browser": "014bb31e83d5c2e76aea1cc6e82217346ab41362f32cb355ad0f5c10aa0aeaff",
+    "agent-desktop": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "anthropic-skills": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
+    "clerk": "b36183cf0be2cbda03d80db9b96e5aacd2879462b15fc8e4f4e179a7c91f1ca7",
+    "convex": "4458503dd48e88c4e0b945fb252a08b93c40ec757309b8ffa7c594dfa1e35104",
+    "cursor-team-kit": "702f5f331b56aff0e33d8c7826df5202559f894145eb70355c6477b55b5bb8a0",
+    "gstack": "e56fbb5b3d95756f3fa1cfefa24732ec79f18ece1ad08a4e79e00df57e8b198c",
+    "mattpocock-skills": "0e7ac423bf2c6e223b7c5b156f8cf72da49d748e56a1641402c31f22ad07dbb5",
+    "ponytail": "fb1bc6909ac3ef82d5c22106e32ef682b0cff66788fa915fb9b53b15c9d2f3ab",
+    "pstack": "bc957ca6bee02792566a1a028d105e02e247c6e77cf057061674273da77b200e",
+    "superpowers": "a37e0e9697144819e1d965176ac4ae5bc3fa02d11e7812036bbcadf6dafe2400",
+    "tstack": "8095f9a9f97d074131f6a2ce09b952d12c18b36f09f4e5df0517c4e64e82c851",
+    "ui-sdk": "85dc930b9f77edd477ceddd7658dd3a4bb4411186718d19e137a7a5724ee7007",
+    "vercel-ai": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529"
+  }
+}
