@@ -13,6 +13,7 @@ import {
 import {
   Drawer,
   DrawerBackdrop,
+  DrawerClose,
   DrawerContent,
   DrawerTitle,
 } from "@ui-sdk/react/drawer";
@@ -306,7 +307,12 @@ export function RoomView({
       <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
         <DrawerBackdrop />
         <DrawerContent className="max-h-[85dvh] overflow-y-auto">
-          <DrawerTitle className="sr-only">Contrato y auditoría</DrawerTitle>
+          <div className="flex items-center justify-between gap-2 px-4 pt-3">
+            <DrawerTitle className="font-medium text-sm">
+              Contrato y auditoría
+            </DrawerTitle>
+            <DrawerClose data-size="sm">Cerrar</DrawerClose>
+          </div>
           {sidePanel}
         </DrawerContent>
       </Drawer>
