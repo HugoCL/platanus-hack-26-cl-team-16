@@ -53,7 +53,8 @@ const text = (value: string): SendableContent => ({
   text: value,
 });
 
-// One provider turn: the room asks the provider about `incoming` and posts what it sends.
+// One provider turn: the room asks the provider about `incoming` and posts what it sends. Closing
+// is checked in the test that books.
 async function providerAnswers(
   room: LoggedRoom,
   incoming: Message,
@@ -61,7 +62,7 @@ async function providerAnswers(
 ) {
   const sent: Message[] = [];
   for (const action of await askProvider(t, room, incoming, llm)) {
-    if (action.kind !== "send") throw new Error("a provider never closes");
+    if (action.kind === "close") continue;
     sent.push(
       await room.post(room.recipient, action.recipient, action.content),
     );
@@ -117,17 +118,19 @@ describe("generic provider agent", () => {
     ]);
   });
 
-  it("books the human's choice and confirms it to the whole room", async () => {
+  it("books the human's choice, confirms it to the human and closes the room", async () => {
     const room = await openRoom();
     const picker = await askForSlots(room);
     const chosen = pickerOf(picker).slots[1].id;
     const choice = await choose(room, picker, chosen);
 
-    const sent = await providerAnswers(room, choice);
+    const actions = await askProvider(t, room, choice, noLlm);
 
-    expect(sent).toHaveLength(1);
-    const [confirmation] = sent;
-    expect(confirmation.recipient).toBe("all");
+    expect(actions).toHaveLength(2);
+    const [confirmation, close] = actions;
+    expect(close).toEqual({ kind: "close" });
+    expect(confirmation).toMatchObject({ kind: "send", recipient: room.owner });
+    if (confirmation.kind !== "send") throw new Error("expected a send");
     expect(confirmation.content).toMatchObject({
       kind: "ui",
       spec: {
@@ -144,29 +147,26 @@ describe("generic provider agent", () => {
     expect((await availability(chosen))?.booked).toBe(1);
   });
 
-  it("books one slot per picker and confirms it once", async () => {
+  it("confirms one booking per room, even when two choices race", async () => {
     const room = await openRoom();
     const picker = await askForSlots(room);
-    const [first, second] = pickerOf(picker).slots.map((s) => s.id);
-    const choice = await choose(room, picker, second);
-    const beforeConfirmation = [...room.history];
-    const [confirmation] = await providerAnswers(room, choice);
+    const slots = pickerOf(picker).slots.map((s) => s.id);
+    const choices = [
+      await choose(room, picker, slots[1]),
+      await choose(room, picker, slots[0]),
+    ];
 
-    const retried = await askProvider(
-      t,
-      { ...room, history: beforeConfirmation },
-      choice,
-      noLlm,
+    const answers = await Promise.all(
+      choices.map((choice) => askProvider(t, room, choice, noLlm)),
     );
-    expect(retried).toEqual([
-      { kind: "send", recipient: "all", content: confirmation.content },
-    ]);
-    expect(await providerAnswers(room, choice)).toEqual([]);
-    expect(
-      await providerAnswers(room, await choose(room, picker, first)),
-    ).toEqual([]);
-    expect((await availability(second))?.booked).toBe(1);
-    expect((await availability(first))?.booked).toBe(0);
+
+    const confirmed = answers.findIndex((actions) => actions.length > 0);
+    expect(answers.flat().filter((a) => a.kind === "send")).toHaveLength(1);
+    expect((await availability(slots[1 - confirmed]))?.booked).toBe(1);
+    expect((await availability(slots[confirmed]))?.booked).toBe(0);
+    for (const choice of choices) {
+      expect(await askProvider(t, room, choice, noLlm)).toEqual([]);
+    }
   });
 
   it("never books a slot it did not offer in that picker", async () => {

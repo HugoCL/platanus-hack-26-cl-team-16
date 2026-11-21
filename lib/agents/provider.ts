@@ -134,8 +134,9 @@ export async function providerTurn(
   );
 }
 
-// Books the slot a human picked in one of this provider's pickers, once per picker, and confirms it
-// to the whole room: the human gets the card and the consumer agent the signal that it is done.
+// Books the slot a human picked in one of this provider's pickers, confirms it to that human and
+// closes the room. Only the call that created the booking confirms it, so a repeated or racing
+// choice never confirms twice or confirms a slot the human did not pick.
 async function bookChoice(
   turn: AgentTurn,
   context: ProviderContext,
@@ -155,18 +156,10 @@ async function bookChoice(
       m.recipient === human.participantId,
   );
   const spec = picker?.content.kind === "ui" ? picker.content.spec : null;
-  const confirmationId = `${pickerId}-reserva`;
-  const alreadyConfirmed = seen.some(
-    (m) =>
-      m.senderParticipantId === turn.self &&
-      m.content.kind === "ui" &&
-      m.content.spec.id === confirmationId,
-  );
   if (
     spec?.type !== "slot_picker" ||
     spec.id !== pickerId ||
-    !spec.slots.some((slot) => slot.id === slotId) ||
-    alreadyConfirmed
+    !spec.slots.some((slot) => slot.id === slotId)
   ) {
     return [];
   }
@@ -181,17 +174,18 @@ async function bookChoice(
       "Ese horario se acaba de tomar. Elige otro",
     );
   }
+  if (!booking.created) return [];
   const when = formatWhen(booking.start);
   const address = context.card.location?.address;
   return [
     {
       kind: "send",
-      recipient: "all",
+      recipient: human.participantId,
       content: {
         kind: "ui",
         spec: {
           type: "confirmation",
-          id: confirmationId,
+          id: `${pickerId}-reserva`,
           title: "Reserva confirmada",
           summary: `${booking.offeringName}, ${when}.`,
           details: [
@@ -214,6 +208,7 @@ async function bookChoice(
         },
       },
     },
+    { kind: "close" },
   ];
 }
 
