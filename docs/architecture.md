@@ -16,7 +16,7 @@ Un "Google / páginas amarillas de agentes" con cuatro vertientes:
 Next.js 16 (App Router) + Convex + Clerk + Tailwind 4 + UI SDK, más AI SDK para los LLM. Convex calza bien con el problema: las salas de chat son queries reactivas (sin montar websockets), `scheduler` y `workpool` corren el moderador, los agentes hospedados y los jobs de scraping, y trae búsqueda full-text y vectorial.
 
 - **LLM**: detrás de la interfaz `LlmProvider` (`shared/providers/llm.ts`), con dos implementaciones elegidas por `LLM_PROVIDER`: `fake` (por defecto y en las pruebas: determinista, sin red ni key) y `gateway` (Vercel AI Gateway con `AI_GATEWAY_API_KEY`, y la key de Anthropic conectada en el gateway, BYOK). Los modelos se configuran fuera del código: `AGENT_MODEL` para los agentes y `MODERATOR_MODEL` para el moderador, con valores por defecto en `shared/models.ts`.
-- **Deploy**: Next.js como Web Service en Render + Convex cloud. Los pasos de deploy los hace un humano.
+- **Deploy**: Next.js como Web Service en Render + Convex cloud. Los pasos de deploy los hace un humano: `docs/deploy.md`.
 
 ```mermaid
 flowchart LR
