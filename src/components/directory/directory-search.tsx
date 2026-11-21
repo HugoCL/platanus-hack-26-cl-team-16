@@ -257,151 +257,149 @@ export function DirectorySearch() {
 
         <div
           id="directory-filters"
-          className={`${filtersOpen ? "flex" : "hidden"} flex-wrap items-center gap-2 sm:flex`}
+          className={`${filtersOpen ? "flex" : "hidden"} flex-col gap-3 sm:flex`}
         >
-          {categories ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {categories ? (
+              <Select
+                value={category ?? ALL}
+                onValueChange={(value) =>
+                  setCategory(!value || value === ALL ? null : value)
+                }
+              >
+                <SelectLabel className="sr-only">Categoría</SelectLabel>
+                <SelectTrigger
+                  className={`!h-9 !text-[13px] ${category ? "!border-foreground" : ""}`}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>Todas las categorías</SelectItem>
+                  {categoryTree(categories).map(({ category: c, depth }) => (
+                    <SelectItem
+                      key={c.slug}
+                      value={c.slug}
+                      className={depth > 0 ? "!ps-6" : ""}
+                    >
+                      {c.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+
             <Select
-              value={category ?? ALL}
+              value={comuna ?? ALL}
               onValueChange={(value) =>
-                setCategory(!value || value === ALL ? null : value)
+                setComuna(!value || value === ALL ? null : value)
               }
             >
-              <SelectLabel className="sr-only">Categoría</SelectLabel>
+              <SelectLabel className="sr-only">Comuna</SelectLabel>
               <SelectTrigger
-                className={`!h-9 !text-[13px] ${category ? "!border-foreground" : ""}`}
+                className={`!h-9 !text-[13px] ${comuna ? "!border-foreground" : ""}`}
               >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL}>Todas las categorías</SelectItem>
-                {categoryTree(categories).map(({ category: c, depth }) => (
-                  <SelectItem
-                    key={c.slug}
-                    value={c.slug}
-                    className={depth > 0 ? "!ps-6" : ""}
-                  >
-                    {c.label}
+                <SelectItem value={ALL}>Todas las comunas</SelectItem>
+                {COMUNAS.map((name) => (
+                  <SelectItem key={name} value={name}>
+                    {name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          ) : null}
 
-          <Select
-            value={comuna ?? ALL}
-            onValueChange={(value) =>
-              setComuna(!value || value === ALL ? null : value)
-            }
-          >
-            <SelectLabel className="sr-only">Comuna</SelectLabel>
-            <SelectTrigger
-              className={`!h-9 !text-[13px] ${comuna ? "!border-foreground" : ""}`}
+            <Toggle
+              pressed={geo.state === "on" || geo.state === "locating"}
+              onPressedChange={locate}
+              className="inline-flex !h-9 items-center gap-1.5 !rounded-full !px-3 text-[13px] data-pressed:!border-primary data-pressed:!bg-primary data-pressed:!text-primary-foreground"
             >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>Todas las comunas</SelectItem>
-              {COMUNAS.map((name) => (
-                <SelectItem key={name} value={name}>
-                  {name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+              <LocateFixed aria-hidden size={15} />
+              {geo.state === "locating" ? "Ubicando…" : "Cerca de mí"}
+            </Toggle>
 
-          <Toggle
-            pressed={geo.state === "on" || geo.state === "locating"}
-            onPressedChange={locate}
-            className="inline-flex !h-9 items-center gap-1.5 !rounded-full !px-3 text-[13px] data-pressed:!border-primary data-pressed:!bg-primary data-pressed:!text-primary-foreground"
-          >
-            <LocateFixed aria-hidden size={15} />
-            {geo.state === "locating" ? "Ubicando…" : "Cerca de mí"}
-          </Toggle>
+            {origin ? (
+              <div className="inline-flex h-9 items-center gap-2.5 rounded-full bg-muted px-3.5">
+                <span
+                  id="radius-label"
+                  className="text-[13px] text-subtle-foreground"
+                >
+                  Radio
+                </span>
+                <Slider
+                  min={1}
+                  max={50}
+                  value={radiusKm}
+                  onValueChange={(value) =>
+                    setRadiusKm(Array.isArray(value) ? value[0] : value)
+                  }
+                  className="w-30"
+                >
+                  <SliderControl>
+                    <SliderTrack>
+                      <SliderIndicator />
+                      <SliderThumb aria-labelledby="radius-label" />
+                    </SliderTrack>
+                  </SliderControl>
+                </Slider>
+                <span className="min-w-12 text-[13px] tabular-nums">
+                  {radiusKm} km
+                </span>
+              </div>
+            ) : null}
 
-          {origin ? (
-            <div className="inline-flex h-9 items-center gap-2.5 rounded-full bg-muted px-3.5">
-              <span
-                id="radius-label"
-                className="text-[13px] text-subtle-foreground"
-              >
-                Radio
-              </span>
-              <Slider
-                min={1}
-                max={50}
-                value={radiusKm}
-                onValueChange={(value) =>
-                  setRadiusKm(Array.isArray(value) ? value[0] : value)
-                }
-                className="w-30"
-              >
-                <SliderControl>
-                  <SliderTrack>
-                    <SliderIndicator />
-                    <SliderThumb aria-labelledby="radius-label" />
-                  </SliderTrack>
-                </SliderControl>
-              </Slider>
-              <span className="min-w-12 text-[13px] tabular-nums">
-                {radiusKm} km
-              </span>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 sm:ml-auto">
+              <label className="inline-flex min-h-9 items-center gap-2 text-[13px] text-subtle-foreground">
+                <Switch
+                  checked={verifiedOnly}
+                  onCheckedChange={setVerifiedOnly}
+                >
+                  <SwitchThumb />
+                </Switch>
+                Solo verificados
+              </label>
+              <label className="inline-flex min-h-9 items-center gap-2 text-[13px] text-subtle-foreground">
+                <Switch
+                  checked={includeProspects}
+                  onCheckedChange={setIncludeProspects}
+                >
+                  <SwitchThumb />
+                </Switch>
+                Incluir sin reclamar
+              </label>
             </div>
-          ) : null}
+          </div>
 
           {intentOptions.length > 0 ? (
-            <>
-              <span
-                aria-hidden
-                className="mx-1 hidden h-6 w-px bg-border sm:block"
-              />
-              <fieldset className="m-0 inline-flex flex-wrap items-center gap-1.5 border-0 p-0">
-                <legend className="sr-only">Intención</legend>
-                {intentOptions.map((intent) => {
-                  const pressed = intents.includes(intent);
-                  return (
-                    <Toggle
-                      key={intent}
-                      pressed={pressed}
-                      onPressedChange={(next) =>
-                        setIntents((list) =>
-                          next
-                            ? [...list, intent]
-                            : list.filter((i) => i !== intent),
-                        )
-                      }
-                      className="inline-flex !h-8 items-center gap-1.5 !rounded-full !px-3 text-[13px] text-subtle-foreground data-pressed:text-foreground"
-                    >
-                      {pressed ? (
-                        <Check aria-hidden size={13} strokeWidth={2} />
-                      ) : null}
-                      {intentLabel(intent)}
-                    </Toggle>
-                  );
-                })}
-              </fieldset>
-            </>
+            <fieldset className="m-0 flex flex-wrap items-center gap-1.5 border-0 p-0">
+              <legend className="float-left mr-1.5 text-xs text-subtle-foreground">
+                Qué puede hacer
+              </legend>
+              {intentOptions.map((intent) => {
+                const pressed = intents.includes(intent);
+                return (
+                  <Toggle
+                    key={intent}
+                    pressed={pressed}
+                    onPressedChange={(next) =>
+                      setIntents((list) =>
+                        next
+                          ? [...list, intent]
+                          : list.filter((i) => i !== intent),
+                      )
+                    }
+                    className="inline-flex !h-8 items-center gap-1.5 !rounded-full !px-3 text-[13px] text-subtle-foreground data-pressed:text-foreground"
+                  >
+                    {pressed ? (
+                      <Check aria-hidden size={13} strokeWidth={2} />
+                    ) : null}
+                    {intentLabel(intent)}
+                  </Toggle>
+                );
+              })}
+            </fieldset>
           ) : null}
-
-          <span
-            aria-hidden
-            className="mx-1 hidden h-6 w-px bg-border sm:block"
-          />
-
-          <label className="inline-flex min-h-9 items-center gap-2 text-[13px] text-subtle-foreground">
-            <Switch checked={verifiedOnly} onCheckedChange={setVerifiedOnly}>
-              <SwitchThumb />
-            </Switch>
-            Solo verificados
-          </label>
-          <label className="inline-flex min-h-9 items-center gap-2 text-[13px] text-subtle-foreground">
-            <Switch
-              checked={includeProspects}
-              onCheckedChange={setIncludeProspects}
-            >
-              <SwitchThumb />
-            </Switch>
-            Incluir sin reclamar
-          </label>
         </div>
 
         {geo.state === "error" ? (
