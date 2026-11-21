@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { judgeRateLimiter } from "../../convex/moderator";
+import { createFakeLlmProvider } from "../../shared/providers/llm";
 import {
   errorKind,
   REQUEST,
@@ -163,6 +164,33 @@ describe("the judge's rate limit under concurrency", () => {
 });
 
 describe("maxViolations", () => {
+  it.each(["moderator", "conversation_moderator"] as const)(
+    "counts confirmed blocks from %s even when the other judge fails",
+    async (blockingRole) => {
+      const llm = createFakeLlmProvider({
+        object: ({ role }) => {
+          if (role !== blockingRole) throw new Error("provider unavailable");
+          return { decision: "block", rule: "scope" };
+        },
+      });
+      vi.spyOn(rooms.llm, "generateObject").mockImplementation(
+        llm.generateObject,
+      );
+      for (let i = 1; i <= 3; i++) {
+        expect(await send(room.human)).toMatchObject({
+          status: "blocked",
+          verdict: { rule: "scope" },
+        });
+        expect(
+          await rooms.t.run((ctx) => ctx.db.get(room.sessionId)),
+        ).toMatchObject({
+          violationCount: i,
+          status: i === 3 ? "terminated" : "active",
+        });
+      }
+    },
+  );
+
   it("publishes only the termination when the terminating block is the last agent turn", async () => {
     const short = await roomWithHuman(rooms, 3);
     rooms.judge.mockReturnValue({ decision: "block", rule: "scope" });

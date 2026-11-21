@@ -84,6 +84,7 @@ it("does not deliver a blocked agent reply to the other agent", async () => {
 
 it("persists a hosted reply blocked by timeout when retry quota is unavailable", async () => {
   const room = await setup();
+  vi.spyOn(Date, "now").mockReturnValue(Date.now());
   await room.t.run((ctx) =>
     judgeRateLimiter.limit(ctx, "roomJudgeSender", {
       key: `participant:${room.provider}`,

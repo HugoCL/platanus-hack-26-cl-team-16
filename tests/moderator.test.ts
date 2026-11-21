@@ -57,6 +57,9 @@ describe("parallel judges", () => {
     ["block", "block", "injection"],
     ["error", "allow", "purpose"],
     ["allow", "error", "purpose"],
+    ["block", "error", "injection"],
+    ["error", "block", "scope"],
+    ["error", "error", "purpose"],
   ])(
     "combines message %s and conversation %s",
     async (message, conversation, rule) => {

@@ -144,11 +144,17 @@ export function createModerator({
         runJudge(messageJudge, "injection", model),
         runJudge(conversationJudge, "purpose", conversationModel),
       ]);
+      const confirmedBlock = [message, conversation].find(
+        ({ verdict, event }) =>
+          verdict.decision === "block" &&
+          !event.reasons.some((reason) => reason.code === "moderator_error"),
+      );
       return {
         verdict:
-          message.verdict.decision === "block"
+          confirmedBlock?.verdict ??
+          (message.verdict.decision === "block"
             ? message.verdict
-            : conversation.verdict,
+            : conversation.verdict),
         events: [deterministic, message.event, conversation.event],
       };
     },
