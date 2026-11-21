@@ -1,0 +1,44 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# next.js
+/.next/
+/out/
+/build
+next-env.d.ts
+*.tsbuildinfo
+
+# env files (Convex and Clerk keyless write .env.local)
+.env*.local
+.env
+
+# Python venv for scripts/smoke.py and webapp-testing
+.venv/
+__pycache__/
+
+# smoke test output (screenshot, dev server log)
+/artifacts/
+
+# Convex local deployment state
+/.convex/
+convex_local_storage/
+convex_local_backend.sqlite3
+.convex-local/
+
+# Clerk keyless state (can include secrets)
+/.clerk/
+
+# misc
+.DS_Store
+*.pem
+npm-debug.log*
+.pnpm-debug.log*
+.vercel
+
+# Local Claude Code links. Capy reads both trees, so committing them duplicates skills.
+/.claude/skills/
+/.claude/agents/
+# Claude Code worktrees (they contain their own biome.json and node_modules)
+/.claude/worktrees/
