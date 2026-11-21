@@ -273,7 +273,20 @@ describe("messagesAfter", () => {
 
   it("rejects a cursor it did not issue", async () => {
     const { readAfter } = await setup();
-    for (const cursor of ["", "s:", "s:1:2", "x:1", "c:5", "c:5:not-an-id"]) {
+    for (const cursor of [
+      "",
+      "s:",
+      "s:1:2",
+      "x:1",
+      "c:5",
+      "c:5:not-an-id",
+      "s:0",
+      "s:-5",
+      "s:   ",
+      "s:1e0",
+      "s:01",
+      "c:   :x",
+    ]) {
       expect(await errorKind(readAfter(cursor))).toBe("InvalidArgument");
     }
   });
