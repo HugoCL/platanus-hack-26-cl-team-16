@@ -116,51 +116,60 @@ describe("RUT", () => {
     ]);
   });
 
-  it.each([
-    "12345678-5",
-    "12.345.678-5",
-    "10.000.013-K",
-    "10000013-k",
-    "rut: 123456785",
-    "RUN 100000040",
-    "123456785",
-    "12345674",
-    "1000005K",
-    "trámite de rutina 123456785",
-    "Ya, es el 12345674.",
-    "91234567k",
-    "RUT 987654325",
-    "$ 59.990 y 123456785",
-    "+56 223456707 y 123456785",
-  ])("finds %s", (value) => {
+  it.each<[string, boolean, string]>([
+    ["12345678-5", true, "hyphen"],
+    ["12.345.678-5", true, "dots and hyphen"],
+    ["10.000.013-K", true, "check digit K"],
+    ["10000013-k", true, "lowercase k"],
+    ["rut: 123456785", true, "label"],
+    ["RUN 100000040", true, "label RUN"],
+    ["RUT 987654325", true, "a label beats the mobile shape"],
+    ["12.345.678-9", false, "wrong check digit"],
+    ["2026-11-24T09:00:00-03:00", false, "timestamp"],
+    ["123456785", true, "compact, 9 characters"],
+    ["12345674", true, "compact, 8 characters"],
+    ["1000005K", true, "compact ending in K"],
+    ["91234567k", true, "ending in k, so not a mobile"],
+    [
+      "trámite de rutina 123456785",
+      true,
+      "compact after a word with rut in it",
+    ],
+    ["Ya, es el 12345674.", true, "compact before a full stop"],
+    ["123456789", false, "fails modulo 11"],
+    ["12345678", false, "fails modulo 11"],
+    ["Pedido 123456789", false, "fails modulo 11"],
+    [
+      "Mi celular es 987654325",
+      false,
+      "nine digits starting with 9 are a mobile",
+    ],
+    ["$1.234.567", false, "price with dots"],
+    ["$123456785", false, "price without dots"],
+    ["Total: $12.345.678", false, "price with dots"],
+    ["$ 123456785", false, "price after a space"],
+    ["$\u00a0123456785", false, "price after a no-break space"],
+    ["Total: $ 12345674", false, "price with 8 digits"],
+    ["$ 59.990 y 123456785", true, "compact after a price"],
+    ["$ 1000005K", true, "a token ending in k is never a price"],
+    ["$1000005k", true, "a token ending in k is never a price"],
+    ["+56912345678", false, "mobile"],
+    ["+56987654325", false, "mobile"],
+    ["+56 2 2345 6789", false, "landline in groups"],
+    ["+56 223456707", false, "compact landline"],
+    ["+56\u00a0223456707", false, "landline after a no-break space"],
+    ["+56 2 23456702", false, "landline with the area code apart"],
+    ["Fono: +56-223456707", false, "landline after a hyphen"],
+    ["+56 223456707 y 123456785", true, "compact after a phone"],
+    ["+56 123456785", true, "a token starting with 1 is never a phone"],
+    ["+56123456785", true, "a token starting with 1 is never a phone"],
+    ["+56 91234567k", true, "a token ending in k is never a phone"],
+  ])("reads %j as a RUT: %s (%s)", (value, isRut) => {
     const findings = rulesFor("hotel", "consumidor", "proveedor", text(value));
-    expect(rulesOf(findings)).toEqual(["sensitive_data"]);
-    expect(findings[0].code).toBe("pii");
-  });
-
-  it.each([
-    "12.345.678-9",
-    "+56912345678",
-    "+56 2 2345 6789",
-    "$1.234.567",
-    "2026-11-24T09:00:00-03:00",
-    "Mi celular es 987654325",
-    "+56987654325",
-    "$123456785",
-    "Total: $12.345.678",
-    "$ 123456785",
-    "$\u00a0123456785",
-    "Total: $ 12345674",
-    "+56 223456707",
-    "+56\u00a0223456707",
-    "+56 2 23456702",
-    "Fono: +56-223456707",
-    "123456789",
-    "12345678",
-    "Pedido 123456789",
-  ])("ignores %s", (value) => {
-    expect(rulesFor("hotel", "consumidor", "proveedor", text(value))).toEqual(
-      [],
+    expect(findings).toEqual(
+      isRut
+        ? [expect.objectContaining({ rule: "sensitive_data", code: "pii" })]
+        : [],
     );
   });
 });
