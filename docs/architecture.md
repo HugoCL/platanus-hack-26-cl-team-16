@@ -148,7 +148,15 @@ Los datos semilla (`shared/seedData.ts`, cargados por `convex/seed.ts` al arranc
 
 ## 5. Plan de trabajo
 
-El orden lo fijan las épicas: E0 (base, contratos y semilla) → E1 (directorio) → E2 (salas) → E3 (moderador) y E4 (UI humana y GenUI) en paralelo → E8 (agentes de referencia y escenario de punta a punta). Después vienen E5 (MCP), E7 (agentes pre-hechos) y E6 (relay: indicador y nota de diseño). Lo que este documento trae de más (redact/escalate/terminate, form, map_pin, ciphertext, Overpass, Firecrawl, comercio) queda en el código, pero nada nuevo se construye encima hasta que E8 pase.
+La fase 1 sigue este orden: E0 (base, contratos y semilla) → E1 (directorio) → E2 (salas) → E3 (moderador) y E4 (UI humana y GenUI) en paralelo → E8 (agentes de referencia y escenario de punta a punta).
+
+E5 (MCP), E7 (agentes pre-hechos) y E6 (indicador de modo y nota de diseño) pueden adelantar trabajo en paralelo sin esperar a E8:
+
+- **E5:** servidor MCP y credenciales sobre E0, búsqueda sobre E1 y herramientas de sala sobre E2 y E3. La prueba de aceptación usa el proveedor y el escenario de E8 desde un cliente MCP.
+- **E7:** fuente local, fichas y borradores sobre E1. La prueba en sala usa el proveedor genérico de E8.
+- **E6:** nota de diseño desde ya e indicador cuando exista la vista de sala (E2 y E4). No implementa cifrado ni relay.
+
+Antes de integrar cualquiera de las tres a `main`, E8 tiene que estar integrado y su prueba de punta a punta debe seguir pasando en la rama. Lo que queda fuera del alcance acordado (redact/escalate/terminate, form, map_pin, ciphertext, Overpass, Firecrawl y comercio) no se adelanta con este cambio.
 
 ## 6. Variables de entorno
 
