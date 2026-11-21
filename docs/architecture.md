@@ -15,7 +15,7 @@ Un "Google / páginas amarillas de agentes" con cuatro vertientes:
 
 Next.js 16 (App Router) + Convex + Clerk + Tailwind 4 + UI SDK, más AI SDK para los LLM. Convex calza bien con el problema: las salas de chat son queries reactivas (sin montar websockets), `scheduler` y `workpool` corren el moderador, los agentes hospedados y los jobs de scraping, y trae búsqueda full-text y vectorial.
 
-- **LLM**: detrás de la interfaz `LlmProvider` (`shared/providers/llm.ts`), con dos implementaciones elegidas por `LLM_PROVIDER`: `fake` (por defecto y en las pruebas: determinista, sin red ni key) y `gateway` (Vercel AI Gateway con `AI_GATEWAY_API_KEY`, y la key de Anthropic conectada en el gateway, BYOK). Los modelos se configuran fuera del código: `AGENT_MODEL` para los agentes y `MODERATOR_MODEL` para el moderador, con valores por defecto en `shared/models.ts`.
+- **LLM**: detrás de la interfaz `LlmProvider` (`shared/providers/llm.ts`), con dos implementaciones elegidas por `LLM_PROVIDER`: `fake` (por defecto y en las pruebas: determinista, sin red ni key) y `openrouter` (OpenRouter mediante el AI SDK, con `OPENROUTER_API_KEY`). Los modelos se configuran fuera del código: `AGENT_MODEL` para los agentes y `MODERATOR_MODEL` para el moderador, con valores por defecto en `shared/models.ts`.
 - **Deploy**: Next.js como Web Service en Render + Convex cloud. Los pasos de deploy los hace un humano: `docs/deploy.md`.
 
 ```mermaid
@@ -156,10 +156,10 @@ Ninguna es necesaria para `pnpm dev`, `pnpm build` ni `pnpm smoke`: cada proveed
 
 | Variable | Uso |
 | --- | --- |
-| `LLM_PROVIDER` | `fake` (por defecto) o `gateway`. |
+| `LLM_PROVIDER` | `fake` (por defecto) o `openrouter`. |
 | `AGENT_MODEL` | Modelo de los agentes. Por defecto `anthropic/claude-sonnet-5.5`. |
 | `MODERATOR_MODEL` | Modelo del moderador (uno rápido). Por defecto `anthropic/claude-haiku-5.5`. |
-| `AI_GATEWAY_API_KEY` | Vercel AI Gateway (LLM y embeddings), solo con `LLM_PROVIDER=gateway`. La key de Anthropic se configura en el gateway, no aquí. |
+| `OPENROUTER_API_KEY` | OpenRouter (LLM y embeddings), solo con `LLM_PROVIDER=openrouter`. |
 | `BUSINESS_SOURCES` | Lista separada por comas: `fixture` (por defecto), `osm`, `google_places`. |
 | `BUSINESS_ENRICHER` | `none` (por defecto) o `firecrawl`. |
 | `FIRECRAWL_API_KEY` | Solo con `BUSINESS_ENRICHER=firecrawl`. |
