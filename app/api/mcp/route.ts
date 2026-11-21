@@ -7,6 +7,6 @@ export const POST = createMcpEndpoint(
   { mutation: fetchMutation },
   {
     publicOrigin:
-      process.env.MCP_PUBLIC_ORIGIN ?? process.env.RENDER_EXTERNAL_URL,
+      process.env.MCP_PUBLIC_ORIGIN || process.env.RENDER_EXTERNAL_URL,
   },
 );

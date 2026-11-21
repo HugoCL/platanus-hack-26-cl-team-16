@@ -31,25 +31,35 @@ function toUrl(value: string) {
   }
 }
 
+const HOST = /^(?:[a-z0-9.-]+|\[[0-9a-f:.]+\])(?::\d{1,5})?$/;
+const DEFAULT_PORT: Record<string, string> = { "http:": "80", "https:": "443" };
+
 // DNS rebinding guard from the MCP spec: the host the client used and the Origin a browser sends
 // must be loopback or the deployment's public origin. The allowed values come from configuration,
 // never from the request, because a rebound page sends an Origin and a Host that match each other.
-// A chain of proxies lists several hosts in X-Forwarded-Host; the first is the one the client used.
+// The host is the first value of X-Forwarded-Host (a chain of proxies appends the rest), or Host.
+// A client can send X-Forwarded-Host itself, but a page in a browser also sends an Origin it cannot
+// forge, and that Origin must pass too.
 function allowedRequest(
   { headers, url }: Request,
   publicOrigin: string | undefined,
 ) {
-  const publicUrl = publicOrigin === undefined ? null : toUrl(publicOrigin);
-  const host = toUrl(
-    `http://${
-      headers.get("x-forwarded-host")?.split(",")[0].trim() ??
-      headers.get("host") ??
-      new URL(url).host
-    }`,
-  );
+  const publicUrl = publicOrigin ? toUrl(publicOrigin) : null;
+  const host = (
+    headers.get("x-forwarded-host")?.split(",")[0].trim() ||
+    headers.get("host") ||
+    new URL(url).host
+  ).toLowerCase();
+  const hostUrl = HOST.test(host) ? toUrl(`http://${host}`) : null;
+  const publicHosts = publicUrl
+    ? [
+        publicUrl.host,
+        `${publicUrl.hostname}:${publicUrl.port || DEFAULT_PORT[publicUrl.protocol]}`,
+      ]
+    : [];
   if (
-    !host ||
-    (!LOOPBACK.has(host.hostname) && host.host !== publicUrl?.host)
+    !hostUrl ||
+    (!LOOPBACK.has(hostUrl.hostname) && !publicHosts.includes(host))
   ) {
     return false;
   }

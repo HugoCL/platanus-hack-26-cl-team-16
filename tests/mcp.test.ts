@@ -95,7 +95,8 @@ describe("MCP endpoint over raw HTTP", () => {
   it.each([
     ["no Authorization header", {}],
     ["a non-Bearer scheme", { authorization: "Basic dXNlcjpwYXNz" }],
-    ["an unknown key", { authorization: "Bearer dak_0000" }],
+    ["a malformed key", { authorization: "Bearer dak_0000" }],
+    ["an unknown key", { authorization: `Bearer dak_${"0".repeat(64)}` }],
   ])("answers 401 with a Bearer challenge for %s", async (_, headers) => {
     const response = await post(initialize, headers);
     expect(response.status).toBe(401);
@@ -151,6 +152,31 @@ describe("MCP endpoint over raw HTTP", () => {
       ).status,
     ).toBe(403);
     expect((await post(initialize, rebound)).status).toBe(403);
+  });
+
+  it("reads the host strictly: default ports, no userinfo or path, empty forwarded host", async () => {
+    const authorization = `Bearer ${apiKey}`;
+    const status = async (headers: Record<string, string>) =>
+      (await post(initialize, { authorization, ...headers })).status;
+    expect(await status({ host: "directorio.example:443" })).toBe(200);
+    expect(await status({ "x-forwarded-host": "Directorio.Example:443" })).toBe(
+      200,
+    );
+    expect(await status({ host: "directorio.example:80" })).toBe(403);
+    expect(
+      await status({ host: "directorio.example", "x-forwarded-host": "" }),
+    ).toBe(200);
+    for (const host of [
+      "evil.example@localhost",
+      "localhost/evil",
+      "localhost?x",
+      "localhost#x",
+    ]) {
+      expect(await status({ host })).toBe(403);
+    }
+    expect(
+      await status({ "x-forwarded-host": "evil@directorio.example" }),
+    ).toBe(403);
   });
 
   it("accepts the public origin behind proxies and only that one", async () => {
