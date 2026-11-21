@@ -204,6 +204,7 @@ export const seeders = {
     };
     const contract: SessionContract = {
       intent,
+      purpose: clinic.purpose,
       capabilities: clinic.capabilities,
       allowedIntents: effectiveAllowedIntents(clinic),
       forbiddenTopics: clinic.scope.forbiddenTopics,

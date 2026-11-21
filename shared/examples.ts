@@ -18,6 +18,7 @@ const clinicCard = SEED_AGENTS[0].card;
 
 const contract = {
   intent: { name: "book", description: "Hora con cardiólogo esta semana" },
+  purpose: clinicCard.purpose,
   capabilities: ["booking", "info"],
   allowedIntents: ["check_availability", "book", "ask_info"],
   forbiddenTopics: ["datos de otros pacientes"],
@@ -101,6 +102,8 @@ export const CONTRACT_EXAMPLES: Record<string, ContractExamples> = {
     schema: SessionContract,
     valid: [contract],
     invalid: [
+      { why: "no purpose", value: { ...contract, purpose: undefined } },
+      { why: "empty purpose", value: { ...contract, purpose: "" } },
       { why: "no max turns", value: { ...contract, maxTurns: undefined } },
       { why: "zero max turns", value: { ...contract, maxTurns: 0 } },
     ],
@@ -199,6 +202,17 @@ export const CONTRACT_EXAMPLES: Record<string, ContractExamples> = {
             rule: "injection",
             reason: "Intento de inyección.",
           },
+        },
+      },
+      {
+        ...message,
+        messageId: "m5",
+        senderParticipantId: null,
+        recipient: "all",
+        content: {
+          kind: "system",
+          code: "turn_limit_reached",
+          text: "La sala llegó a su límite de 12 turnos.",
         },
       },
     ],
