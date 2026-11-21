@@ -73,7 +73,7 @@ describe("bookings", () => {
       status: "booked",
       offeringName: "Consulta cardiología · Dra. Carolina Muñoz",
       total: { amount: 45000, currency: "CLP" },
-      created: true,
+      slotId: first,
     });
     expect((await slot(first))?.booked).toBe(1);
     const [tx] = await roomBookings(r.sessionId);
@@ -87,14 +87,13 @@ describe("bookings", () => {
     const [first, second] = await free(r.providerId);
 
     const once = await book(r, first);
-    const again = { ...once, created: false };
-    expect(once).toMatchObject({ created: true });
-    expect(await book(r, first)).toEqual(again);
-    expect(await book(r, second)).toEqual(again);
+    expect(once).toMatchObject({ slotId: first });
+    expect(await book(r, first)).toEqual(once);
+    expect(await book(r, second)).toEqual(once);
     await t.run((ctx) =>
       ctx.db.patch("sessions", r.sessionId, { status: "closed" }),
     );
-    expect(await book(r, first)).toEqual(again);
+    expect(await book(r, first)).toEqual(once);
 
     expect((await slot(first))?.booked).toBe(1);
     expect((await slot(second))?.booked).toBe(0);
@@ -144,7 +143,7 @@ describe("bookings", () => {
 
     await expect(book(r, first)).resolves.toMatchObject({
       status: "booked",
-      created: true,
+      slotId: first,
     });
     expect((await slot(first))?.booked).toBe(1);
   });
