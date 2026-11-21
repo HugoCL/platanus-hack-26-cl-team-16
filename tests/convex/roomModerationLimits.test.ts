@@ -1,5 +1,5 @@
 // @vitest-environment edge-runtime
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { judgeRateLimiter } from "../../convex/moderator";
@@ -43,6 +43,40 @@ const storedMessages = () =>
   );
 
 describe("the judge's rate limit", () => {
+  it.each(["sender", "room"] as const)(
+    "starts neither judge when only one %s token remains",
+    async (bucket) => {
+      const senderKey = `participant:${room.provider}`;
+      const roomKey = `session:${room.sessionId}`;
+      await rooms.t.run((ctx) =>
+        bucket === "sender"
+          ? judgeRateLimiter.limit(ctx, "roomJudgeSender", {
+              key: senderKey,
+              count: 19,
+              throws: true,
+            })
+          : judgeRateLimiter.limit(ctx, "roomJudgeRoom", {
+              key: roomKey,
+              count: 39,
+              throws: true,
+            }),
+      );
+      const generateObject = vi.spyOn(rooms.llm, "generateObject");
+      const stored = await storedMessages();
+      const senderTokens = () =>
+        rooms.t.run((ctx) =>
+          judgeRateLimiter.getValue(ctx, "roomJudgeSender", { key: senderKey }),
+        );
+      const before = await senderTokens();
+      expect(await errorKind(send(room.provider))).toBe("RateLimited");
+      expect(generateObject).not.toHaveBeenCalled();
+      expect(await storedMessages()).toBe(stored);
+      expect(Math.floor((await senderTokens()).value)).toBe(
+        Math.floor(before.value),
+      );
+    },
+  );
+
   it("rejects a sender whose bucket is empty without calling the judge or storing anything", async () => {
     for (let i = 0; i < 10; i++) await send(room.provider);
     const stored = await storedMessages();

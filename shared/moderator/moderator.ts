@@ -51,7 +51,7 @@ export function createModerator({
   model?: string;
   conversationModel?: string;
   timeoutMs?: number;
-  beforeJudge?: () => Promise<void>;
+  beforeJudge?: (count: number) => Promise<void>;
 }): Moderator {
   return {
     async moderate(input) {
@@ -77,19 +77,19 @@ export function createModerator({
         };
       }
 
+      await beforeJudge?.(2);
       const runJudge = async (
         run: typeof messageJudge,
         stage: "injection" | "purpose",
         model?: string,
       ) => {
-        await beforeJudge?.();
         const started = Date.now();
         for (let retry = false; ; retry = true) {
           let attemptStarted = false;
           let verdict: Verdict;
           let reasons: ModerationReason[];
           try {
-            if (retry) await beforeJudge?.();
+            if (retry) await beforeJudge?.(1);
             attemptStarted = true;
             const decision = await withTimeout(
               (signal) => run(llm, input, signal),

@@ -237,7 +237,7 @@ describe("criterion 5: fail-closed", () => {
     vi.useFakeTimers();
     const llm = stubbornJudge(() => new Promise(() => {}));
     const generateObject = vi.spyOn(llm, "generateObject");
-    const beforeJudge = vi.fn(async () => {});
+    const beforeJudge = vi.fn(async (_count: number) => {});
     let settled = false;
     const result = createModerator({
       llm,
@@ -267,7 +267,7 @@ describe("criterion 5: fail-closed", () => {
     expect(second?.aborted).toBe(true);
     const { verdict, events } = await result;
     expect(generateObject).toHaveBeenCalledTimes(4);
-    expect(beforeJudge).toHaveBeenCalledTimes(4);
+    expect(beforeJudge.mock.calls).toEqual([[2], [1], [1]]);
 
     expect(verdict).toMatchObject({ decision: "block", rule: "purpose" });
     expect(events[1]).toMatchObject({
@@ -432,11 +432,11 @@ describe("beforeJudge", () => {
     "%s runs only when the judge is about to run",
     async (_id, c) => {
       const { llm, prompts } = scriptedJudge();
-      const beforeJudge = vi.fn(async () => {
+      const beforeJudge = vi.fn(async (_count: number) => {
         expect(prompts).toHaveLength(0);
       });
       await createModerator({ llm, beforeJudge }).moderate(moderationInput(c));
-      expect(beforeJudge).toHaveBeenCalledTimes(prompts.length);
+      expect(beforeJudge.mock.calls).toEqual(prompts.length === 0 ? [] : [[2]]);
     },
   );
 
