@@ -124,6 +124,7 @@ export async function loadSession(
 ): Promise<Session | null> {
   const session = await ctx.db.get(sessionId);
   if (!session) return null;
+  const { contract } = session;
   const participants = await ctx.db
     .query("participants")
     .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
@@ -133,7 +134,10 @@ export async function loadSession(
     status: session.status,
     mode: session.mode,
     intent: session.intent,
-    contract: session.contract,
+    contract:
+      contract?.purpose === undefined
+        ? null
+        : { ...contract, purpose: contract.purpose },
     participants: participants.map(toParticipant),
     turnCount: session.turnCount,
   };
