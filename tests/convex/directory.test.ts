@@ -7,6 +7,7 @@ import { api, internal } from "../../convex/_generated/api";
 import type { Doc } from "../../convex/_generated/dataModel";
 import {
   CATEGORY_LIMIT,
+  type DirectorySearchResult,
   listedCard,
   MAX_LIMIT,
   SCAN_ROW_BUDGET,
@@ -352,6 +353,40 @@ describe("directory search", () => {
     await expect(t.query(api.directory.search, { offset: -1 })).rejects.toThrow(
       /offset/,
     );
+  });
+
+  it("continues from nextOffset when the response budget cuts a page short", async () => {
+    await insertCopies("hotel-providencia-suites", 25, (i) => ({
+      slug: `hotel-grande-${i}`,
+      name: `Hotel grande ${i}`,
+      verified: false,
+      publicKey: "k".repeat(300_000),
+    }));
+    const slugs: string[] = [];
+    let offset: number | undefined = 0;
+    let pages = 0;
+    while (offset !== undefined && pages < 20) {
+      const page: DirectorySearchResult = await t.query(api.directory.search, {
+        comuna: "Providencia",
+        offset,
+      });
+      slugs.push(...page.agents.map((a) => a.slug));
+      offset = page.nextOffset;
+      pages += 1;
+    }
+    const all = await t.run((ctx) =>
+      ctx.db
+        .query("agents")
+        .collect()
+        .then((rows) =>
+          rows.filter(
+            (a) => a.location?.comuna === "Providencia" && a.status !== "draft",
+          ),
+        ),
+    );
+    expect(pages).toBeGreaterThan(1);
+    expect(new Set(slugs).size).toBe(slugs.length);
+    expect(slugs.length).toBe(all.length);
   });
 
   it("resolves exact category slugs through the index, beyond the taxonomy page", async () => {
