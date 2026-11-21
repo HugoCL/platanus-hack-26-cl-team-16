@@ -17,6 +17,7 @@ export const DEMO_PARTICIPANTS: RoomParticipant[] = [
   {
     participantId: "p-clinica",
     name: "Agendamiento Clínica Providencia",
+    verified: true,
     side: "other",
     kind: "agent",
   },

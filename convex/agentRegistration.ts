@@ -14,6 +14,13 @@ import {
 } from "./_generated/server";
 import { generateApiKey, sha256Hex, storeApiKey } from "./agentKeys";
 
+export const SELF_REGISTERED_SCOPE = {
+  allowedIntents: [],
+  forbiddenTopics: [],
+  dataItShares: [],
+  dataItRequests: [],
+};
+
 const limiter = new RateLimiter(components.rateLimiter, {
   registrationIp: { kind: "token bucket", rate: 5, period: HOUR, capacity: 5 },
   registrationGlobal: {
@@ -160,6 +167,8 @@ export const create = internalMutation({
       description: text(args.description, 1000),
       purpose: text(args.purpose ?? args.description, 1000),
       categories: [category],
+      scope: SELF_REGISTERED_SCOPE,
+      verified: false,
       slug: args.slug,
       status: "draft",
     });
@@ -292,6 +301,8 @@ async function publishCard(
         : text(args.description, 1000),
     categories: [category.slug],
     primaryCategory: category.slug,
+    scope: SELF_REGISTERED_SCOPE,
+    verified: false,
     capabilities: agent.capabilities.includes("info")
       ? agent.capabilities
       : [...agent.capabilities, "info" as const],

@@ -460,7 +460,7 @@ function SessionHeader({
         <div className="flex min-w-0 flex-col gap-0.5">
           <h1 className="m-0 flex min-w-0 items-center gap-1 text-lg leading-tight font-semibold tracking-tight">
             <span className="truncate">{other?.name}</span>
-            <VerifiedBadge />
+            {other?.verified && <VerifiedBadge />}
           </h1>
           <p className="m-0 truncate text-sm text-subtle-foreground">
             {self?.name} pide: “{contract.intent.description}”

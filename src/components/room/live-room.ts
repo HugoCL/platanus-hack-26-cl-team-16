@@ -15,7 +15,12 @@ export function agentTurnsExhausted(session: Session) {
 
 export function mapLiveRoom(
   session: Session,
-  names: { participantId: string; name: string; slug?: string }[],
+  names: {
+    participantId: string;
+    name: string;
+    slug?: string;
+    verified?: boolean;
+  }[],
   humanParticipantId: string,
 ) {
   const nameOf = (id: string) =>
@@ -33,6 +38,13 @@ export function mapLiveRoom(
       nameOf(p.participantId) ??
       (p.kind === "human" ? p.displayName : "Agente"),
     kind: p.kind,
+    ...(p.kind === "agent"
+      ? {
+          verified:
+            names.find((name) => name.participantId === p.participantId)
+              ?.verified === true,
+        }
+      : {}),
     side: ownParticipantIds.includes(p.participantId) ? "self" : "other",
     ...(p.kind === "human" &&
     p.participantId === humanParticipantId &&

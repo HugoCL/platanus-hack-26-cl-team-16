@@ -135,6 +135,7 @@ export const view = query({
           participantId: v.string(),
           name: v.string(),
           slug: v.optional(v.string()),
+          verified: v.optional(v.boolean()),
         }),
       ),
       humanParticipantId: v.id("participants"),
@@ -156,6 +157,7 @@ export const view = query({
         return {
           participantId: participant.participantId,
           name: agent?.name ?? "Agente",
+          verified: !!agent?.verified && !agent.selfRegistered,
           ...(agent ? { slug: agent.slug } : {}),
         };
       }),

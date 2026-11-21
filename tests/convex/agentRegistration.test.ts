@@ -79,6 +79,12 @@ describe("agent self-onboarding", () => {
       status: "draft",
       verified: false,
       capabilities: [],
+      scope: {
+        allowedIntents: [],
+        forbiddenTopics: [],
+        dataItShares: [],
+        dataItRequests: [],
+      },
       categories: ["asistente_personal"],
     });
     await expect(
@@ -201,6 +207,17 @@ describe("agent self-onboarding", () => {
   it("allows another registered agent to open an information room with a published agent", async () => {
     const provider = await register();
     const initiator = await register();
+    await rooms.t.run((ctx) =>
+      ctx.db.patch(provider.agentId, {
+        verified: true,
+        scope: {
+          allowedIntents: [],
+          forbiddenTopics: ["pacientes"],
+          dataItShares: ["rut", "nombre_paciente", "telefono", "nombre"],
+          dataItRequests: ["rut"],
+        },
+      }),
+    );
     await owner().mutation(api.agentRegistration.link, {
       code: provider.linkCode,
     });
@@ -213,7 +230,17 @@ describe("agent self-onboarding", () => {
     await owner().mutation(api.agentRegistration.publish, publication);
     expect(
       await rooms.t.query(api.directory.get, { agentId: provider.agentId }),
-    ).toMatchObject({ capabilities: ["info"], allowedIntents: ["ask_info"] });
+    ).toMatchObject({
+      capabilities: ["info"],
+      allowedIntents: ["ask_info"],
+      verified: false,
+      scope: {
+        allowedIntents: [],
+        forbiddenTopics: [],
+        dataItShares: [],
+        dataItRequests: [],
+      },
+    });
     const room = await rooms.t.action(api.mcpRooms.open, {
       apiKey: initiator.apiKey,
       targetAgentId: provider.agentId,
@@ -224,6 +251,9 @@ describe("agent self-onboarding", () => {
       capabilities: ["info"],
       allowedIntents: ["ask_info"],
       intent: { name: "ask_info" },
+      recipientShares: [],
+      recipientRequests: [],
+      forbiddenTopics: [],
     });
     await expect(
       rooms.t.action(api.mcpRooms.open, {
