@@ -83,7 +83,7 @@
   }
 
   [data-slot="tooltip-content"] {
-    border-radius: var(--sm-radius-lg);
+    border-radius: var(--ui-radius);
     background: var(--ui-primary);
     color: var(--ui-primary-foreground);
     font-size: 0.75rem;
@@ -132,7 +132,7 @@
 
 @keyframes room-flash {
   from {
-    box-shadow: 0 0 0 3px var(--sm-ring-strong);
+    box-shadow: 0 0 0 3px var(--ui-ring);
   }
   to {
     box-shadow: 0 0 0 3px transparent;
@@ -162,14 +162,20 @@
   display: inline-block;
   width: 0.5rem;
   height: 0.5rem;
-  border-radius: 999px;
+  border-radius: var(--sm-radius-full);
   background: currentColor;
   animation: room-scan 1s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .room-bubble,
-  [data-slot="button"] {
+  :is(
+    [data-slot="button"],
+    [data-slot="dialog-trigger"],
+    [data-slot="dialog-close"],
+    [data-slot="tooltip-trigger"],
+    [data-slot="collapsible-trigger"]
+  ) {
     transition: none;
   }
 
@@ -179,7 +185,13 @@
     animation: none;
   }
 
-  [data-slot="button"]:active {
+  :is(
+    [data-slot="button"],
+    [data-slot="dialog-trigger"],
+    [data-slot="dialog-close"],
+    [data-slot="tooltip-trigger"],
+    [data-slot="collapsible-trigger"]
+  ):active {
     transform: none;
   }
 }

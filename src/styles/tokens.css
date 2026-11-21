@@ -12,7 +12,7 @@
  * - `--ui-ring` uses muted-foreground (~4.6:1 on background) instead of the system's `ring`
  *   (~2.5:1), so keyboard focus passes 3:1.
  * - `--ui-input` keeps the system's soft control edge (~1.2:1). It fails WCAG 1.4.11 on its own;
- *   controls that rely on the edge alone need a fill or `--sm-ring-strong` in their CSS.
+ *   controls that rely on the edge alone need a fill or `--ui-ring` in their CSS.
  * - muted-foreground on muted is ~4.4:1: put text on muted in `--sm-subtle-foreground`.
  */
 :root {
@@ -78,7 +78,6 @@
     oklch(0.444 0.011 73.639),
     oklch(0.8 0.008 56)
   );
-  --sm-ring-strong: var(--ui-muted-foreground);
   --sm-destructive-text: light-dark(
     oklch(0.505 0.213 27.518),
     oklch(0.76 0.16 22)
@@ -94,7 +93,6 @@
   );
   --sm-warning: light-dark(oklch(0.666 0.179 58.318), oklch(0.769 0.188 70.08));
 
-  --sm-radius-lg: 7px;
   --sm-radius-2xl: 13px; /* swatches, map, inner panels */
   --sm-radius-3xl: 16px; /* bubbles, inputs, options */
   --sm-radius-4xl: 19px; /* cards */

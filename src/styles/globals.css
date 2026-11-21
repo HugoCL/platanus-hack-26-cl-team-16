@@ -22,7 +22,7 @@
   --color-destructive-soft: var(--sm-destructive-soft);
   --color-success: var(--sm-success);
   --color-warning: var(--sm-warning);
-  --radius-lg: var(--sm-radius-lg);
+  --radius-lg: var(--ui-radius);
   --radius-2xl: var(--sm-radius-2xl);
   --radius-3xl: var(--sm-radius-3xl);
   --radius-4xl: var(--sm-radius-4xl);
