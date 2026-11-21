@@ -268,7 +268,7 @@ function DemoToolbar({
       <span className="hidden opacity-80 sm:inline">
         Sin backend: datos del seed y una conversación guionada
       </span>
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
         <Select
           value={role}
           onValueChange={(value) => {
@@ -403,7 +403,9 @@ function SessionHeader({
         </span>
         <div className="flex min-w-0 flex-col gap-0.5">
           <h1 className="m-0 flex min-w-0 items-center gap-1 text-lg leading-tight font-semibold tracking-tight">
-            <span className="truncate">{other?.name}</span>
+            <span className="truncate" title={other?.name}>
+              {other?.name}
+            </span>
             <VerifiedBadge />
           </h1>
           <p className="m-0 truncate text-sm text-subtle-foreground">
@@ -415,7 +417,7 @@ function SessionHeader({
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-5 text-xs">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
         <span
           data-testid="session-status"
           className="inline-flex items-center gap-1.5 font-medium"
@@ -430,7 +432,7 @@ function SessionHeader({
           data-testid="violations"
           className="inline-flex items-center gap-2 text-subtle-foreground"
         >
-          Violaciones
+          <span className="max-sm:sr-only">Violaciones</span>
           <span aria-hidden="true" className="flex gap-0.5">
             {segments.map((segment) => (
               <span
@@ -748,9 +750,9 @@ function Terms({
       {items.map((item) => (
         <li
           key={item.code ?? item.label}
-          className="flex items-baseline justify-between gap-3 py-1"
+          className="flex flex-wrap items-baseline justify-between gap-x-3 py-1"
         >
-          <span className="flex items-center gap-2">
+          <span className="flex min-w-0 items-center gap-2">
             {marker ? (
               <span
                 aria-hidden="true"
@@ -760,7 +762,7 @@ function Terms({
             {item.label}
           </span>
           {item.code ? (
-            <code className="font-mono text-xs text-subtle-foreground">
+            <code className="min-w-0 font-mono text-xs break-all text-subtle-foreground">
               {item.code}
             </code>
           ) : null}

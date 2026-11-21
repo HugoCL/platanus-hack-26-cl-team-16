@@ -142,7 +142,7 @@ function Bubble({
       className={`flex scroll-mt-24 flex-col gap-1 ${self ? "items-end" : "items-start"} ${highlighted ? "room-highlight" : ""}`}
     >
       <header
-        className={`flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-subtle-foreground ${self ? "flex-row-reverse" : ""}`}
+        className={`flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-subtle-foreground ${self ? "flex-row-reverse" : ""}`}
       >
         <SenderName sender={sender} />
         <time dateTime={new Date(message.sentAt).toISOString()}>
@@ -213,7 +213,14 @@ function SenderName({ sender }: { sender?: RoomParticipant }) {
       </span>
     );
   }
-  return <span className="font-medium text-foreground">{sender.name}</span>;
+  return (
+    <span
+      title={sender.name}
+      className="max-w-[min(28rem,100%)] min-w-0 truncate font-medium text-foreground"
+    >
+      {sender.name}
+    </span>
+  );
 }
 
 function RedactedText({ text }: { text: string }) {

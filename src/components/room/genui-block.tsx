@@ -102,7 +102,7 @@ export function GenUiBlock({
         <span className="grid size-7 place-items-center rounded-full bg-muted text-subtle-foreground">
           {meta.icon}
         </span>
-        <h3 className="m-0 min-w-0 flex-1 truncate text-sm font-semibold">
+        <h3 className="m-0 line-clamp-2 min-w-0 flex-1 text-sm font-semibold">
           {title ?? meta.label}
         </h3>
         {answer ? (
@@ -517,7 +517,7 @@ function ListRow({ item }: { item: ListSpecItem }) {
   return (
     <>
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="text-sm font-medium">{item.title}</span>
+        <span className="text-sm font-medium break-words">{item.title}</span>
         {item.subtitle ? (
           <span className="text-xs text-subtle-foreground">
             {item.subtitle}
