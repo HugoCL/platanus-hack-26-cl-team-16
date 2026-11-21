@@ -62,7 +62,7 @@ The landing sells the product, so it is the one place with a brand voice: the ph
 * **Scroll in steps.** On screens at least 48rem wide and 40rem tall, the landing scrolls one section at a time with CSS scroll snap (`scroll-snap-type: y mandatory`, `scroll-snap-stop: always`): the header with the hero, the demo, how it works, and the closing call to action with the footer. Each section fills the viewport and centers its content. Phones scroll freely.
 * **Scroll reveal, once.** Content fades in from a blur and rises slightly the first time it enters the viewport, staggered in reading order, and then stays: scrolling back does not replay it, only a reload does. The hero title reveals word by word on load. Mark an element with `revealAt(i)` (`src/components/landing/reveal.tsx`); `ScrollReveal` observes each one until it is revealed. Content is hidden only when scripts run; under `prefers-reduced-motion` it only fades, with no blur or movement.
 * **Motion values.** Entrances use the strong ease-out `--landing-ease-out` (`cubic-bezier(0.23, 1, 0.32, 1)`); hover color changes use `ease`. The call to action presses to `scale(0.97)` in 160ms, and hover effects apply only on devices with a fine pointer.
-* **Headlines:** the hero uses the foreground color; section headings pair muted text with foreground text.
+* **Headlines are two-tone:** the first line in muted gray, the second in the foreground.
 
 ---
 
