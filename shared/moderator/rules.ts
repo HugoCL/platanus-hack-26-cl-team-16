@@ -16,11 +16,11 @@ export type RuleFinding = {
 const RUT_FORMATTED =
   /(?<![\d.])(\d{1,2}(?:\.\d{3}){2}|\d{7,8})-([\dk])(?![\dk])/gi;
 const RUT_AFTER_KEYWORD = /\bru[tn]\b[\s:#]*(\d{7,8})([\dk])(?![\dk])/gi;
-// A card number has 13 to 19 digits, unbroken or in groups split by one kind of
-// separator: spaces (any Unicode space), hyphens or dots. Every run of whole
-// consecutive groups with the same separator is checked with Luhn, so digits
-// next to a card cannot hide it, and a list of prices like "59.990 12.990" is
-// not read as one number.
+// A card number has 13 to 19 digits, unbroken or in groups split either by
+// spaces (any Unicode space) and hyphens, mixed freely, or by dots alone. Every
+// run of whole consecutive groups whose separators are all dotted or all
+// undotted is checked with Luhn, so digits next to a card cannot hide it, and a
+// list of prices like "59.990 12.990" is not read as one number.
 const DIGIT_RUN = /\d+(?:[\p{Zs}.-]+\d+)*/gu;
 const CARD_SEPARATOR = /([\p{Zs}.-]+)/u;
 
@@ -104,13 +104,13 @@ function hasCard(text: string): boolean {
   for (const [run] of text.matchAll(DIGIT_RUN)) {
     const parts = run.split(CARD_SEPARATOR);
     const groups = parts.filter((_, i) => i % 2 === 0);
-    const separators = parts
+    const dotted = parts
       .filter((_, i) => i % 2 === 1)
-      .map((separator) => separator.replace(/\p{Zs}/gu, " "));
+      .map((separator) => separator.includes("."));
     for (let first = 0; first < groups.length; first++) {
       let digits = "";
       for (let last = first; last < groups.length; last++) {
-        if (last > first && separators[last - 1] !== separators[first]) break;
+        if (last > first && dotted[last - 1] !== dotted[first]) break;
         digits += groups[last];
         if (digits.length > 19) break;
         if (digits.length >= 13 && passesLuhn(digits)) return true;
