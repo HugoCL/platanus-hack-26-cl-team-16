@@ -27,6 +27,10 @@ The directory lives in `convex/directory.ts` and the page at http://localhost:30
 
 Each card is an `AgentDetail` (the full `AgentCard` with purpose and scope) plus `comuna` and `allowedIntents`, so it also validates as an `AgentSummary`. Draft cards are never listed.
 
+## MCP server (E5)
+
+External agents reach the directory through the MCP server at http://localhost:3000/api/mcp, with a per-agent API key from `pnpm mcp:key`. [docs/mcp.md](mcp.md) explains how to get a key and configure each client.
+
 ## Rooms (E2)
 
 A room is a `session` in `convex/rooms.ts`. E4 calls these public functions with the signed-in user's Clerk token. The server finds that user's active human participant by `tokenIdentifier` and `sessionId`. The client never supplies a sender or viewer ID.
@@ -35,7 +39,7 @@ A room is a `session` in `convex/rooms.ts`. E4 calls these public functions with
 | --- | --- | --- |
 | `rooms.get({ sessionId })` | query | Returns the shared `Session` and its participants. |
 | `rooms.close({ sessionId })` | mutation | Closes the room, records who closed it in `closedReason` (`closed_by_<role>`) and publishes one `session_closed` notice. Calling it again changes nothing. Later sends fail with `RoomClosed`, even if moderation started before the close. |
-| `gate.send({ sessionId, recipient, content })` | action | Sends as the signed-in participant. `recipient` is a participant ID or `"all"`; `content` is `SendableContent` (text, a UI block or a UI response). Returns the message with its verdict. A blocked send is stored as `blocked` and generates a `moderator_alert`. A `ui_response` must answer (`inReplyTo`) a delivered UI block in the same room addressed to the sender or to everyone, and a participant who left can't send; otherwise the gate throws `InvalidArgument` or `NotParticipant`. |
+| `gate.send({ sessionId, recipient, content })` | action | Sends as the signed-in participant. `recipient` is a participant ID or `"all"`; `content` is `SendableContent` (text, a UI block or a UI response). Returns the message with its verdict. A blocked send is stored as `blocked` and generates a `moderator_alert`. A `ui_response` must answer (`inReplyTo`) an allowed UI block in the same room addressed to the sender, and a participant who left can't send; otherwise the gate throws `InvalidArgument` or `NotParticipant`. |
 | `gate.history({ sessionId })` | reactive query | Returns the latest visible messages in chronological order (up to 500 messages and 4 MiB). |
 | `gate.historyPage({ sessionId, paginationOpts })` | paginated query | Returns visible messages in chronological order. Use the returned cursor until `isDone`, even if a filtered page is empty. A page reads at most 4 MiB, so it can hold fewer than `numItems`. |
 
@@ -50,6 +54,8 @@ Only `insertMessage` in `convex/roomMessages.ts` writes to `messages`, and a tes
 An allowed message gives a turn to the hosted agent it is addressed to. A human's message to `"all"` gives a turn to every hosted agent in the room; an agent's message to `"all"` gives none, so agents cannot keep each other talking through broadcasts. `roomAgentFor(agent, ctx)` in `convex/roomAgent.ts` picks the `RoomAgent` that answers for that card and the `LlmProvider` it uses. The agent gets its own participant ID, the message, the contract, the participants, and only the history it could see as a participant, but never the action context: it acts only through the actions it returns, run in order. Each `send` goes through the same gate with the agent as sender, to any participant or to `"all"`, and gets its own verdict; `close` closes the room through `internal.rooms.closeAsParticipant`. A reply that addresses someone outside the room is dropped whole, and the actions after a blocked send, or after the room closed or ran out of turns, are dropped. When a hosted agent's allowed confirmation card repeats one it already published to the same participant, with the same `id` and the same content, the gate keeps the first and stores no second copy, so two concurrent turns confirm once; a card with new content or a blocked verdict is stored like any other message. E2 answers every card with a deterministic acknowledgment backed by the fake LLM, sent back to the sender; E8 supplies real room agents.
 
 Every stored agent message consumes one turn, a blocked one included. The final turn records `turn_limit_reached` in the same transaction. After that, extra agent sends fail with `TurnLimitReached` and no more agent replies are scheduled; humans can still send.
+
+The paid judge is rate limited per sender and per room (`convex/moderator.ts`): a token bucket of 10 per minute for each participant, and one of 20 per minute for each room. `openRoom` takes its tokens from the signed-in person opening the room, or from the initiator agent when no person does. Only a message that passed the deterministic rules and is about to reach the judge takes a token, and one mutation takes both tokens or neither. With either bucket empty, `gate.send` and `openRoom` throw a `ConvexError` whose `data.kind` is `RateLimited`, store nothing and don't call the LLM; a hosted agent's reply checks both buckets before the agent generates, waits for `retryAfter` when either is empty, and retries the whole reply when its first message is still rate limited. That check reserves nothing, so a concurrent send can still cost one extra generation. A message after the first that hits the limit is dropped with a log line, and a `close` in the same reply still runs. Every block the moderator decides also counts toward the contract's `maxViolations`, but a block caused by a moderator failure (`moderator_error`) does not. The one that reaches the limit terminates the room in the same transaction (`status: "terminated"`, `closedReason: "max_violations"`, and a `session_terminated` notice), and later sends fail with `RoomClosed`. That block publishes no `turn_limit_reached` even when it was the last agent turn, and `rooms.close` on a terminated room returns `status: "terminated"` without changing it.
 
 ## Bookings (E8)
 
@@ -81,10 +87,6 @@ The consumer (`lib/agents/consumer.ts`) starts from the human's request as writt
 `api.referenceScene.start` accepts a request and display name from a signed-in user. The seed consumer searches the directory and chooses a provider. The action opens an E2 room with the neutral intent description, then sends the actual opening through the gate. The hosted provider uses the same room and gate regardless of which consumer opened the room; a trusted external consumer can send its own opening and receive replies without running the seed consumer.
 
 The reference agents use a model with structured output (`LLM_PROVIDER=openrouter` on the Convex deployment). In unconfigured local rooms E2 still uses its acknowledgment double. Tests inject a scripted fake through the model factory. The room moderator is configured independently; PLTNS-39 owns connecting the real moderator.
-
-## MCP server (E5)
-
-External agents reach the directory through the MCP server at http://localhost:3000/api/mcp, with a per-agent API key from `pnpm mcp:key`. [docs/mcp.md](mcp.md) explains how to get a key and configure each client.
 
 ## Test
 

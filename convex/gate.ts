@@ -1,3 +1,4 @@
+import { isRateLimitError } from "@convex-dev/rate-limiter";
 import { type PaginationOptions, paginationOptsValidator } from "convex/server";
 import { ConvexError, v } from "convex/values";
 import { zodToConvex } from "convex-helpers/server/zod4";
@@ -26,7 +27,7 @@ import {
   query,
 } from "./_generated/server";
 import { requireLiveCredential } from "./agentKeys";
-import { moderate } from "./moderator";
+import { type JudgeBuckets, judgeRetryAfter, moderate } from "./moderator";
 import { roomAgentFor } from "./roomAgent";
 import {
   HISTORY_BYTE_BUDGET,
@@ -77,6 +78,16 @@ export const sendAsParticipant = internalAction({
   handler: (ctx, args): Promise<Message> => sendThroughGate(ctx, args),
 });
 
+function judgeBuckets(
+  sessionId: Id<"sessions">,
+  senderParticipantId: Id<"participants">,
+): JudgeBuckets {
+  return {
+    sender: `participant:${senderParticipantId}`,
+    room: `session:${sessionId}`,
+  };
+}
+
 export async function sendThroughGate(
   ctx: ActionCtx,
   args: {
@@ -103,14 +114,18 @@ export async function sendThroughGate(
     inReplyTo: content.kind === "ui_response" ? content.inReplyTo : undefined,
   });
 
-  const outcome = await moderate({
-    content,
-    sender: room.sender,
-    recipient: args.recipient,
-    participants: room.participants,
-    contract: room.contract,
-    history: room.history,
-  });
+  const outcome = await moderate(
+    ctx,
+    {
+      content,
+      sender: room.sender,
+      recipient: args.recipient,
+      participants: room.participants,
+      contract: room.contract,
+      history: room.history,
+    },
+    judgeBuckets(args.sessionId, args.senderParticipantId),
+  );
 
   return ctx.runMutation(internal.gate.commit, {
     sessionId: args.sessionId,
@@ -270,9 +285,34 @@ export const commit = internalMutation({
         },
       );
     }
+    let terminated = false;
+    if (
+      verdict.decision === "block" &&
+      !args.events.some((event) =>
+        event.reasons.some((reason) => reason.code === "moderator_error"),
+      )
+    ) {
+      const stored = await ctx.db.get("sessions", args.sessionId);
+      const violationCount = (stored?.violationCount ?? 0) + 1;
+      terminated = violationCount >= session.contract.maxViolations;
+      await ctx.db.patch("sessions", args.sessionId, {
+        violationCount,
+        ...(terminated
+          ? { status: "terminated" as const, closedReason: "max_violations" }
+          : {}),
+      });
+      if (terminated) {
+        await publishNotice(
+          ctx,
+          args.sessionId,
+          "session_terminated",
+          `La sala se cerró tras ${violationCount} mensajes bloqueados.`,
+        );
+      }
+    }
     if (agentTurn) {
       await ctx.db.patch("sessions", args.sessionId, { turnCount });
-      if (exhausted) {
+      if (exhausted && !terminated) {
         await publishNotice(
           ctx,
           args.sessionId,
@@ -376,6 +416,14 @@ export const reply = internalAction({
     const input = await ctx.runQuery(internal.gate.replyContext, args);
     if (!input) return null;
     const { agent, self, sessionId, ...room } = input;
+    const retryAfter = await judgeRetryAfter(
+      ctx,
+      judgeBuckets(sessionId, self),
+    );
+    if (retryAfter !== undefined) {
+      await ctx.scheduler.runAfter(retryAfter, internal.gate.reply, args);
+      return null;
+    }
     const { agent: roomAgent, llm } = roomAgentFor(agent, ctx);
     const actions = await roomAgent.reply({ self, ...room, llm });
     const strangers = actions.filter(
@@ -390,7 +438,7 @@ export const reply = internalAction({
       );
       return null;
     }
-    for (const action of actions) {
+    for (const [index, action] of actions.entries()) {
       try {
         if (action.kind === "close") {
           await ctx.runMutation(internal.rooms.closeAsParticipant, {
@@ -408,6 +456,26 @@ export const reply = internalAction({
           if (sent.status !== "allowed") return null;
         }
       } catch (error) {
+        if (isRateLimitError(error)) {
+          if (index === 0) {
+            await ctx.scheduler.runAfter(
+              error.data.retryAfter,
+              internal.gate.reply,
+              args,
+            );
+          } else {
+            console.error(
+              `gate.reply: dropped the rate-limited messages of ${self}`,
+            );
+            if (actions.slice(index).some((a) => a.kind === "close")) {
+              await ctx.runMutation(internal.rooms.closeAsParticipant, {
+                sessionId,
+                participantId: self,
+              });
+            }
+          }
+          return null;
+        }
         if (
           !(error instanceof ConvexError) ||
           (error.data?.kind !== "RoomClosed" &&
@@ -619,9 +687,8 @@ async function replyTarget(
     !target ||
     target.sessionId !== sessionId ||
     target.content.kind !== "ui" ||
-    (target.moderation.status !== "allowed" &&
-      target.moderation.status !== "redacted") ||
-    (target.recipient !== "all" && target.recipient !== sender.participantId)
+    target.moderation.status !== "allowed" ||
+    target.recipient !== sender.participantId
   ) {
     gateError(
       "InvalidArgument",

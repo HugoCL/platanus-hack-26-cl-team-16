@@ -84,7 +84,7 @@ describe("agent API keys", () => {
     }
   });
 
-  it("rejects a malformed key without looking it up", async () => {
+  it("rejects malformed keys", async () => {
     const { apiKey } = await issue();
     expect(isApiKeyFormat(apiKey)).toBe(true);
     for (const malformed of [
