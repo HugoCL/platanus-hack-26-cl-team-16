@@ -251,7 +251,9 @@ export function DirectorySearch() {
           {
             key: "near",
             label: radiusFilter ? `A ${radiusFilter} km de ti` : "Cerca de ti",
-            remove: () => setGeo({ state: "off" }),
+            remove: radiusFilter
+              ? () => setWithinRadius(false)
+              : () => setGeo({ state: "off" }),
           },
         ]
       : []),
