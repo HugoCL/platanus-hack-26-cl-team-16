@@ -34,12 +34,8 @@ function scriptedJudge() {
       );
       if (!c) throw new Error("fake judge: no scripted answer");
       return c.expected.decision === "allow"
-        ? { decision: "allow", rule: "purpose", reason: "Sirve al propósito." }
-        : {
-            decision: "block",
-            rule: c.expected.rule,
-            reason: "No sirve al propósito.",
-          };
+        ? { decision: "allow", rule: "purpose" }
+        : { decision: "block", rule: c.expected.rule };
     },
   });
   return { llm, prompts };
@@ -206,12 +202,7 @@ describe("criterion 5: fail-closed", () => {
       <T>() =>
         new Promise<T>((resolve) =>
           setTimeout(
-            () =>
-              resolve({
-                decision: "allow",
-                rule: "purpose",
-                reason: "Ok.",
-              } as T),
+            () => resolve({ decision: "allow", rule: "purpose" } as T),
             MODERATOR_TIMEOUT_MS - 100,
           ),
         ),
@@ -220,8 +211,22 @@ describe("criterion 5: fail-closed", () => {
     await vi.advanceTimersByTimeAsync(MODERATOR_TIMEOUT_MS);
     const { verdict } = await result;
     expect(verdict.decision).toBe("allow");
-    expect(verdict.reason).not.toBe("Ok.");
   });
+
+  it.each([
+    [{ decision: "allow", rule: "purpose" }, []],
+    [{ decision: "block", rule: "scope" }, ["forbidden_topic"]],
+  ])(
+    "takes %j with no reason as the judge's decision",
+    async (answer, codes) => {
+      const llm = createFakeLlmProvider({ object: () => answer });
+      const { verdict, events } = await createModerator({ llm }).moderate(
+        legit,
+      );
+      expect(verdict.decision).toBe(answer.decision);
+      expect(events[1].reasons.map((r) => r.code)).toEqual(codes);
+    },
+  );
 });
 
 describe("public reasons", () => {
@@ -280,7 +285,7 @@ describe("the judge prompt", () => {
     const llm = createFakeLlmProvider({
       object: (args) => {
         prompts.push(args);
-        return { decision: "allow", rule: "purpose", reason: "Ok." };
+        return { decision: "allow", rule: "purpose" };
       },
     });
 
