@@ -89,3 +89,26 @@ it("spends a token on every launch, even one that opens no room", async () => {
   for (let i = 0; i < 10; i++) expect(await start()).toBeNull();
   expect(await errorKind(start())).toBe("RateLimited");
 });
+
+it("opens a room with the opener's last token, which the launch took once", async () => {
+  const rooms = await seededRooms();
+  vi.mocked(referenceLlm).mockReturnValue(
+    createFakeLlmProvider({
+      object: ({ prompt }) =>
+        prompt.includes("<proveedores>")
+          ? { choice: "p1:book", message: "Hola, ¿tienen hora de cardiología?" }
+          : { action: "reply", offerings: [], text: "Sí." },
+    }),
+  );
+  for (let i = 0; i < 9; i++) {
+    await rooms.open({ human: { displayName: "Juan" } });
+  }
+  const start = () =>
+    rooms.t.withIdentity(ROOM_OWNER).action(api.referenceScene.start, {
+      request: REQUEST,
+      displayName: "Juan",
+    });
+
+  expect((await start())?.room.status).toBe("active");
+  expect(await errorKind(start())).toBe("RateLimited");
+});

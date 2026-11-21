@@ -51,6 +51,7 @@ export const open = internalAction({
 export async function openRoom(
   ctx: ActionCtx,
   args: ObjectType<typeof openArgs>,
+  { openerTokenTaken = false }: { openerTokenTaken?: boolean } = {},
 ): Promise<Session> {
   const identity = args.human ? await requireRoomIdentity(ctx) : null;
   const opener = identity
@@ -71,7 +72,10 @@ export async function openRoom(
       contract,
       history: [],
     },
-    { sender: opener, room: `open:${opener}:${args.providerAgentId}` },
+    {
+      sender: openerTokenTaken ? undefined : opener,
+      room: `open:${opener}:${args.providerAgentId}`,
+    },
   );
   if (verdict.decision === "block") {
     throw new ConvexError({

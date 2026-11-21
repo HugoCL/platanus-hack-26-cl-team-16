@@ -51,12 +51,14 @@ const judgeBuckets = { sender: v.string(), room: v.string() };
 export type JudgeBuckets = ObjectType<typeof judgeBuckets>;
 
 export const takeJudgeTokens = internalMutation({
-  args: judgeBuckets,
+  args: { ...judgeBuckets, sender: v.optional(v.string()) },
   handler: async (ctx, { sender, room }) => {
-    await judgeRateLimiter.limit(ctx, "roomJudgeSender", {
-      key: sender,
-      throws: true,
-    });
+    if (sender !== undefined) {
+      await judgeRateLimiter.limit(ctx, "roomJudgeSender", {
+        key: sender,
+        throws: true,
+      });
+    }
     await judgeRateLimiter.limit(ctx, "roomJudgeRoom", {
       key: room,
       throws: true,
@@ -91,7 +93,7 @@ export async function judgeRetryAfter(
 export async function moderate(
   ctx: ActionCtx,
   input: ModerationInput,
-  buckets: JudgeBuckets,
+  buckets: Omit<JudgeBuckets, "sender"> & { sender?: string },
 ): Promise<ModerationOutcome> {
   try {
     const llm = createLlmProvider();
