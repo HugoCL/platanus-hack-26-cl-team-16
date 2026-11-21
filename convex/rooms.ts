@@ -135,6 +135,7 @@ export const view = query({
           participantId: v.string(),
           name: v.string(),
           slug: v.optional(v.string()),
+          verified: v.optional(v.boolean()),
         }),
       ),
       humanParticipantId: v.id("participants"),
@@ -156,6 +157,7 @@ export const view = query({
         return {
           participantId: participant.participantId,
           name: agent?.name ?? "Agente",
+          verified: !!agent?.verified && !agent.selfRegistered,
           ...(agent ? { slug: agent.slug } : {}),
         };
       }),
@@ -186,6 +188,7 @@ export const open = internalAction({
 export async function openRoom(
   ctx: ActionCtx,
   args: ObjectType<typeof openArgs>,
+  { openerTokenTaken = false }: { openerTokenTaken?: boolean } = {},
 ): Promise<Session> {
   const identity = args.human ? await requireRoomIdentity(ctx) : null;
   const opener = identity
@@ -206,7 +209,10 @@ export async function openRoom(
       contract,
       history: [],
     },
-    { sender: opener, room: `open:${opener}:${args.providerAgentId}` },
+    {
+      sender: openerTokenTaken ? undefined : opener,
+      room: `open:${opener}:${args.providerAgentId}`,
+    },
   );
   if (verdict.decision === "block") {
     throw new ConvexError({
@@ -355,7 +361,11 @@ async function planRoom(ctx: QueryCtx, args: ObjectType<typeof openArgs>) {
     invalidArgument("an agent cannot open a room with itself");
   }
   const initiator = await ctx.db.get(args.initiatorAgentId);
-  if (!initiator || !listedCard(initiator)) {
+  if (
+    !initiator ||
+    (!listedCard(initiator) &&
+      !(initiator.kind === "external" && initiator.status === "draft"))
+  ) {
     invalidArgument("the initiator agent does not exist or is not listed");
   }
   const provider = await ctx.db.get(args.providerAgentId);

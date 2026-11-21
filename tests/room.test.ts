@@ -46,6 +46,8 @@ describe("initials", () => {
       expect(initials("Agendamiento y Reservas")).toBe("AR");
       expect(initials("mi asistente 🦊")).toBe("MA");
       expect(initials("𐐨lvaro pérez")).toBe("𐐀P");
+      expect(initials("Ángel Pérez".normalize("NFD"))).toBe("ÁP");
+      expect(initials("Q\u0301uinn Pérez")).toBe("Q\u0301P");
       expect(initials("")).toBe("");
       expect(initials("🦊")).toBe("");
     } finally {
