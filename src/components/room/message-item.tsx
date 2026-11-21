@@ -9,7 +9,7 @@ import {
   TriangleAlertIcon,
   UserIcon,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import type { UiResponse, UiSpec } from "@/shared/genui";
 import { type GenUiAnswer, GenUiBlock } from "./genui-block";
 import { ModerationBadge, PendingStages } from "./moderation";
@@ -35,6 +35,8 @@ type MessageItemProps = {
   // UI specs by the id of the message that carried them; `ui_response.inReplyTo` points there.
   uiSpecsByMessage: Record<string, UiSpec>;
   highlighted?: boolean;
+  // Same sender as the message right above: the name is not repeated.
+  continued?: boolean;
   readOnly?: boolean;
   onRespond: (response: UiResponse) => void;
   onShowAudit: (messageId: string) => void;
@@ -62,6 +64,7 @@ function Bubble({
   answers,
   uiSpecsByMessage,
   highlighted,
+  continued,
   onRespond,
   onShowAudit,
   onReview,
@@ -73,6 +76,7 @@ function Bubble({
   const visible = canSeeContent(status, message.senderParticipantId, viewer);
   const reason = primaryReason(message.reasons);
   const canModerate = viewer.role === "owner" || viewer.role === "operator";
+  const slow = useSlowReview(status === "pending");
 
   const frame =
     status === "blocked"
@@ -144,12 +148,12 @@ function Bubble({
       data-testid="room-message"
       data-status={status}
       aria-label={`${sender?.name ?? "Desconocido"}, ${formatTime(message.sentAt)}`}
-      className={`flex scroll-mt-24 flex-col gap-1 ${self ? "items-end" : "items-start"} ${highlighted ? "room-highlight" : ""}`}
+      className={`flex scroll-mt-24 flex-col gap-1 ${continued ? "-mt-4" : ""} ${self ? "items-end" : "items-start"} ${highlighted ? "room-highlight" : ""}`}
     >
       <header
         className={`flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-subtle-foreground ${self ? "flex-row-reverse" : ""}`}
       >
-        <SenderName sender={sender} />
+        {continued ? null : <SenderName sender={sender} />}
         <time dateTime={new Date(message.sentAt).toISOString()}>
           {formatTime(message.sentAt)}
         </time>
@@ -169,6 +173,12 @@ function Bubble({
         {body}
       </div>
       {status === "pending" ? <PendingStages /> : null}
+      {slow ? (
+        <p className="m-0 max-w-[min(560px,92%)] text-xs text-subtle-foreground">
+          El moderador está tardando más de lo normal. El mensaje no se entrega
+          hasta que lo revise.
+        </p>
+      ) : null}
       {status === "redacted" && reason ? (
         <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 py-0.5 text-xs">
           Se ocultó: {REASON_LABELS[reason.code]}
@@ -201,6 +211,19 @@ function Bubble({
       ) : null}
     </article>
   );
+}
+
+const SLOW_REVIEW_MS = 15_000;
+
+function useSlowReview(pending: boolean) {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    setSlow(false);
+    if (!pending) return;
+    const timer = window.setTimeout(() => setSlow(true), SLOW_REVIEW_MS);
+    return () => window.clearTimeout(timer);
+  }, [pending]);
+  return slow;
 }
 
 function SenderName({ sender }: { sender?: RoomParticipant }) {

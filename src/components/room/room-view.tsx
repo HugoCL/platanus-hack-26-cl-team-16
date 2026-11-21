@@ -257,6 +257,11 @@ export function RoomView({
                   {newDay ? <DayDivider label={day} /> : null}
                   <MessageItem
                     message={message}
+                    continued={
+                      !newDay &&
+                      message.senderParticipantId !== null &&
+                      prev?.senderParticipantId === message.senderParticipantId
+                    }
                     sender={
                       message.senderParticipantId
                         ? participants.get(message.senderParticipantId)
