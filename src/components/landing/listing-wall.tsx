@@ -11,7 +11,7 @@ import { SEED_AGENTS } from "@/shared/seed-data";
  * marked in yellow; a few others are drawn a little brighter. Everything is drawn into one canvas,
  * so the wall costs one DOM node, and redrawn only on resize or theme change.
  */
-const RUBROS = [
+const CATEGORIES = [
   ["Abogados", "Estudio Jurídico", "abogados"],
   ["Almacenes", "Almacén"],
   ["Cafeterías", "Café", "cafeteria"],
@@ -103,8 +103,8 @@ function buildSections(): Section[] {
   const phone = () =>
     `+56 2 2${100 + next(900)} ${String(next(10000)).padStart(4, "0")}`;
 
-  return Array.from({ length: RUBROS.length * 3 }, (_, index) => {
-    const [heading, noun, slug] = RUBROS[index % RUBROS.length];
+  return Array.from({ length: CATEGORIES.length * 3 }, (_, index) => {
+    const [heading, noun, slug] = CATEGORIES[index % CATEGORIES.length];
     const seeded = SEED_LISTINGS.filter(
       (listing) => slug && listing.categories[0] === slug,
     ).map(
