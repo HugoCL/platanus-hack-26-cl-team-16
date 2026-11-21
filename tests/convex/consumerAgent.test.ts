@@ -12,7 +12,7 @@ import {
   type FoundCard,
 } from "../../lib/agents/consumer";
 import type { AgentTurn } from "../../lib/agents/turn";
-import type { Message, SendableContent } from "../../shared/messages";
+import type { Message } from "../../shared/messages";
 import {
   createFakeLlmProvider,
   type LlmProvider,
@@ -90,19 +90,6 @@ function consumerSees(room: LoggedRoom, incoming: Message): AgentTurn {
   };
 }
 
-const confirmationCard: SendableContent = {
-  kind: "ui",
-  spec: {
-    type: "confirmation",
-    id: "horarios-1-reserva",
-    title: "Reserva confirmada",
-    summary: "Consulta cardiología, jueves 26 de noviembre, 10:30.",
-    details: [],
-    confirmLabel: "Listo",
-    cancelLabel: "Cerrar",
-  },
-};
-
 describe("consumer agent", () => {
   it("finds the seed clinic with E1's search and opens with an intent the card allows", async () => {
     const prompts: string[] = [];
@@ -166,27 +153,16 @@ describe("consumer agent", () => {
     ).resolves.toBeNull();
   });
 
-  it("chooses nothing when the directory has no match", async () => {
+  it("chooses nothing when the directory has no match, however long the request", async () => {
     await expect(
       chooseProvider("Necesito un gimnasio en Pirque", { llm: noLlm, search }),
     ).resolves.toBeNull();
-  });
-
-  it("closes the room when its provider's confirmation reaches it", async () => {
-    const room = await openRoom();
-    const toOwner = await room.post(
-      room.recipient,
-      room.owner,
-      confirmationCard,
-    );
-    const toAll = await room.post(room.recipient, "all", confirmationCard);
-
     await expect(
-      consumerTurn(consumerSees(room, toOwner), { llm: noLlm }),
-    ).resolves.toEqual([]);
-    await expect(
-      consumerTurn(consumerSees(room, toAll), { llm: noLlm }),
-    ).resolves.toEqual([{ kind: "close" }]);
+      chooseProvider("Necesito un gimnasio en Pirque. ".repeat(12), {
+        llm: noLlm,
+        search,
+      }),
+    ).resolves.toBeNull();
   });
 
   it("answers its provider through the model, or stays quiet", async () => {
@@ -228,6 +204,35 @@ describe("consumer agent", () => {
         consumerTurn(consumerSees(room, ignored), { llm: noLlm }),
       ).resolves.toEqual([]);
     }
+  });
+
+  it("keeps its opening in view, however long the room gets", async () => {
+    const room = await openRoom();
+    await room.post(room.initiator, room.recipient, {
+      kind: "text",
+      text: "Solo puedo el martes a las 8",
+    });
+    let last = await room.post(room.recipient, room.initiator, {
+      kind: "text",
+      text: "¿Algo más?",
+    });
+    for (let i = 0; i < 14; i++) {
+      last = await room.post(room.recipient, room.initiator, {
+        kind: "text",
+        text: `Pregunta ${i}`,
+      });
+    }
+    const prompts: string[] = [];
+    const llm = createFakeLlmProvider({
+      object: ({ prompt }) => {
+        prompts.push(prompt);
+        return { action: "wait", text: "" };
+      },
+    });
+
+    await consumerTurn(consumerSees(room, last), { llm });
+
+    expect(prompts[0]).toContain("Solo puedo el martes a las 8");
   });
 
   it("completes the reference request with the provider, before E2, behind an allow-all moderator", async () => {
@@ -309,6 +314,7 @@ describe("consumer agent", () => {
       "ui_response",
       "confirmation",
     ]);
+    expect(room.history.at(-1)?.recipient).toBe(room.owner);
     const slot = await t.run((ctx) =>
       ctx.db.get("availability", chosen as Id<"availability">),
     );
