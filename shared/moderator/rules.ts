@@ -15,20 +15,19 @@ export type RuleFinding = {
 
 const RUT_FORMATTED =
   /(?<![\d.])(\d{1,2}(?:\.\d{3}){2}|\d{7,8})-([\dk])(?![\dk])/gi;
-// A value labeled RUT or RUN is always read as a RUT, even after a price or
-// phone prefix.
-const RUT_AFTER_KEYWORD =
-  /\bru[tn]\b[\s:#]*(?:\$|\+\s*56)?[\s-]*(\d{7,8})([\dk])(?![\dk])/gi;
-// A RUT with no dots, hyphen or label: 7 or 8 digits and the check digit,
-// standing alone, so not part of a longer number. Before looking for one, two
-// kinds of whole tokens are set aside: a price, "$" and digits with or without
-// dots, and a Chilean phone, "+56" and nine digits starting with 2 to 9. A
-// "+56" before anything else is dropped, so what follows is read on its own.
-// Everything else that passes modulo 11 is a RUT.
+// A RUT with no dots or hyphen: 7 or 8 digits and the check digit, standing
+// alone, so not part of a longer number. A "+56" before it is dropped, so what
+// follows is read on its own. When the message says RUT or RUN as a word, every
+// such number that passes modulo 11 is a RUT. Otherwise three shapes are not:
+// a price, "$" and a whole token of digits with or without dots; a Chilean
+// phone, "+56" and nine digits starting with 2 to 9; and a mobile, nine digits
+// starting with 9.
 const RUT_COMPACT = /(?<![\p{L}\d.,-])(\d{7,8})([\dk])(?![\p{L}\d]|[.,-]\d)/giu;
+const RUT_WORD = /(?<![\p{L}\d])ru[tn](?![\p{L}\d])/iu;
+const COUNTRY_CODE = /\+\p{Zs}*56/gu;
 const PRICE = /\$\p{Zs}*\d[\d.]*(?![\p{L}\d])/giu;
 const CHILEAN_PHONE =
-  /\+\p{Zs}*56[\p{Zs}()-]*(?:[2-9](?:[\p{Zs}()-]*\d){8}(?![\p{L}\d]))?/giu;
+  /\+\p{Zs}*56[\p{Zs}()-]*[2-9](?:[\p{Zs}()-]*\d){8}(?![\p{L}\d])/gu;
 const CHILEAN_MOBILE = /^9\d{8}$/;
 // A card number has 13 to 19 digits, unbroken or in groups split either by
 // spaces (any Unicode space) and hyphens, mixed freely, or by dots alone. Every
@@ -145,14 +144,14 @@ function passesLuhn(digits: string): boolean {
 }
 
 function hasRut(text: string): boolean {
-  const withoutPricesOrPhones = text
-    .replace(PRICE, " ")
-    .replace(CHILEAN_PHONE, " ");
+  const saysRut = RUT_WORD.test(text);
+  const compactText = (
+    saysRut ? text : text.replace(PRICE, " ").replace(CHILEAN_PHONE, " ")
+  ).replace(COUNTRY_CODE, " ");
   const candidates = [
     ...text.matchAll(RUT_FORMATTED),
-    ...text.matchAll(RUT_AFTER_KEYWORD),
-    ...[...withoutPricesOrPhones.matchAll(RUT_COMPACT)].filter(
-      ([compact]) => !CHILEAN_MOBILE.test(compact),
+    ...[...compactText.matchAll(RUT_COMPACT)].filter(
+      ([compact]) => saysRut || !CHILEAN_MOBILE.test(compact),
     ),
   ];
   return candidates.some(

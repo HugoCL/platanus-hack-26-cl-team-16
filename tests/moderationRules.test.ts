@@ -128,6 +128,23 @@ describe("RUT", () => {
     ["rut: $ 12345674", true, "a label beats the price shape"],
     ["RUT: +56 223456707", true, "a label beats the phone shape"],
     ["RUN +56223456707", true, "a label beats the phone shape"],
+    ["Mi RUT es $123456785", true, "the word RUT turns off the price shape"],
+    ["mi run: +56 123456785", true, "the word RUN turns off the phone shape"],
+    [
+      "RUT pendiente, llámame al 987654325",
+      true,
+      "the word RUT turns off the mobile shape",
+    ],
+    [
+      "Por la ruta 68, peaje $123456785",
+      false,
+      "rut inside another word is no label",
+    ],
+    [
+      "Trutro de pollo, pedidos al +56 223456707",
+      false,
+      "rut inside another word is no label",
+    ],
     ["12.345.678-9", false, "wrong check digit"],
     ["2026-11-24T09:00:00-03:00", false, "timestamp"],
     ["123456785", true, "compact, 9 characters"],
