@@ -37,6 +37,19 @@
   }
 }
 
+@utility press {
+  transition: scale 160ms var(--ease-out);
+  &:active {
+    scale: 0.97;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+    &:active {
+      scale: none;
+    }
+  }
+}
+
 @theme inline {
   --color-background: var(--ui-background);
   --color-foreground: var(--ui-foreground);

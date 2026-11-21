@@ -39,6 +39,7 @@ it("puts schematic pin stacking on the button and preserves popup classes", asyn
         : /^<button[^>]*class="z-10 /,
     );
     expect(html).toContain("!absolute -translate-x-1/2 -translate-y-full");
+    expect(html).not.toContain("active:scale-");
   }
   const html = renderToStaticMarkup(
     createElement(SelectedCard, {

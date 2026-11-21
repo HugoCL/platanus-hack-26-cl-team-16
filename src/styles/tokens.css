@@ -60,6 +60,8 @@
   /* Shape, rhythm, type */
   --ui-radius: 0.4375rem; /* radius-lg 7px; web.css derives popups (×1.5) and thumbs from it */
   --ui-spacing: 0.25rem;
+  /* Motion: the one curve for things that enter or respond to a press */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ui-font-size: 0.875rem; /* body 14px desktop */
   --ui-line-height: 1.6;
   --ui-font-sans: var(--font-geist), system-ui, sans-serif;
