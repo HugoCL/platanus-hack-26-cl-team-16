@@ -680,6 +680,13 @@ describe("MCP room tools", () => {
         recipient: provider,
         content: text("Hola, ¿tienen una hora de cardiología?"),
       });
+      const agentPage = await use("wait_for_messages", {
+        sessionId,
+        timeoutMs: 0,
+      });
+      expect(agentPage.messages.map((message) => message.content.kind)).toEqual(
+        ["system", "text"],
+      );
       await t.finishAllScheduledFunctions(vi.runAllTimers);
       const picker = (await owner.query(api.gate.history, { sessionId })).at(
         -1,
@@ -695,6 +702,13 @@ describe("MCP room tools", () => {
         recipient: human,
         status: "allowed",
       });
+      const afterPicker = await use("wait_for_messages", {
+        sessionId,
+        after: agentPage.cursor,
+        timeoutMs: 0,
+      });
+      expect(afterPicker.messages).toEqual([]);
+      expect(afterPicker.cursor).not.toBe(agentPage.cursor);
       const { id: pickerId, slots } = picker.content.spec;
       const slotId = slots[0].id;
       const choice = {
@@ -729,10 +743,15 @@ describe("MCP room tools", () => {
           }),
         ]),
       );
-      expect(
-        (await use("wait_for_messages", { sessionId, timeoutMs: 0 }))
-          .sessionStatus,
-      ).toBe("closed");
+      const closed = await use("wait_for_messages", {
+        sessionId,
+        after: afterPicker.cursor,
+        timeoutMs: 0,
+      });
+      expect(closed.sessionStatus).toBe("closed");
+      expect(closed.messages.map((message) => message.content)).toMatchObject([
+        { kind: "system", code: "session_closed" },
+      ]);
       expect(
         await t.run((ctx) =>
           ctx.db

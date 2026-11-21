@@ -224,7 +224,13 @@ export const readMessages = internalQuery({
     return {
       messages: page.messages
         .map(toMessage)
-        .filter((m) => visibleTo(m, viewer)),
+        .filter(
+          (m) =>
+            (m.recipient === "all" ||
+              m.recipient === viewer.participantId ||
+              m.senderParticipantId === viewer.participantId) &&
+            visibleTo(m, viewer),
+        ),
       cursor: page.cursor,
       sessionStatus: room.status,
     };

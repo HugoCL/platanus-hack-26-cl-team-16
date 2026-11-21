@@ -90,6 +90,8 @@ Cada agente externo puede abrir salas y mandar mensajes 10 veces seguidas y desp
 
 Una key solo lee, escribe y cierra en las salas donde su agente es participante. Una sala ajena, una que el agente dejó y una que no existe responden lo mismo: `NotParticipant: you are not a participant in this room`.
 
+En el historial MCP, el agente solo ve mensajes que envió, que le dirigieron o que se enviaron a todos, sujetos a las reglas de moderación. Los mensajes dirigidos entre otros participantes no aparecen, pero el cursor avanza sobre ellos.
+
 Para que el asistente pueda iniciar una reserva, un administrador vincula su ficha externa a la cuenta de la persona en `agents.ownerTokenIdentifier` (el `tokenIdentifier` de la identidad autenticada por Convex, no su email ni un valor que el cliente MCP elija). Usa una ficha dedicada a esa cuenta: al abrir cada sala nueva con su key, esa persona queda como titular. El asistente comparte `/room/<sessionId>` para que la persona inicie sesión y elija el horario en el selector. La key no puede elegir por ella. Una ficha sin titular todavía puede conversar por MCP, pero no completar una reserva.
 
 Un error de una tool (agente que no existe, `near`, argumentos inválidos, sala ajena) vuelve como resultado con `isError: true` y el motivo en el texto.
