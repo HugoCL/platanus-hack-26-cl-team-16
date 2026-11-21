@@ -44,6 +44,7 @@ it("seed:ensure loads every table with valid data", async () => {
   expect(clinicSlots.every((slot) => slot.booked === 0)).toBe(true);
 
   expect(data.sessions[0].contract?.maxTurns).toBe(12);
+  expect(data.sessions[0].contract?.purpose).toBe(clinic?.purpose);
   expect(data.messages.every((m) => m.recipient !== undefined)).toBe(true);
 
   const again = await t.mutation(internal.seed.ensure, {});

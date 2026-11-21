@@ -27,8 +27,7 @@
     "eval:moderator": "vitest run --config vitest.eval.config.mts"
   },
   "dependencies": {
-    "@clerk/clerk-react": "^5.61.3",
-    "@clerk/nextjs": "^6.39.6",
+    "@clerk/nextjs": "7.7.9",
     "@convex-dev/migrations": "0.3.8",
     "@convex-dev/rate-limiter": "0.4.3",
     "@convex-dev/workpool": "0.4.16",

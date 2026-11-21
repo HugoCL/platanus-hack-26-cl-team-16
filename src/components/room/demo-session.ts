@@ -36,6 +36,8 @@ export const DEMO_VIEWER: Viewer = {
 
 export const DEMO_CONTRACT: SessionContract = {
   intent: { name: "book", description: "Hora con cardiólogo esta semana" },
+  purpose:
+    "Ofrecer horarios disponibles y reservar horas médicas. Nunca comparte datos de otros pacientes.",
   capabilities: ["booking", "info"],
   allowedIntents: ["check_availability", "book", "cancel_booking", "ask_info"],
   forbiddenTopics: [

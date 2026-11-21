@@ -306,3 +306,33 @@ describe("the judge prompt", () => {
     expect(prompt).toContain("\\u003c/mensaje>");
   });
 });
+
+describe("beforeJudge", () => {
+  it.each(MODERATION_CASES.map((c) => [c.id, c] as const))(
+    "%s runs only when the judge is about to run",
+    async (_id, c) => {
+      const { llm, prompts } = scriptedJudge();
+      const beforeJudge = vi.fn(async () => {
+        expect(prompts).toHaveLength(0);
+      });
+      await createModerator({ llm, beforeJudge }).moderate(moderationInput(c));
+      expect(beforeJudge).toHaveBeenCalledTimes(prompts.length);
+    },
+  );
+
+  it("stops before the judge when it throws", async () => {
+    const c = MODERATION_CASES.find((c) => c.expected.decision === "allow");
+    if (!c) throw new Error("no allowed case");
+    const { llm, prompts } = scriptedJudge();
+    const limited = new Error("rate limited");
+    await expect(
+      createModerator({
+        llm,
+        beforeJudge: async () => {
+          throw limited;
+        },
+      }).moderate(moderationInput(c)),
+    ).rejects.toBe(limited);
+    expect(prompts).toHaveLength(0);
+  });
+});

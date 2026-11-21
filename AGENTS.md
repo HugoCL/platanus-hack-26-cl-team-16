@@ -54,9 +54,9 @@ Smoke checks the landing's `h1` ("Todos los negocios"). Then it opens `/director
 `pnpm dev` needs no Convex or Clerk login.
 
 - **Convex.** A local deployment runs as a subprocess of `convex dev` (`CONVEX_AGENT_MODE=anonymous`, set by `scripts/dev.mjs`). State is in `.convex/` and `.env.local`, both gitignored. `pnpm dev` stays anonymous unless `CONVEX_DEPLOY_KEY` or `CONVEX_DEPLOYMENT_TOKEN` is set, or `.env.local` or `.env` selects a deployment (`CONVEX_DEPLOYMENT=` that does not start with `anonymous:`, or `CONVEX_SELF_HOSTED_*`). In anonymous mode every Convex deployment variable is removed from the children's environment, and cloud mode refuses a production key or deployment (`pnpm dev` pushes and seeds).
-- **Clerk.** Keyless mode provisions temporary dev keys on first load. The prompt "Configure your application" in the corner is expected.
+- **Clerk.** The SDK is pinned to 7.7.9, the last release with automatic keyless mode. Keyless provisions temporary dev keys on first load; the "Configure your application" prompt is expected. Keyless stays off when `CI` is set, so run `pnpm smoke` without it. Clerk 7.8 and later no longer create keyless keys, so they need real keys or a key file from `clerk init`; so revisit this setup and smoke before bumping the pin.
 - `convex/auth.config.ts` accepts tokens from the team's Clerk app only (`cheerful-cougar-1086.clerk.accounts.dev`, a development instance). The keyless app is a different Clerk app, so in this mode Convex sees every user as signed out. The signed-in UI needs the team's Clerk keys (the switch below). `/server` requires sign-in (`src/proxy.ts` protects it).
-- Sign-in and sign-up do not work yet in any mode. Clerk answers both with `action_blocked` ("This app uses an outdated version of Clerk") for clerk-js 5, which `@clerk/nextjs` 6 loads, and accepts them from clerk-js 6. They need a Clerk SDK upgrade: the repository has `@clerk/nextjs` 6 and the current major is 7.
+- `@clerk/nextjs` 7 loads Clerk JS 6, replacing the Clerk JS 5 build that returned `action_blocked` for sign-in and sign-up. To verify the team's login and Convex identity, use real accounts as described below.
 
 ### Switch to real accounts (a human does this once)
 
