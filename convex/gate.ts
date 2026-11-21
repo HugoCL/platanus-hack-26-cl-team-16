@@ -7,7 +7,6 @@ import {
 } from "../shared/messages";
 import {
   ModerationAction,
-  type ModerationOutcome,
   ModerationReason,
   ModerationStage,
   Verdict,
@@ -24,18 +23,12 @@ import {
   type QueryCtx,
   query,
 } from "./_generated/server";
-import { currentModerator } from "./moderator";
+import { moderate } from "./moderator";
 import { loadSession, toMessage } from "./roomState";
 
 const HISTORY_LIMIT = 500;
 
 const recipientValidator = v.union(v.literal("all"), v.id("participants"));
-
-const MODERATOR_FAILED: Verdict = {
-  decision: "block",
-  rule: "purpose",
-  reason: "El moderador no respondió; el mensaje se bloqueó.",
-};
 
 function gateError(kind: string, message: string): never {
   throw new ConvexError({ kind, message });
@@ -74,34 +67,14 @@ export async function sendThroughGate(
     recipient: args.recipient,
   });
 
-  let outcome: ModerationOutcome;
-  try {
-    outcome = await currentModerator().moderate({
-      content,
-      sender: room.sender,
-      recipient: args.recipient,
-      participants: room.participants,
-      contract: room.contract,
-      history: room.history,
-    });
-  } catch {
-    outcome = {
-      verdict: MODERATOR_FAILED,
-      events: [
-        {
-          stage: "purpose",
-          action: "block",
-          reasons: [
-            {
-              code: "moderator_error",
-              stage: "purpose",
-              detail: "the moderator threw instead of returning a verdict",
-            },
-          ],
-        },
-      ],
-    };
-  }
+  const outcome = await moderate({
+    content,
+    sender: room.sender,
+    recipient: args.recipient,
+    participants: room.participants,
+    contract: room.contract,
+    history: room.history,
+  });
 
   return ctx.runMutation(internal.gate.commit, {
     sessionId: args.sessionId,
@@ -143,7 +116,7 @@ export const moderationContext = internalQuery({
   },
 });
 
-const eventValidator = v.object({
+export const eventValidator = v.object({
   stage: zodToConvex(ModerationStage),
   action: zodToConvex(ModerationAction),
   reasons: v.array(zodToConvex(ModerationReason)),
@@ -223,7 +196,7 @@ export async function publishNotice(
   code: Extract<MessageContent, { kind: "system" }>["code"],
   text: string,
 ) {
-  await insertPlatformMessage(ctx, sessionId, "all", {
+  return insertPlatformMessage(ctx, sessionId, "all", {
     kind: "system",
     code,
     text,
@@ -236,7 +209,7 @@ async function insertPlatformMessage(
   recipient: Doc<"messages">["recipient"],
   content: MessageContent,
 ) {
-  await ctx.db.insert("messages", {
+  return ctx.db.insert("messages", {
     sessionId,
     recipient,
     content,

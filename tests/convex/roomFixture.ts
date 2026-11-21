@@ -29,7 +29,7 @@ export async function seededRooms() {
   const consumerId = await agentId(CONSUMER_AGENT_SLUG);
   const clinicId = await agentId(CLINIC_AGENT_SLUG);
   const open = (overrides: Partial<OpenArgs> = {}) =>
-    t.mutation(api.rooms.open, {
+    t.action(api.rooms.open, {
       initiatorAgentId: consumerId,
       providerAgentId: clinicId,
       request: REQUEST,
