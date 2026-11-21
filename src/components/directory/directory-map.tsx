@@ -168,6 +168,12 @@ export function DirectoryMap({
 
   const selectedAt = selected && projection?.project(selected.location);
   const select = revealCard(onSelect);
+  const popupTop = selectedAt
+    ? Math.min(
+        Math.max(selectedAt.y - 120, 64),
+        Math.max(size.height - 300, 16),
+      )
+    : 16;
 
   return (
     <section
@@ -228,31 +234,29 @@ export function DirectoryMap({
                 />
               );
             })}
-
-            {selectedPin && selected && selectedAt ? (
-              <SelectedCard
-                key={selected.agentId}
-                pin={selectedPin}
-                selected={selected}
-                onSelect={select}
-                className="absolute z-30 origin-left"
-                style={{
-                  left: Math.min(
-                    Math.max(selectedAt.x + 32, 16),
-                    Math.max(size.width - 296, 16),
-                  ),
-                  top: Math.min(
-                    Math.max(selectedAt.y - 120, 64),
-                    Math.max(size.height - 300, 16),
-                  ),
-                }}
-              />
-            ) : null}
           </>
         ) : (
           <EmptyMapNote cards={cards} />
         )}
       </div>
+
+      {selectedPin && selected && selectedAt ? (
+        <SelectedCard
+          key={selected.agentId}
+          pin={selectedPin}
+          selected={selected}
+          onSelect={select}
+          className="absolute z-30 origin-left overflow-y-auto overscroll-contain [&>*]:shrink-0"
+          style={{
+            left: Math.min(
+              Math.max(selectedAt.x + 32, 16),
+              Math.max(size.width - 296, 16),
+            ),
+            top: popupTop,
+            maxHeight: Math.max(size.height - popupTop - 16, 0),
+          }}
+        />
+      ) : null}
 
       <div className="absolute right-4 bottom-4 flex flex-col overflow-hidden rounded-2xl bg-card shadow-card">
         <Button
