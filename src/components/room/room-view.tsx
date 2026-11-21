@@ -42,7 +42,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { ThemeToggle } from "@/components/toggle-theme";
+import { SiteHeader } from "@/components/directory/site-header";
 import type { UiResponse, UiSpec } from "@/shared/genui";
 import { MAX_TEXT_LENGTH } from "@/shared/messages";
 import type { SessionContract, SessionStatus } from "@/shared/session";
@@ -69,13 +69,6 @@ import {
   violationTone,
 } from "./room-format";
 import { useDemoRoom } from "./use-demo-room";
-
-const STATUS_DOT: Record<SessionStatus, string> = {
-  requested: "bg-muted-foreground",
-  active: "bg-success",
-  closed: "bg-muted-foreground",
-  terminated: "bg-destructive",
-};
 
 const TONE_SEGMENT = {
   neutral: "bg-foreground",
@@ -158,7 +151,7 @@ export function RoomView({
   answersReadOnly?: boolean;
 }) {
   const role = viewer.role;
-  const [panelOpen, setPanelOpen] = useState(true);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [control, setControl] = useState(false);
   const [auditFor, setAuditFor] = useState<string | null>(null);
@@ -207,6 +200,7 @@ export function RoomView({
 
   return (
     <div className="flex h-dvh flex-col bg-background">
+      <SiteHeader current="rooms" />
       {toolbar}
       <div className="flex min-h-0 flex-1">
         <SessionList
@@ -223,7 +217,6 @@ export function RoomView({
               self={self}
               other={other}
               contract={contract}
-              status={status}
               violations={violations}
               onTogglePanel={() => {
                 if (window.matchMedia("(min-width: 64rem)").matches)
@@ -478,14 +471,12 @@ function SessionHeader({
   self,
   other,
   contract,
-  status,
   violations,
   onTogglePanel,
 }: {
   self?: RoomParticipant;
   other?: RoomParticipant;
   contract: SessionContract;
-  status: SessionStatus;
   violations: number;
   onTogglePanel: () => void;
 }) {
@@ -508,9 +499,6 @@ function SessionHeader({
             </span>
             <VerifiedBadge />
           </h1>
-          <p className="m-0 truncate text-sm text-subtle-foreground">
-            {self?.name} pide: “{contract.intent.description}”
-          </p>
           <p className="m-0 flex items-center gap-1.5 text-xs text-subtle-foreground">
             <ShieldCheckIcon size={13} className="shrink-0" />
             Moderada: cada mensaje se revisa antes de entregarse
@@ -518,16 +506,6 @@ function SessionHeader({
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
-        <span
-          data-testid="session-status"
-          className="inline-flex items-center gap-1.5 font-medium"
-        >
-          <span
-            aria-hidden="true"
-            className={`size-1.5 rounded-full ${STATUS_DOT[status]}`}
-          />
-          {SESSION_STATUS_LABELS[status]}
-        </span>
         <span
           data-testid="violations"
           className="inline-flex items-center gap-2 text-subtle-foreground"
@@ -553,7 +531,6 @@ function SessionHeader({
         >
           <PanelRightIcon size={16} />
         </Button>
-        <ThemeToggle variant="icon" />
       </div>
     </header>
   );
