@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { generateText } from "ai";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import {
   DEFAULT_MODELS,
@@ -10,6 +11,11 @@ import {
   createGatewayLlmProvider,
   createLlmProvider,
 } from "../shared/providers/llm";
+
+vi.mock("ai", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("ai")>()),
+  generateText: vi.fn(async () => ({ text: "hola", output: { ok: true } })),
+}));
 
 describe("LLM provider", () => {
   it("defaults to the fake provider", () => {
@@ -61,6 +67,22 @@ describe("LLM provider", () => {
     await expect(
       broken.generateObject({ role: "moderator", prompt: "x", schema }),
     ).rejects.toThrow();
+  });
+
+  it("the gateway passes the abort signal to the SDK", async () => {
+    const llm = createGatewayLlmProvider({ AI_GATEWAY_API_KEY: "test-key" });
+    const { signal } = new AbortController();
+    await llm.generateObject({
+      role: "moderator",
+      prompt: "x",
+      schema: z.object({ ok: z.boolean() }),
+      abortSignal: signal,
+    });
+    await llm.generateText({ role: "agent", prompt: "x", abortSignal: signal });
+    const signals = vi
+      .mocked(generateText)
+      .mock.calls.map(([args]) => args.abortSignal);
+    expect(signals).toEqual([signal, signal]);
   });
 
   it("models come from the environment, with defaults", () => {
