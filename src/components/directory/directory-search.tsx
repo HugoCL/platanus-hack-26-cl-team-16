@@ -104,14 +104,17 @@ export function DirectorySearch() {
   const [fixture, setFixture] = useFixtureState();
   const origin = geo.state === "on" ? geo.origin : null;
   const near = sort === "distance" ? origin : null;
-  const filterKey = `${category}|${comuna}|${near ? `${near.lat},${near.lng}` : ""}`;
-  const [more, setMore] = useState({ key: filterKey, offsets: FIRST_PAGE });
-  const offsets = more.key === filterKey ? more.offsets : FIRST_PAGE;
-  const { result: liveResult, loadingMore } = usePagedSearch(
-    category,
-    comuna,
-    near,
-    offsets,
+  // Changing only the order keeps how many pages the visitor loaded.
+  const filterKey = `${category}|${comuna}|${verifiedOnly}|${includeProspects}`;
+  const [more, setMore] = useState({ key: filterKey, pages: 1 });
+  const pages = more.key === filterKey ? more.pages : 1;
+  const {
+    result: liveResult,
+    loadingMore,
+    loadedPages,
+  } = usePagedSearch(
+    { category, comuna, near, verifiedOnly, includeProspects },
+    pages,
   );
   const result =
     fixture === "demo" ? liveResult : fixtureResult(fixture, liveResult);
@@ -611,10 +614,7 @@ export function DirectorySearch() {
                     aria-busy={loadingMore}
                     disabled={loadingMore}
                     onClick={() =>
-                      setMore({
-                        key: filterKey,
-                        offsets: [...offsets, result.nextOffset ?? 0],
-                      })
+                      setMore({ key: filterKey, pages: loadedPages + 1 })
                     }
                   >
                     {loadingMore ? "Cargando…" : "Ver más agentes"}
@@ -766,11 +766,33 @@ function TextSearch({
 }
 
 function usePagedSearch(
-  category: string | null,
-  comuna: string | null,
-  near: LatLng | null,
-  offsets: number[],
+  filters: {
+    category: string | null;
+    comuna: string | null;
+    near: LatLng | null;
+    verifiedOnly: boolean;
+    includeProspects: boolean;
+  },
+  pages: number,
 ) {
+  const { category, comuna, near, verifiedOnly, includeProspects } = filters;
+  const args = useMemo(
+    () => ({
+      ...(category ? { category } : {}),
+      ...(comuna ? { comuna } : {}),
+      ...(near ? { near: { lat: near.lat, lng: near.lng } } : {}),
+      ...(verifiedOnly ? { verifiedOnly } : {}),
+      ...(includeProspects ? {} : { includeProspects }),
+    }),
+    [category, comuna, near, verifiedOnly, includeProspects],
+  );
+  const argsKey = JSON.stringify(args);
+  // Each order pages from its own nextOffset, so the next page is requested once the previous one arrives.
+  const [chain, setChain] = useState({ key: argsKey, offsets: FIRST_PAGE });
+  const offsets = useMemo(
+    () => (chain.key === argsKey ? chain.offsets : FIRST_PAGE).slice(0, pages),
+    [chain, argsKey, pages],
+  );
   const requests = useMemo(
     () =>
       Object.fromEntries(
@@ -778,17 +800,11 @@ function usePagedSearch(
           String(page),
           {
             query: api.directory.search,
-            args: {
-              ...(category ? { category } : {}),
-              ...(comuna ? { comuna } : {}),
-              ...(near ? { near: { lat: near.lat, lng: near.lng } } : {}),
-              limit: PAGE_SIZE,
-              offset,
-            },
+            args: { ...args, limit: PAGE_SIZE, offset },
           },
         ]),
       ),
-    [category, comuna, near, offsets],
+    [args, offsets],
   );
   const results = useQueries(requests);
   const loaded: DirectorySearchResult[] = [];
@@ -818,8 +834,17 @@ function usePagedSearch(
       },
     };
   }
+  const last = loaded.at(-1);
+  const hasNext = last?.nextOffset !== undefined;
+  if (loaded.length === offsets.length && offsets.length < pages && hasNext) {
+    setChain({ key: argsKey, offsets: [...offsets, last?.nextOffset ?? 0] });
+  }
   return {
     result: cache.current.result,
-    loadingMore: loaded.length > 0 && loaded.length < offsets.length,
+    loadedPages: loaded.length,
+    loadingMore:
+      loaded.length > 0 &&
+      loaded.length < pages &&
+      (loaded.length < offsets.length || hasNext),
   };
 }

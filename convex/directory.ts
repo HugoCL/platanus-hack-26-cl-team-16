@@ -172,6 +172,8 @@ export const search = query({
     limit: v.optional(v.number()),
     offset: v.optional(v.number()),
     near: v.optional(v.object({ lat: v.number(), lng: v.number() })),
+    verifiedOnly: v.optional(v.boolean()),
+    includeProspects: v.optional(v.boolean()),
   },
   handler: async (ctx, args): Promise<DirectorySearchResult> => {
     checkLimit(args.limit);
@@ -200,7 +202,9 @@ export const search = query({
     let rows = 0;
     let bytes = 0;
     let scanStopped = false;
-    for (const status of LISTED_STATUSES) {
+    const statuses =
+      args.includeProspects === false ? ["active" as const] : LISTED_STATUSES;
+    for (const status of statuses) {
       if (scanStopped) break;
       const range = comuna
         ? ctx.db
@@ -222,7 +226,8 @@ export const search = query({
         bytes += byteSize(agent);
         if (wanted && !agent.categories.some((c) => wanted.has(c))) continue;
         const listed = listedCard(agent);
-        if (listed) matches.push(listed);
+        if (listed && (!args.verifiedOnly || listed.card.verified))
+          matches.push(listed);
       }
     }
     truncated ||= scanStopped || matches.length > offset + limit;
