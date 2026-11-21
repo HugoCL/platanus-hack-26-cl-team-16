@@ -73,7 +73,7 @@ None are required to run the template. VMs stay on their local Convex deployment
 
 The app reads these only when a provider is created, and none is needed to build, test or run `pnpm dev`, because the defaults are the fake LLM and the local business fixture: `LLM_PROVIDER` (`fake` or `openrouter`), `AGENT_MODEL`, `MODERATOR_MODEL`, `CONVERSATION_MODERATOR_MODEL`, `OPENROUTER_API_KEY`, `BUSINESS_SOURCES`, `BUSINESS_ENRICHER`, `FIRECRAWL_API_KEY`, `GOOGLE_PLACES_API_KEY` and `OVERPASS_URL`. Code that runs in Convex reads them from the deployment's environment, which a human sets with `npx convex env set`. See [how to test Claude locally](development.md#try-claude-through-openrouter-locally).
 
-Do not add `CONVEX_DEPLOYMENT`, `NEXT_PUBLIC_CONVEX_URL` or `CLERK_JWT_ISSUER_DOMAIN`. They make every VM try to log in to Convex or point the page at the cloud deployment. `pnpm dev` also removes every Convex deployment variable (`CONVEX_DEPLOYMENT`, `CONVEX_SELF_HOSTED_*`) from the environment on purpose, unless a deploy key is set.
+Do not add `CONVEX_DEPLOYMENT`, `NEXT_PUBLIC_CONVEX_URL` or `CLERK_JWT_ISSUER_DOMAIN`. They make every VM try to log in to Convex or point the page at the cloud deployment. `pnpm dev` also ignores `CONVEX_DEPLOYMENT` and `CONVEX_SELF_HOSTED_*` from the shell; set these only in a local env file when switching the checkout to another deployment.
 
 `CONVEX_DEPLOY_KEY` (or its alias `CONVEX_DEPLOYMENT_TOKEN`) is an option if every thread must use a cloud dev deployment; `pnpm dev` refuses a production key. The trade-off: parallel threads then push to one shared dev deployment and overwrite each other. See `AGENTS.md` for the account switch.
 
