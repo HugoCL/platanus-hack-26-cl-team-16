@@ -198,6 +198,28 @@ describe("the request passes the moderator before the room opens", () => {
     expect(await stored()).toEqual(before);
   });
 
+  it("stores the contract the moderator saw, even if the card changes meanwhile", async () => {
+    const moderate = vi
+      .spyOn(allowAllModerator, "moderate")
+      .mockImplementation(async () => {
+        await rooms.t.run((ctx) =>
+          ctx.db.patch(rooms.clinicId, {
+            purpose: "Provide general office information.",
+          }),
+        );
+        return {
+          verdict: { decision: "allow", reason: "Sirve al propósito." },
+          events: [],
+        };
+      });
+
+    const room = await open();
+
+    const moderated = moderate.mock.calls[0][0].contract;
+    expect(moderated.purpose).toBe(clinicCard.purpose);
+    expect(room.contract).toEqual(moderated);
+  });
+
   it("keeps the request's moderation events with the opening notice", async () => {
     vi.spyOn(allowAllModerator, "moderate").mockResolvedValue({
       verdict: { decision: "allow", reason: "Sirve al propósito." },
