@@ -184,6 +184,7 @@ describe("generic provider agent", () => {
   it("only its own booking's confirmation counts as sent", async () => {
     const room = await openRoom();
     const picker = await askForSlots(room);
+    const chosen = pickerOf(picker).slots[0].id;
     await room.post(room.recipient, room.owner, {
       kind: "ui",
       spec: {
@@ -196,7 +197,14 @@ describe("generic provider agent", () => {
         cancelLabel: "No",
       },
     });
-    const chosen = pickerOf(picker).slots[0].id;
+    await room.post(room.recipient, room.owner, {
+      kind: "ui",
+      spec: {
+        type: "card",
+        id: `reserva-${chosen}`,
+        title: "Datos de la hora",
+      },
+    });
 
     const actions = await askProvider(
       t,
