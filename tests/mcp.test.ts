@@ -391,7 +391,7 @@ describe("MCP room tools", () => {
   }
 
   async function hostedRoom() {
-    const session = await t.action(api.rooms.open, {
+    const session = await t.action(internal.rooms.open, {
       initiatorAgentId: agents.consumer,
       providerAgentId: agents.clinic,
       request: REQUEST,
@@ -413,7 +413,10 @@ describe("MCP room tools", () => {
     );
 
   const history = (sessionId: Id<"sessions">, viewer: Id<"participants">) =>
-    t.query(api.gate.history, { sessionId, viewerParticipantId: viewer });
+    t.query(internal.gate.historyForParticipant, {
+      sessionId,
+      viewerParticipantId: viewer,
+    });
 
   it("open_session opens a moderated room with the key's agent as the initiator", async () => {
     const { session, sessionId, me } = await openRoom();
@@ -488,12 +491,17 @@ describe("MCP room tools", () => {
       sessionId,
       after: opened.cursor,
     });
-    expect(mine.messages).toEqual([message]);
-    const reply = await use("wait_for_messages", {
-      sessionId,
-      after: mine.cursor,
-    });
-    expect(reply.messages).toMatchObject([
+    expect(mine.messages[0]).toEqual(message);
+    const replies =
+      mine.messages.length > 1
+        ? mine.messages.slice(1)
+        : (
+            await use("wait_for_messages", {
+              sessionId,
+              after: mine.cursor,
+            })
+          ).messages;
+    expect(replies).toMatchObject([
       { senderParticipantId: provider, recipient: me, status: "allowed" },
     ]);
   });
@@ -546,7 +554,7 @@ describe("MCP room tools", () => {
     ).toEqual(["system"]);
 
     const hosted = await hostedRoom();
-    const fromHosted = await t.action(api.gate.send, {
+    const fromHosted = await t.action(internal.gate.sendAsParticipant, {
       sessionId: hosted.sessionId,
       senderParticipantId: hosted.consumer,
       recipient: hosted.provider,
@@ -578,7 +586,7 @@ describe("MCP room tools", () => {
 
     expect(await stored()).toEqual(before);
     const fromHosted = await t
-      .action(api.rooms.open, {
+      .action(internal.rooms.open, {
         initiatorAgentId: agents.consumer,
         providerAgentId: agents.clinic,
         request: REFERENCE_ATTACK,
@@ -608,7 +616,7 @@ describe("MCP room tools", () => {
     }
 
     expect(await history(sessionId, provider)).toEqual(before);
-    expect((await t.query(api.rooms.get, { sessionId }))?.status).toBe(
+    expect((await t.run((ctx) => ctx.db.get(sessionId)))?.status).toBe(
       "active",
     );
     expect(moderate).not.toHaveBeenCalled();

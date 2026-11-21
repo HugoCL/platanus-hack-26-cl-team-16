@@ -2,7 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { zodToConvex } from "convex-helpers/server/zod4";
 import { type Message, SendableContent } from "../shared/messages";
 import type { Session, SessionStatus } from "../shared/session";
-import { api, internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
   action,
@@ -14,6 +14,7 @@ import {
 import { agentForApiKey } from "./agentKeys";
 import { sendThroughGate } from "./gate";
 import { loadSession, toMessage } from "./roomState";
+import { closeRoom, openRoom } from "./rooms";
 import { visibleTo } from "./visibility";
 
 // Room operations for external agents, called by the MCP server in lib/mcp.ts. Each one takes the
@@ -85,7 +86,7 @@ export const open = action({
       initiatorAgentId: Id<"agents">;
       providerAgentId: Id<"agents">;
     } = await ctx.runQuery(internal.mcpRooms.opener, { apiKey, targetAgentId });
-    return ctx.runAction(api.rooms.open, { ...agents, request, intent });
+    return openRoom(ctx, { ...agents, request, intent });
   },
 });
 
@@ -165,11 +166,9 @@ export const close = mutation({
   args: { apiKey: v.string(), sessionId: v.string() },
   handler: async (ctx, { apiKey, sessionId }) => {
     const participant = await callerParticipant(ctx, apiKey, sessionId);
-    const closed: { sessionId: Id<"sessions">; status: "closed" } =
-      await ctx.runMutation(api.rooms.close, {
-        sessionId: participant.sessionId,
-        participantId: participant._id,
-      });
-    return closed;
+    return closeRoom(ctx, {
+      sessionId: participant.sessionId,
+      participantId: participant._id,
+    });
   },
 });
