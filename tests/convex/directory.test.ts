@@ -355,6 +355,77 @@ describe("directory search", () => {
     );
   });
 
+  it("sorts by distance before paging when near is given", async () => {
+    const source = await t.run((ctx) =>
+      ctx.db
+        .query("agents")
+        .withIndex("by_slug", (q) => q.eq("slug", "hotel-providencia-suites"))
+        .unique(),
+    );
+    const at = source?.location;
+    if (!at) throw new Error("seed hotel has no location");
+    await insertCopies("hotel-providencia-suites", 25, (i) => ({
+      slug: `hotel-lejos-${i}`,
+      name: `Hotel lejos ${i}`,
+      verified: true,
+      location: { ...at, lat: at.lat + 0.05 },
+    }));
+    await insertCopies("hotel-providencia-suites", 1, () => ({
+      slug: "zz-hotel-cerca",
+      name: "Zz hotel cerca",
+      verified: false,
+      location: { ...at, lat: at.lat - 0.2 },
+    }));
+    const near = { lat: at.lat - 0.2, lng: at.lng };
+    const byRelevance = await t.query(api.directory.search, {});
+    expect(byRelevance.agents.map((a) => a.slug)).not.toContain(
+      "zz-hotel-cerca",
+    );
+    const byDistance = await t.query(api.directory.search, { near });
+    expect(byDistance.agents[0]?.slug).toBe("zz-hotel-cerca");
+  });
+
+  it("filters verified cards and prospects before paging", async () => {
+    const source = await t.run((ctx) =>
+      ctx.db
+        .query("agents")
+        .withIndex("by_slug", (q) => q.eq("slug", "hotel-providencia-suites"))
+        .unique(),
+    );
+    const at = source?.location;
+    if (!at) throw new Error("seed hotel has no location");
+    await insertCopies("hotel-providencia-suites", 25, (i) => ({
+      slug: `hotel-cerca-${i}`,
+      name: `Hotel cerca ${i}`,
+      verified: false,
+      location: at,
+    }));
+    await insertCopies("hotel-providencia-suites", 1, () => ({
+      slug: "hotel-verificado-lejos",
+      name: "Hotel verificado lejos",
+      verified: true,
+      location: { ...at, lat: at.lat + 0.5 },
+    }));
+    const near = { lat: at.lat, lng: at.lng };
+    const unfiltered = await t.query(api.directory.search, { near });
+    expect(unfiltered.agents.map((a) => a.slug)).not.toContain(
+      "hotel-verificado-lejos",
+    );
+    const verified = await t.query(api.directory.search, {
+      near,
+      verifiedOnly: true,
+    });
+    expect(verified.agents.every((a) => a.verified)).toBe(true);
+    expect(verified.agents.map((a) => a.slug)).toContain(
+      "hotel-verificado-lejos",
+    );
+    const noProspects = await t.query(api.directory.search, {
+      includeProspects: false,
+    });
+    expect(noProspects.agents.length).toBeGreaterThan(0);
+    expect(noProspects.agents.every((a) => a.status !== "prospect")).toBe(true);
+  });
+
   it("continues from nextOffset when the response budget cuts a page short", async () => {
     await insertCopies("hotel-providencia-suites", 25, (i) => ({
       slug: `hotel-grande-${i}`,
