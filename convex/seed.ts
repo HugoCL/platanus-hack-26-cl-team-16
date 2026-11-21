@@ -18,6 +18,7 @@ import { DEFAULT_MAX_TURNS, type SessionContract } from "../shared/session";
 import type { Id, TableNames } from "./_generated/dataModel";
 import { internalMutation, type MutationCtx } from "./_generated/server";
 import { sha256Hex } from "./agentKeys";
+import { insertMessage } from "./roomMessages";
 import { loadSession } from "./roomState";
 
 // Local deployments start empty, so every table needs sample data to develop against.
@@ -280,7 +281,7 @@ export const seeders = {
       }),
     );
 
-    await ctx.db.insert("messages", {
+    await insertMessage(ctx, {
       sessionId: session._id,
       recipient: "all",
       content: {
@@ -290,7 +291,7 @@ export const seeders = {
       },
       moderation: allowed("Aviso del sistema."),
     });
-    await ctx.db.insert("messages", {
+    await insertMessage(ctx, {
       sessionId: session._id,
       senderParticipantId: role("initiator"),
       recipient: role("recipient"),
@@ -300,7 +301,7 @@ export const seeders = {
       },
       moderation: allowed("Pide horarios, dentro del propósito de la sala."),
     });
-    const picker = await ctx.db.insert("messages", {
+    const picker = await insertMessage(ctx, {
       sessionId: session._id,
       senderParticipantId: role("recipient"),
       recipient: role("owner"),
@@ -316,7 +317,7 @@ export const seeders = {
       },
       moderation: allowed("Ofrece horarios disponibles."),
     });
-    await ctx.db.insert("messages", {
+    await insertMessage(ctx, {
       sessionId: session._id,
       senderParticipantId: role("owner"),
       recipient: role("recipient"),
@@ -352,7 +353,7 @@ export const seeders = {
     const [first] = findings;
     if (!first)
       throw new Error("seed: the reference message must be blocked by rules");
-    const blocked = await ctx.db.insert("messages", {
+    const blocked = await insertMessage(ctx, {
       sessionId: session._id,
       senderParticipantId: senderId,
       recipient,
@@ -372,7 +373,7 @@ export const seeders = {
         decidedAt: Date.now(),
       },
     });
-    await ctx.db.insert("messages", {
+    await insertMessage(ctx, {
       sessionId: session._id,
       recipient: senderId,
       content: {
