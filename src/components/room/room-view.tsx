@@ -29,6 +29,7 @@ import { Textarea } from "@ui-sdk/react/textarea";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
+  BotIcon,
   PanelRightIcon,
   ShieldCheckIcon,
   UserIcon,
@@ -45,8 +46,11 @@ import { ReasonList } from "./moderation";
 import {
   auditMetrics,
   dataFieldLabel,
+  formatLatency,
   formatLongDay,
+  formatScore,
   formatTime,
+  initials,
   intentLabel,
   REASON_LABELS,
   type RoomMessage,
@@ -133,7 +137,6 @@ export function DemoRoom({
   const sidePanel = (
     <SidePanel
       contract={fixture.contract}
-      otherName={other?.name ?? "el proveedor"}
       messages={room.messages}
       participants={fixture.participants}
       role={role}
@@ -238,7 +241,7 @@ export function DemoRoom({
           <DialogTitle>Auditoría del mensaje</DialogTitle>
           <DialogDescription>
             {auditMessage
-              ? `${participants.get(auditMessage.senderParticipantId ?? "")?.name ?? "Sistema"} · ${formatTime(auditMessage.sentAt)} · ${auditMessage.audit?.model ?? MODERATOR_MODEL} · ${auditMessage.audit?.latencyMs ?? "—"} ms`
+              ? `${participants.get(auditMessage.senderParticipantId ?? "")?.name ?? "Sistema"} · ${formatTime(auditMessage.sentAt)} · ${auditMessage.audit?.model ?? MODERATOR_MODEL} · ${auditMessage.audit ? formatLatency(auditMessage.audit.latencyMs) : "—"}`
               : null}
           </DialogDescription>
           {auditMessage?.reasons?.length ? (
@@ -303,12 +306,7 @@ function Avatar({
   participant?: RoomParticipant;
   size?: number;
 }) {
-  const initials = (participant?.name ?? "?")
-    .split(/\s+/)
-    .filter((w) => /^[A-ZÁÉÍÓÚÑ]/.test(w))
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join("");
+  const letters = initials(participant?.name ?? "");
   return (
     <span
       aria-hidden="true"
@@ -319,7 +317,11 @@ function Avatar({
           : "bg-muted text-foreground"
       }`}
     >
-      {participant?.kind === "human" ? <UserIcon size={14} /> : initials}
+      {participant?.kind === "human" ? (
+        <UserIcon size={14} />
+      ) : (
+        letters || <BotIcon size={14} />
+      )}
     </span>
   );
 }
@@ -683,14 +685,12 @@ function Composer({
 
 function SidePanel({
   contract,
-  otherName,
   messages,
   participants,
   role,
   onJump,
 }: {
   contract: SessionContract;
-  otherName: string;
   messages: RoomMessage[];
   participants: RoomParticipant[];
   role: Viewer["role"];
@@ -704,7 +704,7 @@ function SidePanel({
         <TabsTab value="participantes">Participantes</TabsTab>
       </TabsList>
       <TabsPanel value="contrato">
-        <ContractView contract={contract} otherName={otherName} />
+        <ContractView contract={contract} />
       </TabsPanel>
       <TabsPanel value="auditoria">
         <AuditView messages={messages} onJump={onJump} />
@@ -772,14 +772,7 @@ function Terms({
   );
 }
 
-function ContractView({
-  contract,
-  otherName,
-}: {
-  contract: SessionContract;
-  otherName: string;
-}) {
-  const short = otherName.replace(/^Agendamiento\s+/, "la ");
+function ContractView({ contract }: { contract: SessionContract }) {
   const fields = (codes: string[]) =>
     codes.map((code) => ({ label: dataFieldLabel(code), code }));
   return (
@@ -812,10 +805,10 @@ function ContractView({
           items={contract.forbiddenTopics.map((label) => ({ label }))}
         />
       </Section>
-      <Section title={`Qué comparte ${short}`}>
+      <Section title="Qué comparte el proveedor">
         <Terms items={fields(contract.recipientShares)} />
       </Section>
-      <Section title={`Qué pide ${short}`}>
+      <Section title="Qué pide el proveedor">
         <Terms items={fields(contract.recipientRequests)} />
       </Section>
       <Section title="Máximo de violaciones">
@@ -855,7 +848,7 @@ function AuditView({
             "Latencia media",
             metrics.averageLatencyMs === null
               ? "—"
-              : `${metrics.averageLatencyMs} ms`,
+              : formatLatency(metrics.averageLatencyMs),
           ],
         ].map(([label, value]) => (
           <div key={label} className="flex flex-col px-3 py-2.5 first:pl-0">
@@ -894,7 +887,7 @@ function AuditView({
                   {AUDIT_ACTION[m.status]} · {formatTime(m.sentAt)}
                 </span>
                 <span className="font-mono tabular-nums text-subtle-foreground">
-                  {m.audit?.latencyMs ?? "—"} ms
+                  {m.audit ? formatLatency(m.audit.latencyMs) : "—"}
                 </span>
               </span>
               {m.reasons?.length ? (
@@ -902,7 +895,7 @@ function AuditView({
                   {m.reasons
                     .map(
                       (r) =>
-                        `${r.code}${r.score !== undefined ? ` ${r.score.toFixed(2)}` : ""}`,
+                        `${r.code}${r.score !== undefined ? ` ${formatScore(r.score)}` : ""}`,
                     )
                     .join(" · ")}
                 </span>

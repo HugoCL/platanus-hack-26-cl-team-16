@@ -16,6 +16,7 @@ import { ModerationBadge, PendingStages } from "./moderation";
 import {
   canSeeContent,
   describeUiResponse,
+  formatScore,
   formatTime,
   primaryReason,
   REASON_LABELS,
@@ -275,7 +276,7 @@ function BlockedBody({
         {reasonLabel ? (
           <span className="font-mono text-subtle-foreground">
             {reasonLabel}
-            {score !== undefined ? ` · ${score.toFixed(2)}` : ""}
+            {score !== undefined ? ` · ${formatScore(score)}` : ""}
           </span>
         ) : null}
         <Button data-size="sm" onClick={onShowAudit}>
