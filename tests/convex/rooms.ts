@@ -17,6 +17,7 @@ import {
   DEFAULT_MAX_TURNS,
   type Participant,
   type SessionContract,
+  type SessionIntent,
   type SessionStatus,
 } from "../../shared/session";
 
@@ -50,11 +51,15 @@ export async function insertRoom(
   {
     status = "active",
     ownerName = "Juan",
-  }: { status?: SessionStatus; ownerName?: string } = {},
+    intent = { name: "book", description: "Reservar una hora" },
+  }: {
+    status?: SessionStatus;
+    ownerName?: string;
+    intent?: SessionIntent;
+  } = {},
 ): Promise<TestRoom> {
   const consumer = await agentBySlug(ctx, CONSUMER_AGENT_SLUG);
   const provider = await agentBySlug(ctx, providerSlug);
-  const intent = { name: "book", description: "Reservar una hora" };
   const contract: SessionContract = {
     intent,
     capabilities: provider.capabilities,
