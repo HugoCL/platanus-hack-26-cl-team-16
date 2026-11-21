@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import { CONTRACT_EXAMPLES } from "../shared/examples";
 import { PHASE1_UI_COMPONENTS } from "../shared/genui";
+import { MCP_TOOLS } from "../shared/mcp";
 
 describe.each(Object.entries(CONTRACT_EXAMPLES))("%s", (_name, examples) => {
   it("has at least one valid and one invalid example", () => {
@@ -23,6 +25,19 @@ describe.each(Object.entries(CONTRACT_EXAMPLES))("%s", (_name, examples) => {
     },
   );
 });
+
+// Anthropic and OpenAI reject a tool whose input schema has a top-level union, and one such
+// tool breaks every tool in the session.
+it.each(Object.entries(MCP_TOOLS))(
+  "MCP tool %s takes a plain object as input",
+  (_name, tool) => {
+    const schema = z.toJSONSchema(tool.input, { io: "input" });
+    expect(schema.type).toBe("object");
+    for (const union of ["anyOf", "oneOf", "allOf", "not"]) {
+      expect(schema).not.toHaveProperty(union);
+    }
+  },
+);
 
 it("phase-1 catalog is the four agreed components", () => {
   expect([...PHASE1_UI_COMPONENTS].sort()).toEqual(
