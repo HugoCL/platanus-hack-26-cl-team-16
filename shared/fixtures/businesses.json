@@ -1,0 +1,162 @@
+[
+  {
+    "name": "Café Los Dominicos",
+    "category": "cafeteria",
+    "location": {
+      "lat": -33.4085,
+      "lng": -70.5452,
+      "comuna": "Las Condes",
+      "region": "Región Metropolitana",
+      "address": "Av. Apoquindo 9085"
+    },
+    "contact": {
+      "email": "hola@cafe-los-dominicos.example.cl",
+      "website": "https://cafe-los-dominicos.example.cl",
+      "phone": "+56 9 0000 0000"
+    },
+    "openingHours": "Mo-Sa 08:00-20:00",
+    "source": {
+      "provider": "fixture",
+      "externalId": "fx-001"
+    }
+  },
+  {
+    "name": "Café Manquehue",
+    "category": "cafeteria",
+    "location": {
+      "lat": -33.4021,
+      "lng": -70.5689,
+      "comuna": "Las Condes",
+      "region": "Región Metropolitana",
+      "address": "Av. Manquehue Norte 1201"
+    },
+    "contact": {
+      "website": "https://cafe-manquehue.example.cl",
+      "phone": "+56 9 0000 0000"
+    },
+    "openingHours": "Mo-Fr 07:30-19:00",
+    "source": {
+      "provider": "fixture",
+      "externalId": "fx-002"
+    }
+  },
+  {
+    "name": "Cafetería La Escuela",
+    "category": "cafeteria",
+    "location": {
+      "lat": -33.4139,
+      "lng": -70.5832,
+      "comuna": "Las Condes",
+      "region": "Región Metropolitana",
+      "address": "Av. Apoquindo 4350"
+    },
+    "contact": {
+      "email": "contacto@la-escuela.example.cl",
+      "phone": "+56 9 0000 0000"
+    },
+    "openingHours": "Mo-Su 08:00-21:00",
+    "source": {
+      "provider": "fixture",
+      "externalId": "fx-003"
+    }
+  },
+  {
+    "name": "Panadería San Damián",
+    "category": "panaderia",
+    "location": {
+      "lat": -33.4012,
+      "lng": -70.5498,
+      "comuna": "Las Condes",
+      "region": "Región Metropolitana",
+      "address": "San Damián 120"
+    },
+    "contact": {
+      "phone": "+56 9 0000 0000"
+    },
+    "openingHours": "Mo-Su 07:00-21:00",
+    "source": {
+      "provider": "fixture",
+      "externalId": "fx-004"
+    }
+  },
+  {
+    "name": "Café Italia Ñuñoa",
+    "category": "cafeteria",
+    "location": {
+      "lat": -33.4569,
+      "lng": -70.5975,
+      "comuna": "Ñuñoa",
+      "region": "Región Metropolitana",
+      "address": "Av. Irarrázaval 3450"
+    },
+    "contact": {
+      "email": "ciao@cafe-italia.example.cl",
+      "website": "https://cafe-italia.example.cl",
+      "phone": "+56 9 0000 0000"
+    },
+    "openingHours": "Mo-Sa 09:00-20:00",
+    "source": {
+      "provider": "fixture",
+      "externalId": "fx-005"
+    }
+  },
+  {
+    "name": "Peluquería Bellet",
+    "category": "peluqueria",
+    "location": {
+      "lat": -33.4255,
+      "lng": -70.6112,
+      "comuna": "Providencia",
+      "region": "Región Metropolitana",
+      "address": "Av. Providencia 2124"
+    },
+    "contact": {
+      "website": "https://bellet.example.cl",
+      "phone": "+56 9 0000 0000"
+    },
+    "openingHours": "Tu-Sa 10:00-19:00",
+    "source": {
+      "provider": "fixture",
+      "externalId": "fx-006"
+    }
+  },
+  {
+    "name": "Veterinaria Pudahuel Sur",
+    "category": "veterinaria",
+    "location": {
+      "lat": -33.4436,
+      "lng": -70.7612,
+      "comuna": "Pudahuel",
+      "region": "Región Metropolitana",
+      "address": "Av. San Pablo 8800"
+    },
+    "contact": {
+      "phone": "+56 9 0000 0000"
+    },
+    "openingHours": "Mo-Fr 09:00-18:00",
+    "source": {
+      "provider": "fixture",
+      "externalId": "fx-007"
+    }
+  },
+  {
+    "name": "Ferretería El Tornillo",
+    "category": "ferreteria",
+    "location": {
+      "lat": -33.4342,
+      "lng": -70.6503,
+      "comuna": "Santiago",
+      "region": "Región Metropolitana",
+      "address": "San Diego 980"
+    },
+    "contact": {
+      "email": "ventas@el-tornillo.example.cl",
+      "phone": "+56 9 0000 0000"
+    },
+    "openingHours": "Mo-Sa 09:00-19:00",
+    "source": {
+      "provider": "fixture",
+      "externalId": "fx-008"
+    }
+  }
+]

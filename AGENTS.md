@@ -14,6 +14,7 @@ Next.js 16 (App Router, Turbopack), Convex, Clerk, Tailwind 4, [UI SDK](https://
 | `pnpm lint`, `pnpm format` | `biome check .`, `biome check --write .`. Markdown is not linted. |
 | `pnpm typecheck`, `pnpm build` | `tsc --noEmit`, then `next build` (it passes without `.env.local`; running needs `NEXT_PUBLIC_CONVEX_URL`). `pnpm start` serves the build. |
 | `pnpm seed`, `pnpm seed:reset`, `pnpm migrate` | `convex run seed:ensure` (idempotent), a wipe plus reseed (local deployments only), and `convex run migrations:runAll`. They talk to the running deployment, so start `pnpm dev` first. |
+| `pnpm test` | Vitest, offline: contract examples, seed data, fake LLM, business fixture, and `seed:ensure` through convex-test. No network or keys (`fetch` is stubbed to throw). |
 | `pnpm smoke` | Playwright smoke test. Starts `pnpm dev` itself, bootstraps `.venv` and Chromium on first run, saves `artifacts/smoke.png` and `artifacts/dev.log`. With a server already running: `SMOKE_REUSE=1 pnpm smoke`. `PORT` changes the port. |
 | `pnpm browser:install` | Download Chrome for `agent-browser`. |
 | `pnpm skills:sync [ids] [--update]` | Install or refresh vendored skills from `scripts/skills/sources.json` (staged, prunes orphans, regenerates `docs/skills.md`). |
@@ -21,6 +22,8 @@ Next.js 16 (App Router, Turbopack), Convex, Clerk, Tailwind 4, [UI SDK](https://
 | `pnpm skills:link` | Claude Code only: symlink `.agents/skills` into `.claude/skills` (gitignored). |
 
 Code lives in `app/` (UI), `components/`, and `convex/` (backend). Before touching `convex/`, read `convex/_generated/ai/guidelines.md`.
+
+Architecture (Spanish) and the contracts every track builds on: `docs/architecture.md`; the zod schemas in `shared/` are the source of truth for `convex/schema.ts`. Start and test from a clean clone: `docs/development.md`.
 
 ## UI: UI SDK primitives, your design system
 
@@ -70,7 +73,7 @@ Local Markdown tracker, committed so teammates see them: `.scratch/<feature>/spe
 - No claiming the Clerk app and no `npx convex login` from an agent.
 - Do not hand-edit vendored skills in `.agents/`, `skills-lock.json`, or `licenses/`: `pnpm skills:check` fails on drift. Change `scripts/skills/sources.json`, then `pnpm skills:sync`. The first-party `toolbox` skills (`harness-map`, `subagent-routing`, `git-conventions`) are the exception and are edited in place.
 - Do not disable pnpm's security settings (in `pnpm-workspace.yaml`). Fix a failing install by pinning an older version or adding a documented exception there.
-- Commits, branches and PR bodies follow `$git-conventions`. Before a PR, `pnpm lint`, `pnpm typecheck` and `pnpm smoke` pass. Open a PR for each ticket with `$file-pr`. Keep changes small.
+- Commits, branches and PR bodies follow `$git-conventions`. Before a PR, `pnpm lint`, `pnpm typecheck`, `pnpm test` and `pnpm smoke` pass. Open a PR for each ticket with `$file-pr`. Keep changes small.
 - Subagents and model choices follow `$subagent-routing`: defaults are in its editable table, effort `high`.
 - When a skill names a tool you do not have, use `$harness-map`.
 
