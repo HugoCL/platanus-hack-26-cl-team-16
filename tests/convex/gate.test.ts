@@ -300,5 +300,21 @@ describe("long rooms", () => {
     const sent = await send(room.human, room.provider, text("¿Sigue ahí?"));
 
     expect((await history()).at(-1)).toEqual(sent);
+
+    const all: Message[] = [];
+    let cursor: string | null = null;
+    while (true) {
+      const result: FunctionReturnType<typeof api.gate.historyPage> =
+        await rooms.t.query(api.gate.historyPage, {
+          sessionId: room.sessionId,
+          viewerParticipantId: room.human,
+          paginationOpts: { numItems: 200, cursor },
+        });
+      all.push(...result.page);
+      if (result.isDone) break;
+      cursor = result.continueCursor;
+    }
+    expect(all).toHaveLength(152);
+    expect(all.at(-1)).toEqual(sent);
   });
 });

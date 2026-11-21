@@ -217,7 +217,13 @@ export const historyPage = query({
     const result = await ctx.db
       .query("messages")
       .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
-      .paginate(paginationOpts);
+      .paginate({
+        ...paginationOpts,
+        maximumBytesRead: Math.min(
+          paginationOpts.maximumBytesRead ?? HISTORY_BYTE_BUDGET,
+          HISTORY_BYTE_BUDGET,
+        ),
+      });
     return {
       ...result,
       page: result.page
