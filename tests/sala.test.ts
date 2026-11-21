@@ -1,0 +1,150 @@
+import { describe, expect, it } from "vitest";
+import { UiSpec } from "../shared/genui";
+import { Message } from "../shared/messages";
+import { SessionContract } from "../shared/session";
+import {
+  DEMO_CONTRACT,
+  DEMO_SCRIPT,
+  DEMO_VIEWER,
+} from "../src/components/room/demo-session";
+import {
+  auditMetrics,
+  canAnswerUi,
+  canSeeContent,
+  describeUiResponse,
+  formatTime,
+  groupSlotsByDay,
+  primaryReason,
+  splitRedacted,
+  violationTone,
+} from "../src/components/room/sala-format";
+
+const messages = DEMO_SCRIPT.map((step) => step.message);
+const slotPicker = messages.find(
+  (m) => m.content.kind === "ui" && m.content.spec.type === "slot_picker",
+);
+
+describe("demo fixture", () => {
+  it.each(messages.map((m) => [m.messageId, m] as const))(
+    "message %s matches the Message contract",
+    (_id, message) => {
+      expect(Message.safeParse(message).error?.issues ?? []).toEqual([]);
+    },
+  );
+
+  it("uses a valid session contract", () => {
+    expect(SessionContract.safeParse(DEMO_CONTRACT).success).toBe(true);
+  });
+
+  it("covers the §11 moderation states and closes the session", () => {
+    const statuses = new Set(messages.map((m) => m.status));
+    expect(statuses).toEqual(new Set(["allowed", "redacted", "blocked"]));
+    const last = messages.at(-1)?.content;
+    expect(last?.kind === "system" && last.code).toBe("session_closed");
+  });
+
+  it("pauses on every card the human answers", () => {
+    const awaited = DEMO_SCRIPT.filter((s) => s.awaitsResponse).map(
+      (s) => s.message.content.kind === "ui" && s.message.content.spec.type,
+    );
+    expect(awaited).toEqual(["slot_picker", "form", "confirmation"]);
+  });
+});
+
+describe("GenUI validation", () => {
+  it("rejects a component outside the closed catalog", () => {
+    expect(
+      UiSpec.safeParse({ type: "iframe", id: "x", src: "https://evil" })
+        .success,
+    ).toBe(false);
+  });
+
+  it("rejects a slot picker without slots", () => {
+    expect(
+      UiSpec.safeParse({ type: "slot_picker", id: "x", title: "t", slots: [] })
+        .success,
+    ).toBe(false);
+  });
+});
+
+describe("visibility", () => {
+  it("hides a blocked message from the recipient but not from its sender's owner", () => {
+    expect(canSeeContent("blocked", "p-clinica", DEMO_VIEWER)).toBe(false);
+    expect(canSeeContent("blocked", "p-mi-agente", DEMO_VIEWER)).toBe(true);
+    expect(canSeeContent("redacted", "p-clinica", DEMO_VIEWER)).toBe(true);
+  });
+
+  it("keeps a pending message from the other side hidden until it is reviewed", () => {
+    expect(canSeeContent("pending", "p-clinica", DEMO_VIEWER)).toBe(false);
+    expect(canSeeContent("pending", "p-juan", DEMO_VIEWER)).toBe(true);
+  });
+
+  it("lets only the owner or operator answer GenUI", () => {
+    expect(canAnswerUi({ ...DEMO_VIEWER, role: "owner" })).toBe(true);
+    expect(canAnswerUi({ ...DEMO_VIEWER, role: "operator" })).toBe(true);
+    expect(canAnswerUi({ ...DEMO_VIEWER, role: "observer" })).toBe(false);
+  });
+});
+
+describe("formatting", () => {
+  it("shows 24h Santiago time", () => {
+    expect(formatTime("2026-11-26T13:30:00Z")).toBe("10:30");
+  });
+
+  it("describes a chosen slot", () => {
+    if (slotPicker?.content.kind !== "ui") throw new Error("no slot picker");
+    expect(
+      describeUiResponse(
+        { type: "slot_selected", pickerId: "slots-cardio", slotId: "s2" },
+        slotPicker.content.spec,
+      ),
+    ).toBe("Eligió: Jue 26, 10:30 – Dra. Carolina Muñoz");
+  });
+
+  it("groups slots by day in order", () => {
+    if (slotPicker?.content.kind !== "ui") throw new Error("no slot picker");
+    const spec = slotPicker.content.spec;
+    if (spec.type !== "slot_picker") throw new Error("wrong spec");
+    expect(groupSlotsByDay(spec.slots).map((d) => d.slots.length)).toEqual([
+      1, 2,
+    ]);
+  });
+
+  it("names form fields by label, not by value", () => {
+    expect(
+      describeUiResponse({
+        type: "form_submit",
+        formId: "f",
+        values: { rut: "11.111.111-1" },
+      }),
+    ).toBe("Envió: rut");
+  });
+
+  it("splits redacted text into hidden and visible parts", () => {
+    expect(splitRedacted("pide el RUT y ████.")).toEqual([
+      { at: 0, text: "pide el RUT y ", hidden: false },
+      { at: 14, text: "████", hidden: true },
+      { at: 18, text: ".", hidden: false },
+    ]);
+  });
+});
+
+describe("moderation summary", () => {
+  it("turns the violation counter amber past half and red at the max", () => {
+    expect(violationTone(1, 3)).toBe("neutral");
+    expect(violationTone(2, 3)).toBe("warning");
+    expect(violationTone(3, 3)).toBe("danger");
+  });
+
+  it("picks the highest-scoring reason", () => {
+    const blocked = messages.find((m) => m.status === "blocked");
+    expect(primaryReason(blocked?.reasons)?.code).toBe("prompt_injection");
+  });
+
+  it("counts reviewed messages and interventions", () => {
+    const metrics = auditMetrics(messages);
+    expect(metrics.reviewed).toBe(8);
+    expect(metrics.interventions).toBe(2);
+    expect(metrics.averageLatencyMs).toBeGreaterThan(0);
+  });
+});
