@@ -403,6 +403,19 @@ function SlotPickerBlock({
           Ver {hiddenDays} {hiddenDays === 1 ? "día más" : "días más"}
         </Button>
       ) : null}
+      {answered ? null : (
+        <Button
+          data-variant="solid"
+          disabled={disabled || slotId === null}
+          className="self-start"
+          onClick={() => {
+            if (slotId)
+              onRespond({ type: "slot_selected", pickerId: spec.id, slotId });
+          }}
+        >
+          Elegir horario
+        </Button>
+      )}
     </div>
   );
 }
