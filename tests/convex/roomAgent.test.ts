@@ -138,6 +138,7 @@ it("sends what an agent asks, to whom it asks, each through the gate", async () 
     room.human,
   ]);
   expect(typeof input.llm.generateObject).toBe("function");
+  expect(input).not.toHaveProperty("ctx");
   expect((await room.history(room.human)).slice(1)).toMatchObject([
     sent,
     {
@@ -178,4 +179,89 @@ it("closes the room when an agent asks, like rooms.close, and drops what follows
     (await room.t.query(api.rooms.get, { sessionId: room.sessionId }))?.status,
   ).toBe("closed");
   expect(await errorKind(room.send())).toBe("RoomClosed");
+});
+
+it("gives every agent a turn for a human's message to everyone, and none for an agent's", async () => {
+  const room = await setup();
+  const agent = vi.spyOn(testRoomAgent, "reply");
+  const toEveryone = { kind: "text" as const, text: "Hola a todos." };
+
+  await room.t.action(api.gate.send, {
+    sessionId: room.sessionId,
+    senderParticipantId: room.human,
+    recipient: "all",
+    content: toEveryone,
+  });
+  await room.finishReplies();
+
+  expect(agent.mock.calls.map(([input]) => input.self).sort()).toEqual(
+    [room.consumer, room.provider].sort(),
+  );
+  const acks = (await room.history(room.human)).filter(
+    (m) => m.content.kind === "text" && m.content.text === "Recibido.",
+  );
+  expect(acks.map((m) => m.recipient)).toEqual([room.human, room.human]);
+
+  agent.mockClear();
+  await room.send("all");
+  await room.finishReplies();
+  expect(agent).not.toHaveBeenCalled();
+});
+
+it("drops a whole reply that addresses someone outside the room", async () => {
+  const room = await setup();
+  const other = await roomWithHuman(room);
+  vi.spyOn(testRoomAgent, "reply").mockResolvedValueOnce([
+    {
+      kind: "send",
+      recipient: room.human,
+      content: { kind: "text", text: "Para Juan." },
+    },
+    {
+      kind: "send",
+      recipient: other.human,
+      content: { kind: "text", text: "Para otra sala." },
+    },
+    { kind: "close" },
+  ]);
+  vi.spyOn(console, "error").mockImplementation(() => {});
+
+  const sent = await room.send();
+  await room.finishReplies();
+
+  expect((await room.history(room.human)).slice(1)).toEqual([sent]);
+  expect(
+    (await room.t.query(api.rooms.get, { sessionId: room.sessionId }))?.status,
+  ).toBe("active");
+});
+
+it("stops a reply at the first send the moderator blocks", async () => {
+  const room = await setup();
+  vi.spyOn(testRoomAgent, "reply").mockResolvedValueOnce([
+    {
+      kind: "send",
+      recipient: room.human,
+      content: { kind: "text", text: "Reserva confirmada." },
+    },
+    { kind: "close" },
+  ]);
+  const moderate = vi.spyOn(allowAllModerator, "moderate");
+  moderate.mockResolvedValueOnce({
+    verdict: { decision: "allow", reason: "Within the room's purpose." },
+    events: [],
+  });
+  moderate.mockResolvedValueOnce({
+    verdict: { decision: "block", rule: "sensitive_data", reason: "Datos." },
+    events: [],
+  });
+
+  await room.send();
+  await room.finishReplies();
+
+  expect(
+    (await room.t.query(api.rooms.get, { sessionId: room.sessionId }))?.status,
+  ).toBe("active");
+  expect((await room.history(room.human)).at(-1)).toMatchObject({
+    content: { kind: "ui", spec: { type: "moderator_alert" } },
+  });
 });

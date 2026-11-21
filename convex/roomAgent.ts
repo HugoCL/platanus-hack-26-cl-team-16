@@ -10,14 +10,17 @@ import type { ActionCtx } from "./_generated/server";
 const ACK = "Recibido.";
 
 // What a room agent asks the room to do, in order. The gate sends each message with the agent as
-// sender, through moderation, and closes the room like `rooms.close`.
+// sender, through moderation, and closes the room like `rooms.close`. The actions after a send
+// the moderator blocked are dropped, and so is a whole reply that addresses someone outside the
+// room.
 export type RoomAgentAction =
   | { kind: "send"; recipient: Recipient; content: SendableContent }
   | { kind: "close" };
 
+// An agent gets data and a model, never the action context: everything it writes goes through
+// its actions. `roomAgentFor` binds any narrower port an agent needs.
 export interface RoomAgent {
   reply(input: {
-    ctx: ActionCtx;
     self: string;
     message: Message;
     contract: SessionContract;
@@ -50,7 +53,10 @@ export const fakeRoomLlm = createFakeLlmProvider({ text: () => ACK });
 
 // The agent that answers for a hosted card in a room, with the model it uses. Every card gets the
 // test agent until E8 plugs in the reference agents here.
-export function roomAgentFor(_agent: Doc<"agents">): {
+export function roomAgentFor(
+  _agent: Doc<"agents">,
+  _ctx: ActionCtx,
+): {
   agent: RoomAgent;
   llm: LlmProvider;
 } {

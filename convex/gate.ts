@@ -188,15 +188,13 @@ export const commit = internalMutation({
         );
       }
     }
-    if (
-      !exhausted &&
-      verdict.decision === "allow" &&
-      args.recipient !== args.senderParticipantId &&
-      session.participants.some(
-        (p) => p.kind === "agent" && p.participantId === args.recipient,
-      )
-    ) {
-      await ctx.scheduler.runAfter(0, internal.gate.reply, { messageId });
+    if (!exhausted && verdict.decision === "allow") {
+      for (const responder of responders(session.participants, sender, args)) {
+        await ctx.scheduler.runAfter(0, internal.gate.reply, {
+          messageId,
+          participantId: responder.participantId as Id<"participants">,
+        });
+      }
     }
     const stored = await ctx.db.get(messageId);
     if (!stored) throw new Error("message vanished right after it was stored");
@@ -214,19 +212,43 @@ type ReplyContext = {
   history: Message[];
 };
 
+// The agents that get a turn for an allowed message: the agent it is addressed to, or, for a
+// human's message to everyone, every agent in the room. An agent's message to everyone gets no
+// turn, so two agents can never keep each other talking through broadcasts.
+function responders(
+  participants: Participant[],
+  sender: Participant,
+  { recipient }: { recipient: Doc<"messages">["recipient"] },
+) {
+  return participants.filter(
+    (p) =>
+      p.kind === "agent" &&
+      p.participantId !== sender.participantId &&
+      (p.participantId === recipient ||
+        (recipient === "all" && sender.kind === "human")),
+  );
+}
+
 export const replyContext = internalQuery({
-  args: { messageId: v.id("messages") },
-  handler: async (ctx, { messageId }): Promise<ReplyContext | null> => {
+  args: { messageId: v.id("messages"), participantId: v.id("participants") },
+  handler: async (
+    ctx,
+    { messageId, participantId },
+  ): Promise<ReplyContext | null> => {
     const source = await ctx.db.get("messages", messageId);
     if (
       !source?.senderParticipantId ||
       source.moderation.status !== "allowed" ||
-      source.recipient === "all"
+      (source.recipient !== participantId && source.recipient !== "all")
     ) {
       return null;
     }
-    const recipient = await ctx.db.get("participants", source.recipient);
-    if (recipient?.kind !== "agent" || recipient.leftAt !== undefined)
+    const recipient = await ctx.db.get("participants", participantId);
+    if (
+      recipient?.kind !== "agent" ||
+      recipient.sessionId !== source.sessionId ||
+      recipient.leftAt !== undefined
+    )
       return null;
     const agent = await ctx.db.get("agents", recipient.agentId);
     if (agent?.kind !== "hosted") return null;
@@ -256,13 +278,25 @@ export const replyContext = internalQuery({
 });
 
 export const reply = internalAction({
-  args: { messageId: v.id("messages") },
-  handler: async (ctx, { messageId }): Promise<null> => {
-    const input = await ctx.runQuery(internal.gate.replyContext, { messageId });
+  args: { messageId: v.id("messages"), participantId: v.id("participants") },
+  handler: async (ctx, args): Promise<null> => {
+    const input = await ctx.runQuery(internal.gate.replyContext, args);
     if (!input) return null;
     const { agent, self, sessionId, ...room } = input;
-    const { agent: roomAgent, llm } = roomAgentFor(agent);
-    const actions = await roomAgent.reply({ ctx, self, ...room, llm });
+    const { agent: roomAgent, llm } = roomAgentFor(agent, ctx);
+    const actions = await roomAgent.reply({ self, ...room, llm });
+    const strangers = actions.filter(
+      (action) =>
+        action.kind === "send" &&
+        action.recipient !== "all" &&
+        !room.participants.some((p) => p.participantId === action.recipient),
+    );
+    if (strangers.length > 0) {
+      console.error(
+        `gate.reply: dropped the reply of ${self}, which addressed someone outside the room`,
+      );
+      return null;
+    }
     for (const action of actions) {
       try {
         if (action.kind === "close") {
@@ -271,12 +305,13 @@ export const reply = internalAction({
             participantId: self,
           });
         } else {
-          await sendThroughGate(ctx, {
+          const sent = await sendThroughGate(ctx, {
             sessionId,
             senderParticipantId: self,
             recipient: action.recipient as Doc<"messages">["recipient"],
             content: action.content,
           });
+          if (sent.status !== "allowed") return null;
         }
       } catch (error) {
         if (
