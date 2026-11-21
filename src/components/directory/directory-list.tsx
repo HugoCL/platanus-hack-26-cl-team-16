@@ -87,7 +87,7 @@ function AgentResult({
       data-testid="agent-card"
       data-slug={card.slug}
       data-status={card.status}
-      className={`relative flex scroll-m-4 flex-col gap-2.5 rounded-3xl p-4 transition-shadow has-[[data-select]:focus-visible]:outline-2 has-[[data-select]:focus-visible]:outline-offset-2 has-[[data-select]:focus-visible]:outline-ring ${
+      className={`relative flex scroll-m-4 flex-col gap-2.5 rounded-3xl p-4 transition-[opacity,box-shadow] duration-200 ease-[var(--ease-out)] starting:opacity-0 motion-reduce:transition-none has-[[data-select]:focus-visible]:outline-2 has-[[data-select]:focus-visible]:outline-offset-2 has-[[data-select]:focus-visible]:outline-ring ${
         prospect ? "bg-muted [background-image:var(--sm-hatch)]" : "bg-card"
       } ${selected ? "shadow-[0_0_0_2px_var(--ui-foreground)]" : prospect ? "" : "shadow-card"}`}
     >
@@ -163,7 +163,7 @@ function AgentResult({
         )}
         <Link
           href={href}
-          className="inline-flex h-9 flex-1 items-center justify-center rounded-full border border-input bg-card text-sm font-medium text-foreground no-underline hover:bg-muted"
+          className="press inline-flex h-9 flex-1 items-center justify-center rounded-full border border-input bg-card text-sm font-medium text-foreground no-underline hover:bg-muted"
         >
           Ver ficha
           <span className="sr-only"> de {card.name}</span>

@@ -24,6 +24,7 @@ import { ConvexError } from "convex/values";
 import {
   Check,
   List,
+  LoaderCircle,
   LocateFixed,
   Map as MapIcon,
   Search,
@@ -565,9 +566,29 @@ export function DirectorySearch() {
 
           <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-24 lg:pb-4">
             {result === undefined || categories === undefined ? (
-              <p className="m-0 text-subtle-foreground" data-testid="loading">
-                Cargando…
-              </p>
+              <div data-testid="loading" className="flex flex-col gap-3">
+                <span className="sr-only">Cargando…</span>
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    aria-hidden
+                    className="flex animate-pulse flex-col gap-3 rounded-3xl bg-card p-4 shadow-card"
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="size-10 flex-none rounded-2xl bg-muted" />
+                      <div className="flex flex-1 flex-col gap-2 pt-1">
+                        <span className="h-4 w-3/5 rounded-full bg-muted" />
+                        <span className="h-3 w-2/5 rounded-full bg-muted" />
+                      </div>
+                    </div>
+                    <span className="h-3 w-full rounded-full bg-muted" />
+                    <div className="flex gap-2">
+                      <span className="h-9 flex-1 rounded-full bg-muted" />
+                      <span className="h-9 flex-1 rounded-full bg-muted" />
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
               <div className="flex flex-col gap-3">
                 {cards.length === 0 ? (
@@ -603,7 +624,20 @@ export function DirectorySearch() {
                       setMore({ key: filterKey, pages: pages + 1 })
                     }
                   >
-                    {loadingMore ? "Cargando…" : "Ver más agentes"}
+                    <span className="grid">
+                      <span
+                        className={`[grid-area:1/1] ${loadingMore ? "invisible" : ""}`}
+                      >
+                        Ver más agentes
+                      </span>
+                      {loadingMore ? (
+                        <LoaderCircle
+                          aria-label="Cargando"
+                          size={16}
+                          className="m-auto animate-spin [grid-area:1/1]"
+                        />
+                      ) : null}
+                    </span>
                   </Button>
                 ) : null}
                 {origin && radiusKm < 50 ? (
