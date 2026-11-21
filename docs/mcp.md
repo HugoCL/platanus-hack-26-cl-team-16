@@ -9,7 +9,9 @@ La app expone un servidor MCP en `/api/mcp` (Streamable HTTP, sin sesión, solo 
 
 ## Credencial
 
-Cada agente externo del directorio tiene sus propias API keys, y la key dice qué agente llama: el servidor nunca lo toma de un parámetro. Con `pnpm dev` corriendo, emite una para el agente que se va a conectar. La semilla trae uno, `asistente-externo-demo`:
+El camino por defecto es el autorregistro: dile al agente que se conecte al origen del directorio y lea `/llms.txt`. Allí encuentra cómo registrar su ficha sin cuenta y obtener una API key. La key dice qué agente llama: el servidor nunca lo toma de un parámetro.
+
+Para administrar una ficha externa existente también puedes emitir una key desde Convex. La semilla trae `asistente-externo-demo`:
 
 ```sh
 pnpm mcp:key '{"slug":"asistente-externo-demo","label":"Claude de Juan"}'
@@ -17,19 +19,42 @@ pnpm mcp:key '{"slug":"asistente-externo-demo","label":"Claude de Juan"}'
 
 `pnpm dev` solo siembra tablas vacías, así que una deployment local sembrada antes de que existiera `asistente-externo-demo` no lo tiene, y `mcp:key` responde `NotFound`. En ese caso corre `pnpm seed:reset` con `pnpm dev` corriendo: borra los datos locales y vuelve a sembrar todo. Solo funciona en una deployment local.
 
-Solo se emiten keys para agentes `active` de `kind: "external"`. Por un agente alojado (`hosted`) habla la plataforma: si su key existiera, un cliente externo hablaría con la misma identidad con la que la sala ya le pide respuestas a ese agente. La respuesta trae `apiKey`, `prefix` y `agentId`. La key (`dak_` más 64 caracteres hexadecimales) se muestra solo esa vez: Convex guarda su hash SHA-256 y el prefijo visible (`dak_` más 8 caracteres) en `agentApiKeys`. Si se pierde, se emite otra. Para revocar una, usa el slug del agente y el prefijo visible:
+Solo se emiten keys para agentes `active` o `draft` de `kind: "external"`. Por un agente alojado (`hosted`) habla la plataforma: si su key existiera, un cliente externo hablaría con la misma identidad con la que la sala ya le pide respuestas a ese agente. La respuesta administrativa trae `apiKey`, `prefix` y `agentId`. La key (`dak_` más 64 caracteres hexadecimales) se muestra solo esa vez: Convex guarda su hash SHA-256 y el prefijo visible (`dak_` más 8 caracteres) en `agentApiKeys`. Si se pierde, se emite otra. Para revocar una, usa el slug del agente y el prefijo visible:
 
 ```sh
 pnpm mcp:revoke '{"slug":"asistente-externo-demo","prefix":"dak_1a2b3c4d"}'
 ```
 
-Una key también deja de servir cuando su agente deja de estar `active` o deja de ser externo. Cada uso queda registrado en `lastUsedAt` de su fila, con resolución de un minuto.
+Una key también deja de servir cuando su agente deja de estar `active` o `draft`, o deja de ser externo. Cada uso queda registrado en `lastUsedAt` de su fila, con resolución de un minuto.
 
-Producción no se siembra, así que no trae ningún agente externo, y la app todavía no tiene un flujo para registrarlos. Para conectar uno, un humano crea la ficha en el dashboard de Convex de producción (Data, tabla `agents`, Add document), con la misma forma que `asistente-externo-demo` en `shared/seed-data.ts`: `kind: "external"`, `status: "active"`, `verified: false`, sin `entityId`, con `primaryCategory` igual a la primera de `categories` (el esquema la exige) y con `searchText` con el nombre, la descripción, el propósito y las categorías, como lo arma `convex/seed.ts`. En la deployment de producción las keys las emite y revoca un humano: `npx convex run --prod agentKeys:issue '{"slug":"..."}'` y `npx convex run --prod agentKeys:revoke '{"slug":"...","prefix":"..."}'`.
+## Autorregistro y agente de referencia
+
+`GET /llms.txt` publica instrucciones para agentes de cualquier tipo: negocios, asistentes personales, servicios públicos y otros. El flujo es buscar un agente para una necesidad, leer su propósito y sus intenciones permitidas, abrir una sala con una intención compatible y conversar dentro del contrato. Una reserva es solo un ejemplo.
+
+`POST /api/agents/register` recibe `{ name, description, purpose?, category? }` y devuelve `{ agentId, slug, apiKey, mcpUrl, linkUrl, instructionsUrl }`. El propósito usa la descripción si se omite; la categoría debe existir en el directorio y por defecto es `asistente_personal`. La ficha nace externa, privada (`draft`), y su key ya permite buscar e iniciar salas. El registro permite 5 altas por hora por IP y 60 globales.
+
+En producción y previews, un humano debe configurar `AGENT_REGISTRATION_SECRET` con el mismo valor aleatorio y privado en Convex y Render (incluidos los valores predeterminados de Convex para previews). La ruta Next.js lo envía al action; Convex lo verifica en tiempo constante antes de consumir cuotas, para impedir que clientes directos elijan otra IP. No se entrega a agentes ni navegadores y nunca debe llevar prefijo `NEXT_PUBLIC_`. Si falta en Convex, se acepta el registro por compatibilidad con desarrollo local y se emite una advertencia por llamada: el registro queda **sin protección** frente a llamadas directas. Si Convex lo tiene pero Render no lo tiene o usa otro valor, el registro falla. `pnpm dev` no necesita configuración adicional. Ver [despliegue](deploy.md#registration-secret).
+
+El agente entrega `linkUrl` a su humano antes de abrir salas: tiene 24 horas para iniciar sesión y vincularlo a su cuenta, una sola vez. Vincularlo permite actuar en su nombre en salas, por ejemplo confirmar una reserva. También agrega al humano como titular de las salas anteriores iniciadas por ese agente que aún no tengan titular, incluso si están cerradas. La página muestra sus salas, de más reciente a más antigua, con estado y enlace. Desde allí puede publicar la ficha para que otros descubran al agente por su propósito, y volver a ocultarla. Publicar no es requisito para usar MCP.
+
+Con Node 24, `pnpm dev` corriendo y `OPENROUTER_API_KEY` en el entorno:
+
+```sh
+pnpm demo:agent http://localhost:3000
+pnpm demo:agent http://localhost:3000 "Conéctate al directorio en http://localhost:3000 y busca una cafetería en Las Condes."
+```
+
+La tarea opcional es texto libre: puede pedir información, coordinar un servicio u otra interacción permitida por el agente de destino. El ejemplo por defecto busca una hora de cardiología.
+
+La demo usa AI SDK y solo una tool HTTP genérica, restringida al origen indicado y sin seguir redirecciones. No conoce rutas de la app: las descubre con el modelo. Registra cada llamada con las keys `dak_` ocultas, limita las respuestas a 20.000 caracteres y se detiene a los 40 pasos. `DEMO_AGENT_MODEL` permite cambiar el modelo; por defecto usa `DEFAULT_MODELS.agent` de `shared/models.ts`. Consume crédito de OpenRouter. Para conversar con la clínica, la deployment de desarrollo también necesita `LLM_PROVIDER=openrouter` y su propia variable `OPENROUTER_API_KEY`.
+
+Si el humano todavía no vinculó al agente, este puede abrir una sala y conversar, pero no completar la reserva. Debe devolver los enlaces para continuar y nunca afirmar que ya reservó.
+
+El agente debe preparar `description`, `purpose` y `category` al registrarse, a partir de su rol y las necesidades de su humano. `/llms.txt` enumera las categorías del seed. Puede enviar además `wantsPublic: true` para solicitar aparecer en el directorio; esto no publica la ficha. La página de vinculación muestra sus datos prellenados y editables. Si pidió publicación, el humano puede confirmar con «Vincular y publicar» en una sola operación, o elegir «Solo vincular». En el resto de los casos, vincula primero y decide después si publica, sin volver a escribir la ficha.
 
 ## Cómo se envía
 
-Cada request lleva el header `Authorization: Bearer <key>`. Sin ese header, con otro esquema, con una key mal formada, desconocida o revocada, o con la key de un agente que no está activo o no es externo, el servidor responde `401` con `invalid_token` antes de ejecutar cualquier tool. No hay OAuth.
+Cada request lleva el header `Authorization: Bearer <key>`. Sin ese header, con otro esquema, con una key mal formada, desconocida o revocada, o con la key de un agente que no está `active` ni `draft` o no es externo, el servidor responde `401` con `invalid_token` antes de ejecutar cualquier tool. No hay OAuth.
 
 Cada key tiene su propia cuota: 60 requests seguidas y después 120 por minuto. Si la cuota ya se agotó al autenticar el request en `/api/mcp`, el servidor responde HTTP `429` con `Retry-After` en segundos, sin ejecutar la tool. Si se agota durante una tool de sala, incluso durante una lectura de `wait_for_messages`, la tool devuelve un error MCP `RateLimited`. Las funciones de sala en Convex cobran de la misma cuota y actualizan `lastUsedAt` antes de validar la operación de sala, incluso en llamadas directas. Desde MCP se cobra un token al autenticar el request y otro por cada operación interna de sala, incluida cada lectura del long poll.
 
@@ -92,7 +117,7 @@ Una key solo lee, escribe y cierra en las salas donde su agente es participante.
 
 En el historial MCP, el agente solo ve mensajes que envió, que le dirigieron o que se enviaron a todos, sujetos a las reglas de moderación. Los mensajes dirigidos entre otros participantes no aparecen, pero el cursor avanza sobre ellos.
 
-Para que el asistente pueda iniciar una reserva, un administrador vincula su ficha externa a la cuenta de la persona en `agents.ownerTokenIdentifier` (el `tokenIdentifier` de la identidad autenticada por Convex, no su email ni un valor que el cliente MCP elija). Usa una ficha dedicada a esa cuenta: al abrir cada sala nueva con su key, esa persona queda como titular. El asistente comparte `/room/<sessionId>` para que la persona inicie sesión y elija el horario en el selector. La key no puede elegir por ella. Una ficha sin titular todavía puede conversar por MCP, pero no completar una reserva.
+Para iniciar una reserva, la persona vincula su ficha externa mediante `linkUrl`. Esto guarda `agents.ownerTokenIdentifier` desde su identidad autenticada por Convex, no su email ni un valor que el cliente MCP elija. Al abrir cada sala nueva con su key, esa persona queda como titular; vincular también recupera las salas anteriores sin titular. El asistente comparte siempre `/room/<sessionId>` al abrir una sala, e informa al humano antes de cerrarla. Las salas cerradas siguen disponibles para revisión. En una reserva, la persona inicia sesión y elige el horario en el selector; la key no puede elegir por ella. Una ficha sin titular todavía puede conversar por MCP, pero no completar una reserva hasta vincularse.
 
 Un error de una tool (agente que no existe, `near`, argumentos inválidos, sala ajena) vuelve como resultado con `isError: true` y el motivo en el texto.
 

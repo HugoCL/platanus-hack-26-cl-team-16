@@ -22,6 +22,7 @@ export type RoomParticipant = {
   name: string;
   side: "self" | "other";
   kind: "agent" | "human";
+  verified?: boolean;
   onBehalfOf?: string;
 };
 
@@ -257,4 +258,18 @@ export function splitRedacted(text: string) {
       at += part.length;
       return piece;
     });
+}
+
+// The last session notice decides whether the room is open, closed, or terminated.
+export function sessionEnd(messages: RoomMessage[]) {
+  const notice = messages.findLast(
+    (m) =>
+      m.content.kind === "system" &&
+      (m.content.code === "session_closed" ||
+        m.content.code === "session_terminated"),
+  );
+  if (notice?.content.kind !== "system") return null;
+  const status: SessionStatus =
+    notice.content.code === "session_terminated" ? "terminated" : "closed";
+  return { status, text: notice.content.text };
 }

@@ -34,6 +34,9 @@ export default async function RootLayout({
       suppressHydrationWarning
       className={`${geist.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <link rel="alternate" type="text/plain" href="/llms.txt" />
+      </head>
       <body className="flex min-h-full flex-col">
         <ClerkProvider dynamic>
           <ConvexClientProvider>

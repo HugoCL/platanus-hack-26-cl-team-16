@@ -9,6 +9,7 @@
  */
 
 import type * as agentKeys from "../agentKeys.js";
+import type * as agentRegistration from "../agentRegistration.js";
 import type * as bookings from "../bookings.js";
 import type * as directory from "../directory.js";
 import type * as gate from "../gate.js";
@@ -36,6 +37,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   agentKeys: typeof agentKeys;
+  agentRegistration: typeof agentRegistration;
   bookings: typeof bookings;
   directory: typeof directory;
   gate: typeof gate;

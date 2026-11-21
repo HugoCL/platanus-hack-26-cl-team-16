@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { type CSSProperties, Fragment } from "react";
 
 export function revealAt(index: number) {
   return { "data-reveal": "", style: { "--reveal-i": index } as CSSProperties };
@@ -12,9 +12,11 @@ export function RevealWords({
   from?: number;
 }) {
   return text.split(" ").map((word, index) => (
-    <span key={word} className="landing-word" {...revealAt(from + index)}>
+    <Fragment key={word}>
       {index > 0 && " "}
-      {word}
-    </span>
+      <span className="landing-word" {...revealAt(from + index)}>
+        {word}
+      </span>
+    </Fragment>
   ));
 }

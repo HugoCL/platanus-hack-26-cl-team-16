@@ -1,6 +1,7 @@
 import { Migrations } from "@convex-dev/migrations";
 import { components, internal } from "./_generated/api";
 import type { DataModel } from "./_generated/dataModel";
+import { SELF_REGISTERED_SCOPE } from "./agentRegistration";
 
 // Use this file for every destructive schema change and every backfill:
 //   1. make the schema accept old and new data (new field optional, old field optional),
@@ -17,7 +18,42 @@ export const run = migrations.runner();
 export const runAll = migrations.runner([
   internal.migrations.exampleBackfillNumbers,
   internal.migrations.backfillSessionPurpose,
+  internal.migrations.clearSelfRegisteredPatientScope,
+  internal.migrations.clearSelfRegisteredRoomData,
 ]);
+
+export const clearSelfRegisteredPatientScope = migrations.define({
+  table: "agents",
+  migrateOne: (_ctx, agent) =>
+    agent.selfRegistered
+      ? { scope: SELF_REGISTERED_SCOPE, verified: false }
+      : undefined,
+});
+
+export const clearSelfRegisteredRoomData = migrations.define({
+  table: "sessions",
+  migrateOne: async (ctx, session) => {
+    if (!session.contract) return;
+    const participants = await ctx.db
+      .query("participants")
+      .withIndex("by_sessionId", (q) => q.eq("sessionId", session._id))
+      .take(10);
+    const recipient = participants.find(
+      (p) => p.kind === "agent" && p.role === "recipient",
+    );
+    if (recipient?.kind !== "agent") return;
+    const agent = await ctx.db.get(recipient.agentId);
+    if (!agent?.selfRegistered) return;
+    return {
+      contract: {
+        ...session.contract,
+        recipientShares: [],
+        recipientRequests: [],
+        forbiddenTopics: [],
+      },
+    };
+  },
+});
 
 // TEMPLATE, copy this to write a real migration. It runs over every document of `numbers`
 // in batches. Return a partial document to patch it, or return nothing to leave it alone.
