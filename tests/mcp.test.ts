@@ -1,11 +1,13 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
+
+import rateLimiter from "@convex-dev/rate-limiter/test";
 import {
   Client,
   StreamableHTTPClientTransport,
 } from "@modelcontextprotocol/client";
 import { convexTest } from "convex-test";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { internal } from "../convex/_generated/api";
 import schema from "../convex/schema";
 import { type ConvexCaller, createMcpEndpoint } from "../lib/mcp";
@@ -14,6 +16,7 @@ import { CONSUMER_AGENT_SLUG } from "../shared/seedData";
 const modules = import.meta.glob("../convex/**/*.ts");
 const MCP_URL = "http://localhost/api/mcp";
 const REJECTED = /invalid_token|unauthorized|401/i;
+const PUBLIC_ORIGIN = "https://directorio.example";
 
 type Negotiation = "legacy" | "auto";
 
@@ -23,11 +26,14 @@ let endpoint: ReturnType<typeof createMcpEndpoint>;
 let apiKey: string;
 beforeEach(async () => {
   t = createTest();
+  rateLimiter.register(t);
   await t.mutation(internal.seed.ensure, {});
   ({ apiKey } = await t.action(internal.agentKeys.issue, {
     slug: CONSUMER_AGENT_SLUG,
   }));
-  endpoint = createMcpEndpoint(t as ConvexCaller);
+  endpoint = createMcpEndpoint(t as ConvexCaller, {
+    publicOrigin: PUBLIC_ORIGIN,
+  });
 });
 
 async function connect(mode: Negotiation, key?: string) {
@@ -111,34 +117,95 @@ describe("MCP endpoint over raw HTTP", () => {
     for (const origin of [
       "https://evil.example",
       "http://localhost.evil.example",
-      "https://localhost",
       "http://localhost/api/mcp",
+      "file://localhost",
       "null",
     ]) {
       expect((await post(initialize, { authorization, origin })).status).toBe(
         403,
       );
     }
-    expect(
-      (await post(initialize, { authorization, origin: "http://localhost" }))
-        .status,
-    ).toBe(200);
+    for (const origin of [
+      "http://localhost",
+      "http://localhost:3000",
+      "https://127.0.0.1:8443",
+      PUBLIC_ORIGIN,
+    ]) {
+      expect((await post(initialize, { authorization, origin })).status).toBe(
+        200,
+      );
+    }
+  });
 
-    const proxy = {
-      authorization,
-      "x-forwarded-proto": "https",
-      "x-forwarded-host": "directorio.example",
+  it("refuses a page rebound to this server, whose Origin and Host match each other", async () => {
+    const rebound = {
+      authorization: `Bearer ${apiKey}`,
+      host: "evil.example:3000",
     };
     expect(
       (
         await post(initialize, {
-          ...proxy,
-          origin: "https://directorio.example",
+          ...rebound,
+          origin: "http://evil.example:3000",
         })
       ).status,
-    ).toBe(200);
-    expect(
-      (await post(initialize, { ...proxy, origin: "http://localhost" })).status,
     ).toBe(403);
+    expect((await post(initialize, rebound)).status).toBe(403);
+  });
+
+  it("accepts the public origin behind proxies and only that one", async () => {
+    const authorization = `Bearer ${apiKey}`;
+    const behindProxies = (forwardedHost: string, origin = PUBLIC_ORIGIN) =>
+      post(initialize, {
+        authorization,
+        origin,
+        "x-forwarded-proto": "https, http",
+        "x-forwarded-host": forwardedHost,
+      });
+    expect((await behindProxies("directorio.example")).status).toBe(200);
+    expect(
+      (await behindProxies("directorio.example, internal.render:10000")).status,
+    ).toBe(200);
+    expect((await behindProxies("evil.example")).status).toBe(403);
+    expect(
+      (await behindProxies("directorio.example", "https://evil.example"))
+        .status,
+    ).toBe(403);
+
+    const unconfigured = createMcpEndpoint(t as ConvexCaller);
+    const response = await unconfigured(
+      new Request(MCP_URL, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+          authorization,
+          origin: PUBLIC_ORIGIN,
+          "x-forwarded-host": "directorio.example",
+        },
+        body: JSON.stringify(initialize),
+      }),
+    );
+    expect(response.status).toBe(403);
+  });
+
+  it("answers 429 with Retry-After once a key spends its bucket", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const authorization = `Bearer ${apiKey}`;
+      const statuses = [];
+      for (let i = 0; i < 60; i++) {
+        statuses.push((await post(initialize, { authorization })).status);
+      }
+      expect(statuses).toEqual(Array(60).fill(200));
+      const limited = await post(initialize, { authorization });
+      expect(limited.status).toBe(429);
+      expect(Number(limited.headers.get("retry-after"))).toBeGreaterThan(0);
+
+      vi.advanceTimersByTime(1000);
+      expect((await post(initialize, { authorization })).status).toBe(200);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
