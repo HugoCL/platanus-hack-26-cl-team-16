@@ -6,7 +6,7 @@ import { convexTest } from "convex-test";
 import { afterEach, expect, it, vi } from "vitest";
 import { internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
-import { CLINIC_AGENT_SLUG } from "../../shared/seedData";
+import { CLINIC_AGENT_SLUG } from "../../shared/seed-data";
 
 const modules = import.meta.glob("../../convex/**/*.ts");
 

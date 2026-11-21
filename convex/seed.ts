@@ -1,5 +1,5 @@
 import { effectiveAllowedIntents } from "../shared/agent";
-import { REFERENCE_ATTACK } from "../shared/fixtures/moderationSet";
+import { REFERENCE_ATTACK } from "../shared/fixtures/moderation-set";
 import type { SendableContent } from "../shared/messages";
 import type { ModerationReason } from "../shared/moderation";
 import { checkRules } from "../shared/moderator/rules";
@@ -8,14 +8,17 @@ import type { Capability } from "../shared/scope";
 import {
   CLINIC_AGENT_SLUG,
   CONSUMER_AGENT_SLUG,
+  EXTERNAL_AGENT_SLUG,
   SEED_AGENTS,
   SEED_AVAILABILITY,
   SEED_CATEGORIES,
   SEED_OFFERINGS,
-} from "../shared/seedData";
+} from "../shared/seed-data";
 import { DEFAULT_MAX_TURNS, type SessionContract } from "../shared/session";
 import type { Id, TableNames } from "./_generated/dataModel";
 import { internalMutation, type MutationCtx } from "./_generated/server";
+import { sha256Hex } from "./agentKeys";
+import { insertMessage } from "./roomMessages";
 import { loadSession } from "./roomState";
 
 // Local deployments start empty, so every table needs sample data to develop against.
@@ -79,16 +82,6 @@ async function demoSession(ctx: MutationCtx) {
   return session;
 }
 
-async function sha256Hex(value: string) {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(value),
-  );
-  return Array.from(new Uint8Array(digest), (b) =>
-    b.toString(16).padStart(2, "0"),
-  ).join("");
-}
-
 export const seeders = {
   numbers: async (ctx) => {
     for (const value of [3, 1, 4, 1, 5]) {
@@ -143,7 +136,7 @@ export const seeders = {
   },
 
   agentApiKeys: async (ctx) => {
-    const agent = await agentBySlug(ctx, CONSUMER_AGENT_SLUG);
+    const agent = await agentBySlug(ctx, EXTERNAL_AGENT_SLUG);
     const unknowableKey = crypto.randomUUID();
     await ctx.db.insert("agentApiKeys", {
       agentId: agent._id,
@@ -288,7 +281,7 @@ export const seeders = {
       }),
     );
 
-    await ctx.db.insert("messages", {
+    await insertMessage(ctx, {
       sessionId: session._id,
       recipient: "all",
       content: {
@@ -298,7 +291,7 @@ export const seeders = {
       },
       moderation: allowed("Aviso del sistema."),
     });
-    await ctx.db.insert("messages", {
+    await insertMessage(ctx, {
       sessionId: session._id,
       senderParticipantId: role("initiator"),
       recipient: role("recipient"),
@@ -308,7 +301,7 @@ export const seeders = {
       },
       moderation: allowed("Pide horarios, dentro del propósito de la sala."),
     });
-    const picker = await ctx.db.insert("messages", {
+    const picker = await insertMessage(ctx, {
       sessionId: session._id,
       senderParticipantId: role("recipient"),
       recipient: role("owner"),
@@ -324,7 +317,7 @@ export const seeders = {
       },
       moderation: allowed("Ofrece horarios disponibles."),
     });
-    await ctx.db.insert("messages", {
+    await insertMessage(ctx, {
       sessionId: session._id,
       senderParticipantId: role("owner"),
       recipient: role("recipient"),
@@ -360,7 +353,7 @@ export const seeders = {
     const [first] = findings;
     if (!first)
       throw new Error("seed: the reference message must be blocked by rules");
-    const blocked = await ctx.db.insert("messages", {
+    const blocked = await insertMessage(ctx, {
       sessionId: session._id,
       senderParticipantId: senderId,
       recipient,
@@ -380,7 +373,7 @@ export const seeders = {
         decidedAt: Date.now(),
       },
     });
-    await ctx.db.insert("messages", {
+    await insertMessage(ctx, {
       sessionId: session._id,
       recipient: senderId,
       content: {

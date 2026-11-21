@@ -95,7 +95,7 @@ Corre en cada mensaje antes de guardarlo y entregarlo, **fail-closed**: si falla
 
 `ModerationResult` (con `redact`, `escalate` y `terminate`) queda en el código para después de E8; nada de la fase 1 lo usa.
 
-El set versionado de casos, con su veredicto esperado, está en `shared/fixtures/moderationSet.ts`, y `pnpm test` lo corre con el LLM falso. `pnpm eval:moderator` lo corre contra el modelo real en OpenRouter (10 veces por defecto, fuera de CI) y reporta, para el moderador completo y para el juez solo, el ataque de referencia bloqueado, los bloqueos falsos del set legítimo, el p95 de latencia y el costo.
+El set versionado de casos, con su veredicto esperado, está en `shared/fixtures/moderation-set.ts`, y `pnpm test` lo corre con el LLM falso. `pnpm eval:moderator` lo corre contra el modelo real en OpenRouter (10 veces por defecto, fuera de CI) y reporta, para el moderador completo y para el juez solo, el ataque de referencia bloqueado, los bloqueos falsos del set legítimo, el p95 de latencia y el costo.
 
 Todo queda auditado en `moderationEvents` (un evento por etapa que corrió), visible en la UI de la sala. Es la pieza diferenciadora del pitch, así que el demo debe mostrar un bloqueo en vivo.
 
@@ -147,7 +147,7 @@ sequenceDiagram
   M-->>J: bloqueado (injection + fuera de propósito)
 ```
 
-Los datos semilla (`shared/seedData.ts`, cargados por `convex/seed.ts` al arrancar) traen 15 fichas de 13 rubros: la clínica de Providencia con 2 doctores como ofertas reservables y 4 horarios, un hotel con noches, cafeterías, ferretería y panadería con productos, precio e imagen, y el resto de los rubros. También traen "Mi agente" de Juan, una sala de ejemplo con el `slot_picker`, la respuesta, el mensaje bloqueado, su `moderator_alert` y sus `moderationEvents`, y un job de prospección con un prospecto y su borrador.
+Los datos semilla (`shared/seed-data.ts`, cargados por `convex/seed.ts` al arrancar) traen 15 fichas de 13 rubros: la clínica de Providencia con 2 doctores como ofertas reservables y 4 horarios, un hotel con noches, cafeterías, ferretería y panadería con productos, precio e imagen, y el resto de los rubros. También traen "Mi agente" de Juan, una sala de ejemplo con el `slot_picker`, la respuesta, el mensaje bloqueado, su `moderator_alert` y sus `moderationEvents`, y un job de prospección con un prospecto y su borrador.
 
 ## 5. Plan de trabajo
 
@@ -197,7 +197,7 @@ Los schemas zod de `shared/` son la única fuente de verdad: `convex/schema.ts` 
 | `shared/messages.ts` | `Message` (con `recipient` y veredicto), `Recipient`, `MessageContent`, `SendableContent`, `UiResponseContent` | B, C, D |
 | `shared/moderation.ts` | `Verdict`, `VerdictRule`, `MessageModeration`, `DELIVERABLE_STATUSES`; `ModerationResult` para después de E8 | B, C |
 | `shared/genui.ts` | `Phase1UiSpec` (slot_picker, confirmation, card, moderator_alert), `UiSpec`, `AgentUiSpec`, `UiResponse`, `PostE8CommerceUiSpec` | C, D |
-| `shared/seedData.ts` | Categorías, fichas, ofertas y disponibilidad semilla | todos |
+| `shared/seed-data.ts` | Categorías, fichas, ofertas y disponibilidad semilla | todos |
 | `shared/examples.ts` | Ejemplos válidos e inválidos por contrato | todos |
 | `shared/mcp.ts` | Inputs/outputs de las seis tools y `MCP_TOOLS` | D (y A y B como implementadores) |
 | `shared/prospecting.ts` | `ProspectingScope`, `BusinessCandidate`, `SiteExtraction`, `OutreachDraft` (sin estado "enviado") | E |

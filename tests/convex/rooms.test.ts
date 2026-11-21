@@ -5,7 +5,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { testRoomAgent } from "../../convex/roomAgent";
 import { effectiveAllowedIntents } from "../../shared/agent";
 import * as rules from "../../shared/moderator/rules";
-import { CLINIC_AGENT_SLUG, SEED_AGENTS } from "../../shared/seedData";
+import { CLINIC_AGENT_SLUG, SEED_AGENTS } from "../../shared/seed-data";
 import { Session } from "../../shared/session";
 import { errorKind, REQUEST, ROOM_OWNER, seededRooms } from "./roomFixture";
 

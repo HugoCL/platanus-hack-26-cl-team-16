@@ -1,12 +1,12 @@
 import type { z } from "zod";
 import { AgentCard } from "./agent";
 import { Availability, Offering, Transaction } from "./catalog";
-import { REFERENCE_ATTACK } from "./fixtures/moderationSet";
+import { REFERENCE_ATTACK } from "./fixtures/moderation-set";
 import { Phase1UiSpec, UiSpec } from "./genui";
-import { GetAgentInput } from "./mcp";
+import { GetAgentInput, SearchAgentsOutput, WaitForMessagesInput } from "./mcp";
 import { Message, SendableContent, UiResponseContent } from "./messages";
 import { Verdict } from "./moderation";
-import { SEED_AGENTS } from "./seedData";
+import { SEED_AGENTS } from "./seed-data";
 import { Session, SessionContract } from "./session";
 
 export type ContractExamples = {
@@ -540,6 +540,37 @@ export const CONTRACT_EXAMPLES: Record<string, ContractExamples> = {
       {
         why: "both agentId and slug",
         value: { agentId: "a1", slug: "clinica-providencia-agenda" },
+      },
+    ],
+  },
+  waitForMessagesInput: {
+    schema: WaitForMessagesInput,
+    valid: [
+      { sessionId: "s1" },
+      { sessionId: "s1", after: "s:12", timeoutMs: 0 },
+    ],
+    invalid: [
+      {
+        why: "a numeric cursor from before the cursor was opaque",
+        value: { sessionId: "s1", after: 1795276959927 },
+      },
+      { why: "an empty cursor", value: { sessionId: "s1", after: "" } },
+    ],
+  },
+  searchAgentsOutput: {
+    schema: SearchAgentsOutput,
+    valid: [
+      { agents: [], truncated: false, unresolved: [] },
+      { agents: [], truncated: false, unresolved: ["comuna"] },
+    ],
+    invalid: [
+      {
+        why: "says nothing about truncation or unresolved text",
+        value: { agents: [] },
+      },
+      {
+        why: "an unresolved field the search does not have",
+        value: { agents: [], truncated: true, unresolved: ["near"] },
       },
     ],
   },

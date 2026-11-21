@@ -38,7 +38,7 @@ The `buildFilter` in `render.yaml` keeps deploys from spending build minutes on 
 
 The Free instance stops after 15 minutes without traffic, and the next request waits about a minute while it starts. That is the price of $0. For a demo, change `plan` in `render.yaml` to `0.5c-512mb` (see [Costs](#costs)). Do not add a service that pings the app to keep it awake: it uses up the month's free instance hours, and when they run out Render suspends every Free service in the workspace.
 
-Seed data is not loaded in production. `pnpm seed` runs `seed:ensure` against the deployment a person has selected. On 2026-11-21 production showed no agent cards on `/directorio`.
+Seed data is not loaded in production. `pnpm seed` runs `seed:ensure` against the deployment a person has selected. On 2026-11-21 production showed no agent cards on `/directory`.
 
 ## PR previews
 
@@ -130,7 +130,7 @@ Clerk keyless mode works only under `next dev`. A deployed build runs `next star
 On 2026-11-21 the label on PR #5, head `1350ced`, produced a preview that went live 67 s after the service was created:
 
 - It deployed to the Convex preview deployment `preview/feat-clerk-convex-auth`, `fine-caterpillar-547.convex.cloud`, and `seed:ensure` filled 12 tables.
-- From outside, `/` answered 200 and showed the 5 seeded numbers, `/directorio` listed 15 agents, and `/server` redirected to Clerk's sign-in page.
+- From outside, `/` answered 200 and showed the 5 seeded numbers, `/directory` listed 15 agents, and `/server` redirected to Clerk's sign-in page.
 - The two apps keep their data apart: the preview's WebSocket pointed at `fine-caterpillar-547`, production's at the production deployment `courteous-gnu-824`, which still had no agent cards.
 - Removing the label deleted the preview service within a minute and its URL answers 404. The Convex preview deployment stays until Convex expires it, 5 days after creation, or a person deletes it in the dashboard.
 

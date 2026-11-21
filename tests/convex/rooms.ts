@@ -12,7 +12,7 @@ import {
 } from "../../shared/messages";
 import { DELIVERABLE_STATUSES, type Moderator } from "../../shared/moderation";
 import type { LlmProvider } from "../../shared/providers/llm";
-import { CONSUMER_AGENT_SLUG } from "../../shared/seedData";
+import { CONSUMER_AGENT_SLUG } from "../../shared/seed-data";
 import {
   DEFAULT_MAX_TURNS,
   type Participant,
