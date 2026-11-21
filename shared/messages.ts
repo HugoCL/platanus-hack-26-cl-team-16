@@ -31,6 +31,7 @@ export const SystemContent = z.object({
     "escalation_requested",
     "human_joined",
     "human_took_control",
+    "turn_limit_reached",
   ]),
   text: z.string().max(MAX_TEXT_LENGTH),
 });
