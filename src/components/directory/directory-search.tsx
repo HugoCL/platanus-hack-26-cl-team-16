@@ -32,7 +32,14 @@ import {
   X,
 } from "lucide-react";
 import dynamic from "next/dynamic";
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type FormEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { api } from "@/convex/_generated/api";
 import type { DirectoryCard, DirectorySearchResult } from "@/convex/directory";
 import type { LatLng } from "@/shared/geo";
@@ -302,17 +309,31 @@ export function DirectorySearch() {
             setCategory(category);
             setComuna(comuna);
           }}
+          trailing={
+            view === "map" ? null : (
+              <Button
+                data-size="icon"
+                className="relative !size-12 flex-none sm:!hidden"
+                aria-expanded={filtersOpen}
+                aria-controls="directory-filters"
+                onClick={() => setFiltersOpen((open) => !open)}
+              >
+                <SlidersHorizontal aria-hidden size={18} />
+                <span className="sr-only">
+                  Filtros{active.length > 0 ? ` · ${active.length}` : ""}
+                </span>
+                {active.length > 0 ? (
+                  <span
+                    aria-hidden
+                    className="absolute -top-1 -right-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-medium text-primary-foreground tabular-nums"
+                  >
+                    {active.length}
+                  </span>
+                ) : null}
+              </Button>
+            )
+          }
         />
-
-        <Button
-          className="inline-flex items-center gap-1.5 self-start sm:!hidden"
-          aria-expanded={filtersOpen}
-          aria-controls="directory-filters"
-          onClick={() => setFiltersOpen((open) => !open)}
-        >
-          <SlidersHorizontal aria-hidden size={15} />
-          Filtros{active.length > 0 ? ` · ${active.length}` : ""}
-        </Button>
 
         <div
           id="directory-filters"
@@ -709,8 +730,10 @@ type Interpretation = { category: string | null; comuna: string | null };
 
 function TextSearch({
   onInterpreted,
+  trailing,
 }: {
   onInterpreted: (value: Interpretation) => void;
+  trailing?: ReactNode;
 }) {
   const searchText = useAction(api.directory.searchText);
   const [text, setText] = useState("");
@@ -770,22 +793,33 @@ function TextSearch({
           <Input
             id="dir-q"
             type="search"
+            enterKeyHint="search"
+            aria-busy={busy}
             value={text}
             maxLength={MAX_QUERY_LENGTH}
             onChange={(event) => setText(event.target.value)}
             placeholder="¿Qué necesitas? ej. hora con cardiólogo en Providencia"
-            className="!h-12 w-full !border-ring !pl-11 !text-[15px]"
+            className="!h-12 w-full !border-ring !pl-11 !text-[15px] max-sm:!pr-11"
           />
+          {busy ? (
+            <LoaderCircle
+              aria-hidden
+              size={18}
+              className="pointer-events-none absolute right-4 animate-spin text-muted-foreground sm:hidden"
+            />
+          ) : null}
         </div>
         <Button
           type="submit"
           data-variant="solid"
           data-size="xl"
+          className="max-sm:!hidden"
           aria-busy={busy}
           disabled={busy}
         >
           {busy ? "Buscando…" : "Buscar"}
         </Button>
+        {trailing}
       </form>
       {note ? (
         <p
