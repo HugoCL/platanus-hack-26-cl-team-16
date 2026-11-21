@@ -207,7 +207,7 @@ async function waitForMessages(
   const started = performance.now();
   const deadline = started + timeoutMs;
   const read = (cursor: string | null) =>
-    convex.mutation(api.mcpRooms.messages, {
+    convex.action(api.mcpRooms.messages, {
       apiKey,
       sessionId,
       after: cursor ?? undefined,
@@ -251,7 +251,7 @@ async function closeSession(
   apiKey: string,
   { sessionId }: z.output<typeof CloseSessionInput>,
 ) {
-  return convex.mutation(api.mcpRooms.close, { apiKey, sessionId });
+  return convex.action(api.mcpRooms.close, { apiKey, sessionId });
 }
 
 export function createMcpEndpoint(

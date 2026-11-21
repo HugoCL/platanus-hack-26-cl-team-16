@@ -3,16 +3,16 @@ import { ConvexError, v } from "convex/values";
 import { zodToConvex } from "convex-helpers/server/zod4";
 import { type Message, SendableContent } from "../shared/messages";
 import type { Session, SessionStatus } from "../shared/session";
-import { components, internal } from "./_generated/api";
+import { api, components, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
   type ActionCtx,
   action,
   internalMutation,
-  type MutationCtx,
-  mutation,
+  internalQuery,
+  type QueryCtx,
 } from "./_generated/server";
-import { credentialForApiKey, spendRequest } from "./agentKeys";
+import { credentialForApiKey } from "./agentKeys";
 import { sendThroughGate } from "./gate";
 import { messagesAfter } from "./roomMessages";
 import { loadSession, toMessage } from "./roomState";
@@ -21,8 +21,7 @@ import { visibleTo } from "./visibility";
 
 // Room operations for external agents, called by the MCP server in lib/mcp.ts. Each one takes the
 // caller's API key, resolves the agent from it and spends a token of the key's `mcpRequest`
-// bucket, so a client that calls Convex directly is held to the same quota as /api/mcp. They are
-// mutations or actions for that reason, `messages` included; the room itself is E2's (rooms.ts, gate.ts), so
+// bucket before touching a room, even when the operation fails. The room itself is E2's, so
 // an external agent's messages pass the same moderation gate as an internal agent's.
 
 // The key travels to the final write as `credentialId`, which re-checks it there, so a key revoked
@@ -44,11 +43,22 @@ function fail(kind: string, message: string): never {
   throw new ConvexError({ kind, message });
 }
 
-async function callerCredential(ctx: MutationCtx, apiKey: string) {
+async function callerCredential(ctx: QueryCtx, apiKey: string) {
   const credential = await credentialForApiKey(ctx, apiKey);
   if (!credential) fail("Unauthorized", "the API key is not valid");
-  await spendRequest(ctx, credential.key, { throws: true });
   return credential;
+}
+
+async function chargeRequest(ctx: ActionCtx, apiKey: string) {
+  const result = await ctx.runMutation(api.agentKeys.authenticate, { apiKey });
+  if (!result) fail("Unauthorized", "the API key is not valid");
+  if (!result.ok) {
+    throw new ConvexError({
+      kind: "RateLimited",
+      message: "the API key request quota is exhausted",
+      retryAfter: result.retryAfterMs,
+    });
+  }
 }
 
 const spendModeratedWrite = (ctx: ActionCtx, agentId: Id<"agents">) =>
@@ -57,7 +67,7 @@ const spendModeratedWrite = (ctx: ActionCtx, agentId: Id<"agents">) =>
 // A room the caller is not in and a room that does not exist answer the same way, so a key cannot
 // probe other rooms.
 async function callerParticipant(
-  ctx: MutationCtx,
+  ctx: QueryCtx,
   apiKey: string,
   sessionId: string,
 ) {
@@ -77,7 +87,7 @@ async function callerParticipant(
   fail("NotParticipant", "you are not a participant in this room");
 }
 
-export const opener = internalMutation({
+export const opener = internalQuery({
   args: { apiKey: v.string(), targetAgentId: v.string() },
   handler: async (ctx, { apiKey, targetAgentId }) => {
     const { key, agent } = await callerCredential(ctx, apiKey);
@@ -107,11 +117,12 @@ export const open = action({
     ctx,
     { apiKey, targetAgentId, intent, request },
   ): Promise<Session> => {
+    await chargeRequest(ctx, apiKey);
     const caller: {
       initiatorAgentId: Id<"agents">;
       providerAgentId: Id<"agents">;
       credentialId: Id<"agentApiKeys">;
-    } = await ctx.runMutation(internal.mcpRooms.opener, {
+    } = await ctx.runQuery(internal.mcpRooms.opener, {
       apiKey,
       targetAgentId,
     });
@@ -120,7 +131,7 @@ export const open = action({
   },
 });
 
-export const sender = internalMutation({
+export const sender = internalQuery({
   args: { apiKey: v.string(), sessionId: v.string(), recipient: v.string() },
   handler: async (ctx, { apiKey, sessionId, recipient }) => {
     const { participant, credentialId, agentId } = await callerParticipant(
@@ -151,6 +162,7 @@ export const send = action({
     content: zodToConvex(SendableContent),
   },
   handler: async (ctx, { content, ...args }): Promise<Message> => {
+    await chargeRequest(ctx, args.apiKey);
     const {
       agentId,
       ...route
@@ -160,7 +172,7 @@ export const send = action({
       recipient: Id<"participants"> | "all";
       credentialId: Id<"agentApiKeys">;
       agentId: Id<"agents">;
-    } = await ctx.runMutation(internal.mcpRooms.sender, args);
+    } = await ctx.runQuery(internal.mcpRooms.sender, args);
     await spendModeratedWrite(ctx, agentId);
     return sendThroughGate(ctx, { ...route, content });
   },
@@ -170,20 +182,29 @@ export const send = action({
 // convex/roomMessages.ts). The cursor is opaque and points after the last message read, visible or
 // not, so a page the caller cannot see still moves it forward. A page stops at READ_LIMIT rows or
 // before the history byte budget.
-export const messages = mutation({
-  args: {
-    apiKey: v.string(),
-    sessionId: v.string(),
-    after: v.optional(v.string()),
+const messageArgs = {
+  apiKey: v.string(),
+  sessionId: v.string(),
+  after: v.optional(v.string()),
+};
+
+type MessagePage = {
+  messages: Message[];
+  cursor: string | null;
+  sessionStatus: SessionStatus;
+};
+
+export const messages = action({
+  args: messageArgs,
+  handler: async (ctx, args): Promise<MessagePage> => {
+    await chargeRequest(ctx, args.apiKey);
+    return ctx.runQuery(internal.mcpRooms.readMessages, args);
   },
-  handler: async (
-    ctx,
-    { apiKey, sessionId, after },
-  ): Promise<{
-    messages: Message[];
-    cursor: string | null;
-    sessionStatus: SessionStatus;
-  }> => {
+});
+
+export const readMessages = internalQuery({
+  args: messageArgs,
+  handler: async (ctx, { apiKey, sessionId, after }): Promise<MessagePage> => {
     const { participant } = await callerParticipant(ctx, apiKey, sessionId);
     const room = await loadSession(ctx, participant.sessionId);
     const viewer = room?.participants.find(
@@ -210,8 +231,21 @@ export const messages = mutation({
   },
 });
 
-export const close = mutation({
-  args: { apiKey: v.string(), sessionId: v.string() },
+const closeArgs = { apiKey: v.string(), sessionId: v.string() };
+
+export const close = action({
+  args: closeArgs,
+  handler: async (
+    ctx,
+    args,
+  ): Promise<Awaited<ReturnType<typeof closeRoom>>> => {
+    await chargeRequest(ctx, args.apiKey);
+    return ctx.runMutation(internal.mcpRooms.closeAsCaller, args);
+  },
+});
+
+export const closeAsCaller = internalMutation({
+  args: closeArgs,
   handler: async (ctx, { apiKey, sessionId }) => {
     const { participant } = await callerParticipant(ctx, apiKey, sessionId);
     return closeRoom(ctx, {

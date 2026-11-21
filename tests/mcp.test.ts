@@ -820,11 +820,11 @@ describe("MCP room tools", () => {
     let reads = 0;
     endpoint = createMcpEndpoint({
       query: (ref, ...args) => convex.query(ref, ...args),
-      mutation: (ref, ...args) =>
+      mutation: (ref, ...args) => convex.mutation(ref, ...args),
+      action: (ref, ...args) =>
         getFunctionName(ref) === "mcpRooms:messages" && reads++ > 0
           ? new Promise<never>(() => {})
-          : convex.mutation(ref, ...args),
-      action: (ref, ...args) => convex.action(ref, ...args),
+          : convex.action(ref, ...args),
     });
     const stalled = await connect("auto", apiKey);
 
@@ -850,11 +850,11 @@ describe("MCP room tools", () => {
     const convex = t as ConvexCaller;
     endpoint = createMcpEndpoint({
       query: (ref, ...args) => convex.query(ref, ...args),
-      mutation: (ref, ...args) =>
+      mutation: (ref, ...args) => convex.mutation(ref, ...args),
+      action: (ref, ...args) =>
         getFunctionName(ref) === "mcpRooms:messages"
           ? new Promise<never>(() => {})
-          : convex.mutation(ref, ...args),
-      action: (ref, ...args) => convex.action(ref, ...args),
+          : convex.action(ref, ...args),
     });
     const stalled = await connect("auto", apiKey);
 
@@ -875,16 +875,24 @@ describe("MCP room tools", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     try {
       const { sessionId } = await openRoom();
-      const read = () =>
-        t.mutation(api.mcpRooms.messages, { apiKey, sessionId });
+      const read = () => t.action(api.mcpRooms.messages, { apiKey, sessionId });
       await t.run(async (ctx) => {
         for (const key of await ctx.db.query("agentApiKeys").collect()) {
           await ctx.db.patch(key._id, { lastUsedAt: undefined });
         }
       });
+      await expect(
+        t.action(api.mcpRooms.messages, {
+          apiKey,
+          sessionId,
+          after: "invalid",
+        }),
+      ).rejects.toMatchObject({ data: { kind: "InvalidArgument" } });
+      const keys = await t.run((ctx) => ctx.db.query("agentApiKeys").collect());
+      expect(keys.some((key) => key.lastUsedAt !== undefined)).toBe(true);
       let served = 0;
       let refusal = "";
-      while (!refusal) {
+      while (!refusal && served < 60) {
         await read().then(
           () => served++,
           (error) => {
@@ -895,8 +903,6 @@ describe("MCP room tools", () => {
       expect(refusal).toBe("RateLimited");
       expect(served).toBeGreaterThan(0);
       expect(served).toBeLessThan(60);
-      const keys = await t.run((ctx) => ctx.db.query("agentApiKeys").collect());
-      expect(keys.some((key) => key.lastUsedAt !== undefined)).toBe(true);
       const limited = await endpoint(
         new Request(MCP_URL, {
           method: "POST",
