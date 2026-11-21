@@ -16,7 +16,6 @@ import { type ConvexCaller, createMcpEndpoint } from "../lib/mcp";
 import { REFERENCE_ATTACK } from "../shared/fixtures/moderationSet";
 import {
   AgentDetail,
-  AgentSummary,
   MCP_TOOLS,
   type McpToolName,
   SearchAgentsOutput,
@@ -786,5 +785,128 @@ describe("MCP room tools", () => {
       }),
     ).toEqual({ messages: [], cursor: read.cursor, sessionStatus: "active" });
     expect(Date.now() - started).toBeGreaterThanOrEqual(700);
+  });
+
+  it("wait_for_messages returns by timeoutMs even when a read stalls", async () => {
+    const { sessionId } = await openRoom();
+    const read = await use("wait_for_messages", { sessionId, timeoutMs: 0 });
+    const convex = t as ConvexCaller;
+    let reads = 0;
+    endpoint = createMcpEndpoint({
+      query: (ref, ...args) =>
+        reads++ === 0
+          ? convex.query(ref, ...args)
+          : new Promise<never>(() => {}),
+      mutation: (ref, ...args) => convex.mutation(ref, ...args),
+      action: (ref, ...args) => convex.action(ref, ...args),
+    });
+    const stalled = await connect("auto", apiKey);
+
+    const started = performance.now();
+    const result = await stalled.callTool({
+      name: "wait_for_messages",
+      arguments: { sessionId, after: read.cursor, timeoutMs: 800 },
+    });
+    const elapsed = performance.now() - started;
+    expect(result.structuredContent).toEqual({
+      messages: [],
+      cursor: read.cursor,
+      sessionStatus: "active",
+    });
+    expect(reads).toBeGreaterThan(1);
+    expect(elapsed).toBeGreaterThanOrEqual(790);
+    expect(elapsed).toBeLessThan(1300);
+    await stalled.close();
+  });
+
+  const revokeKey = () =>
+    t.run(async (ctx) => {
+      for (const key of await ctx.db.query("agentApiKeys").collect()) {
+        await ctx.db.patch(key._id, { revokedAt: Date.now() });
+      }
+    });
+
+  // The judge runs between the key check and the final write: revoke the key there.
+  const revokeDuringModeration = () => {
+    const llm = providers.createFakeLlmProvider({
+      object: () => ({ decision: "allow", rule: "purpose" }),
+    });
+    vi.spyOn(providers, "createLlmProvider").mockReturnValue({
+      ...llm,
+      async generateObject(args) {
+        await revokeKey();
+        return llm.generateObject(args);
+      },
+    });
+  };
+
+  it("send_message stores nothing when the key is revoked while moderation runs", async () => {
+    const { sessionId, me, provider } = await openRoom();
+    const before = await history(sessionId, me);
+    revokeDuringModeration();
+
+    expect(
+      await refusal("send_message", {
+        sessionId,
+        recipient: provider,
+        content: text("Hola"),
+      }),
+    ).toContain("Unauthorized: the API key is not valid");
+    expect(await history(sessionId, me)).toEqual(before);
+  });
+
+  it("open_session opens no room when the key is revoked while moderation runs", async () => {
+    revokeDuringModeration();
+    expect(
+      await refusal("open_session", { targetAgentId: agents.clinic, intent }),
+    ).toContain("Unauthorized: the API key is not valid");
+    expect(await t.run((ctx) => ctx.db.query("sessions").collect())).toEqual(
+      await t.run((ctx) =>
+        ctx.db
+          .query("sessions")
+          .filter((q) => q.neq(q.field("initiatorAgentId"), agents.external))
+          .collect(),
+      ),
+    );
+  });
+
+  it("limits how often one external agent can ask the moderator", async () => {
+    const { sessionId } = await openRoom();
+    const sent = [];
+    for (let i = 0; i < 9; i++) {
+      sent.push(
+        await use("send_message", {
+          sessionId,
+          recipient: "all",
+          content: text(`Mensaje ${i}`),
+        }),
+      );
+    }
+    expect(sent).toHaveLength(9);
+    expect(
+      await refusal("send_message", {
+        sessionId,
+        recipient: "all",
+        content: text("Uno más"),
+      }),
+    ).toContain("RateLimited");
+  });
+
+  it("reads a room the agent rejoined, even if an older membership row has left", async () => {
+    const { sessionId, me } = await openRoom();
+    await t.run(async (ctx) => {
+      await ctx.db.patch(me, { leftAt: Date.now() });
+      await ctx.db.insert("participants", {
+        sessionId,
+        kind: "agent",
+        agentId: agents.external,
+        role: "initiator",
+      });
+    });
+    const { messages } = await use("wait_for_messages", {
+      sessionId,
+      timeoutMs: 0,
+    });
+    expect(messages[0]?.content).toMatchObject({ code: "session_opened" });
   });
 });

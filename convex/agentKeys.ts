@@ -46,7 +46,31 @@ export async function agentForApiKey(
   return (await credentialForApiKey(ctx, apiKey))?.agent ?? null;
 }
 
-async function credentialForApiKey(
+// Called again by the mutation that finally writes for an MCP caller (rooms.create and the gate's
+// commit):
+// moderation runs between the first check and that write, and a key revoked in between must not
+// still open a room or send.
+export async function requireLiveCredential(
+  ctx: Pick<QueryCtx, "db">,
+  keyId: Id<"agentApiKeys">,
+  agentId: string,
+) {
+  const key = await ctx.db.get(keyId);
+  const agent =
+    key && key.revokedAt === undefined ? await ctx.db.get(key.agentId) : null;
+  if (
+    agent?._id !== agentId ||
+    agent.status !== "active" ||
+    agent.kind !== "external"
+  ) {
+    throw new ConvexError({
+      kind: "Unauthorized",
+      message: "the API key is not valid",
+    });
+  }
+}
+
+export async function credentialForApiKey(
   ctx: Pick<QueryCtx, "db">,
   apiKey: string,
 ): Promise<{ key: Doc<"agentApiKeys">; agent: Doc<"agents"> } | null> {

@@ -184,25 +184,43 @@ async function sendMessage(
   };
 }
 
-// Polls until a visible message arrives, the room stops being active or the timeout passes.
+// Polls until a visible message arrives, the room stops being active or `timeoutMs` passes. A read
+// still running at the deadline is abandoned; its cursor was never handed out, so nothing is lost.
 async function waitForMessages(
   convex: ConvexCaller,
   apiKey: string,
   { sessionId, after, timeoutMs }: z.output<typeof WaitForMessagesInput>,
 ) {
-  const deadline = Date.now() + timeoutMs;
-  const read = (cursor?: number) =>
-    convex.query(api.mcpRooms.messages, { apiKey, sessionId, after: cursor });
-  let result = await read(after);
-  while (
-    result.messages.length === 0 &&
-    result.sessionStatus === "active" &&
-    Date.now() < deadline
-  ) {
+  const deadline = performance.now() + timeoutMs;
+  const read = (cursor: string | null) =>
+    convex.query(api.mcpRooms.messages, {
+      apiKey,
+      sessionId,
+      after: cursor ?? undefined,
+    });
+  const untilDeadline = <T>(promise: Promise<T>) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    return Promise.race([
+      promise,
+      new Promise<undefined>((resolve) => {
+        timer = setTimeout(
+          () => resolve(undefined),
+          deadline - performance.now(),
+        );
+      }),
+    ]).finally(() => clearTimeout(timer));
+  };
+  let result = await read(after ?? null);
+  while (result.messages.length === 0 && result.sessionStatus === "active") {
+    const remaining = deadline - performance.now();
+    if (remaining <= 0) break;
     await new Promise((resolve) =>
-      setTimeout(resolve, Math.min(POLL_MS, deadline - Date.now())),
+      setTimeout(resolve, Math.min(POLL_MS, remaining)),
     );
-    result = await read(result.cursor);
+    if (performance.now() >= deadline) break;
+    const next = await untilDeadline(read(result.cursor));
+    if (!next) break;
+    result = next;
   }
   return result;
 }

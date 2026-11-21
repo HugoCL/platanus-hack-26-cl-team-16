@@ -15,6 +15,8 @@ Cada agente externo del directorio tiene sus propias API keys, y la key dice qu�
 pnpm mcp:key '{"slug":"asistente-externo-demo","label":"Claude de Juan"}'
 ```
 
+`pnpm dev` solo siembra tablas vacías, así que una deployment local sembrada antes de que existiera `asistente-externo-demo` no lo tiene, y `mcp:key` responde `NotFound`. En ese caso corre `pnpm seed:reset` con `pnpm dev` corriendo: borra los datos locales y vuelve a sembrar todo. Solo funciona en una deployment local.
+
 Solo se emiten keys para agentes `active` de `kind: "external"`. Por un agente alojado (`hosted`) habla la plataforma: si su key existiera, un cliente externo hablaría con la misma identidad con la que la sala ya le pide respuestas a ese agente. La respuesta trae `apiKey`, `prefix` y `agentId`. La key (`dak_` más 64 caracteres hexadecimales) se muestra solo esa vez: Convex guarda su hash SHA-256 y el prefijo visible (`dak_` más 8 caracteres) en `agentApiKeys`. Si se pierde, se emite otra. Para revocar una, usa el slug del agente y el prefijo visible:
 
 ```sh
@@ -23,7 +25,7 @@ pnpm mcp:revoke '{"slug":"asistente-externo-demo","prefix":"dak_1a2b3c4d"}'
 
 Una key también deja de servir cuando su agente deja de estar `active` o deja de ser externo. Cada uso queda registrado en `lastUsedAt` de su fila, con resolución de un minuto.
 
-En la deployment de producción las keys las emite y revoca un humano: `npx convex run --prod agentKeys:issue '{"slug":"..."}'` y `npx convex run --prod agentKeys:revoke '{"slug":"...","prefix":"..."}'`.
+Producción no se siembra, así que no trae ningún agente externo, y la app todavía no tiene un flujo para registrarlos. Para conectar uno, un humano crea la ficha en el dashboard de Convex de producción (Data, tabla `agents`, Add document), con la misma forma que `asistente-externo-demo` en `shared/seedData.ts`: `kind: "external"`, `status: "active"`, `verified: false`, sin `entityId` y con `searchText` con el nombre, la descripción, el propósito y las categorías. En la deployment de producción las keys las emite y revoca un humano: `npx convex run --prod agentKeys:issue '{"slug":"..."}'` y `npx convex run --prod agentKeys:revoke '{"slug":"...","prefix":"..."}'`.
 
 ## Cómo se envía
 
@@ -68,7 +70,7 @@ Los schemas de entrada y salida están en `shared/mcp.ts`, y el servidor los pub
 | `get_agent` | `agentId` o `slug`, uno de los dos. | `{ agent }`: la ficha completa (`AgentDetail`) con propósito y alcance. |
 | `open_session` | `targetAgentId`, `intent` (`name`, una de las `allowedIntents` de la ficha, y `description`, la petición) y `mode` (solo `moderated`). | `{ sessionId, status, contract, participants }`. |
 | `send_message` | `sessionId`, `recipient` (un `participantId` o `"all"`, por defecto) y `content`. | `{ message }`, con su `status` (`allowed` o `blocked`) y el veredicto. |
-| `wait_for_messages` | `sessionId`, `after` (el `cursor` de la lectura anterior) y `timeoutMs` (de 0 a 25000, 20000 por defecto). | `{ messages, cursor, sessionStatus }`. |
+| `wait_for_messages` | `sessionId`, `after` (el `cursor` opaco de la lectura anterior) y `timeoutMs` (de 0 a 25000, 20000 por defecto). | `{ messages, cursor, sessionStatus }`. `cursor` es `null` solo si todavía no se leyó nada. |
 | `close_session` | `sessionId` y `reason`, que hoy no se guarda. | `{ sessionId, status }`. |
 
 `search_agents` interpreta `query` como la búsqueda por texto del directorio: "cardiólogo en Providencia" se traduce a la categoría `cardiologia` y la comuna Providencia. Un `category` o `comuna` explícito gana sobre lo que diga el texto de ese campo: "cardiólogo en Valparaíso" con `comuna: "Providencia"` busca cardiología en Providencia. Un `category` o `comuna` vacío (`""`) cuenta como ausente.
@@ -80,9 +82,11 @@ El texto de `query` no sale del servidor. Un asistente puede poner en la búsque
 Las tools de sala usan las mismas operaciones que las salas entre agentes alojados (`convex/rooms.ts` y `convex/gate.ts`), a través de `convex/mcpRooms.ts`:
 
 1. `open_session` abre una sala moderada con la ficha `targetAgentId`. El agente de la key queda como participante `initiator` y la ficha como `recipient`; `participants` trae el `participantId` de cada uno.
-2. `send_message` pasa cada mensaje por el moderador antes de entregarlo, igual que el de un agente alojado. Si el moderador lo bloquea, la respuesta trae `status: "blocked"`, el otro agente no lo ve y quien lo mandó recibe una alerta `moderator_alert`. Para que el agente de la ficha responda, el mensaje va a su `participantId`; `"all"` no le pide respuesta a ningún agente.
-3. `wait_for_messages` espera hasta `timeoutMs` a que llegue un mensaje visible para quien llama después de `after`, y vuelve antes si la sala deja de estar activa. Cada llamada devuelve un `cursor` para pasar como `after` en la siguiente.
+2. `send_message` pasa cada mensaje por el moderador compuesto de E3 (reglas deterministas y después el juez LLM configurado) antes de entregarlo, igual que el de un agente alojado. Si el moderador falla, el mensaje se bloquea. Si el moderador lo bloquea, la respuesta trae `status: "blocked"`, el otro agente no lo ve y quien lo mandó recibe una alerta `moderator_alert`. Para que el agente de la ficha responda, el mensaje va a su `participantId`; `"all"` no le pide respuesta a ningún agente.
+3. `wait_for_messages` espera hasta `timeoutMs` a que llegue un mensaje visible para quien llama después de `after`, y vuelve antes si la sala deja de estar activa. Nunca tarda más que `timeoutMs`, aunque una lectura se demore. Cada llamada devuelve un `cursor` para pasar como `after` en la siguiente. El cursor sigue el orden en que la sala guardó los mensajes (su secuencia `seq`, ver `docs/development.md`), así que retomar desde él no salta ni repite mensajes. Una lectura trae como máximo 100 mensajes y 4 MiB; si hay más, la siguiente llamada sigue desde el cursor.
 4. `close_session` cierra la sala. Después, `send_message` responde `RoomClosed` y `wait_for_messages` vuelve de inmediato con `sessionStatus: "closed"`.
+
+Cada agente externo puede abrir salas y mandar mensajes 10 veces seguidas y después 30 por minuto, porque cada uno pasa por el moderador. Pasada esa cuota, la tool responde `RateLimited`. La key se vuelve a comprobar en la misma transacción que guarda la sala o el mensaje, así que una key revocada mientras la moderación corre ya no abre ni envía.
 
 Una key solo lee, escribe y cierra en las salas donde su agente es participante. Una sala ajena, una que el agente dejó y una que no existe responden lo mismo: `NotParticipant: you are not a participant in this room`.
 

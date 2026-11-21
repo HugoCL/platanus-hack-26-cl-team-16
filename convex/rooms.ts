@@ -19,6 +19,7 @@ import {
   type QueryCtx,
   query,
 } from "./_generated/server";
+import { requireLiveCredential } from "./agentKeys";
 import { listedCard } from "./directory";
 import { eventValidator, publishNotice } from "./gate";
 import { moderate } from "./moderator";
@@ -41,6 +42,7 @@ const openArgs = {
   intent: v.optional(v.string()),
   maxTurns: v.optional(v.number()),
   human: v.optional(v.object({ displayName: v.string() })),
+  credentialId: v.optional(v.id("agentApiKeys")),
 };
 
 export const open = internalAction({
@@ -120,7 +122,13 @@ export const create = internalMutation({
     contract: zodToConvex(SessionContract),
     events: v.array(eventValidator),
   },
-  handler: async (ctx, { contract, events, ...args }): Promise<Session> => {
+  handler: async (
+    ctx,
+    { contract, events, credentialId, ...args },
+  ): Promise<Session> => {
+    if (credentialId) {
+      await requireLiveCredential(ctx, credentialId, args.initiatorAgentId);
+    }
     const { contract: currentContract, humanName } = await planRoom(ctx, args);
     if (
       JSON.stringify(convexToJson(contract)) !==
