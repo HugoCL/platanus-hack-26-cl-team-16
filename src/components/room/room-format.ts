@@ -293,7 +293,10 @@ export function formatScore(score: number) {
   return scoreFormat.format(score);
 }
 
-const graphemes = new Intl.Segmenter("es", { granularity: "grapheme" });
+const graphemes =
+  typeof Intl.Segmenter === "function"
+    ? new Intl.Segmenter("es", { granularity: "grapheme" })
+    : null;
 
 // Prefer capitalized words ("Agendamiento y Reservas" gives "AR"), else any words ("mi asistente 🦊" gives "MA").
 export function initials(name: string) {
@@ -303,7 +306,9 @@ export function initials(name: string) {
     .slice(0, 2)
     .map(
       (word) =>
-        graphemes.segment(word)[Symbol.iterator]().next().value?.segment ?? "",
+        (graphemes
+          ? graphemes.segment(word)[Symbol.iterator]().next().value?.segment
+          : Array.from(word)[0]) ?? "",
     )
     .join("")
     .toLocaleUpperCase("es");
