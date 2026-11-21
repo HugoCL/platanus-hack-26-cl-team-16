@@ -27,11 +27,12 @@ Each card is an `AgentDetail` (the full `AgentCard` with purpose and scope) plus
 
 ## Rooms (E2)
 
-A room is a `session` in `convex/rooms.ts`. Call `rooms.close` with the room's `sessionId` and a `participantId` to close it. Closing publishes one system notice, even if called again, and later sends fail with `RoomClosed`.
+A room is a `session` in `convex/rooms.ts`. Other code calls these functions:
 
 | Function | Kind | What it does |
 | --- | --- | --- |
 | `rooms.open` | action | Opens a room from `initiatorAgentId` (the consumer agent), `providerAgentId` (the card) and the free-text `request`, with an optional `intent` (one the card allows; defaults to its first), `maxTurns` (default 12) and `human` (`{ displayName }`, added as the owner acting for the initiator). The contract is the request plus the card's purpose, capabilities, allowed intents, forbidden topics and data rules, and it never changes. Before anything is stored, the moderator reviews the request as the initiator's first message to the provider. Returns the room as a shared `Session`, already `active`. A missing, draft or invalid card, a room with oneself, a disallowed intent or a contract that fails validation throws a `ConvexError` with `data.kind` `"InvalidArgument"`. A request the moderator blocks, or a moderator that throws, throws `"RequestBlocked"` with the verdict's `rule` and reason as `message`, and stores nothing. |
+| `rooms.close` | mutation | Closes the room `sessionId` on behalf of `participantId`, one of its participants. It publishes one `session_closed` notice, and calling it again changes nothing. Later sends fail with `RoomClosed`, even when their moderation started before the close. A participant from another room throws `NotParticipant`. |
 | `rooms.get` | query | One room by `sessionId` as a shared `Session` with its participants, or `null`. |
 | `gate.send` | action | The single path for a participant's message: `sessionId`, `senderParticipantId`, `recipient` (a participant or `"all"`) and `content` (`SendableContent`: text, a UI block or a UI response). It asks the moderator, then stores the message with its verdict and returns it as a shared `Message`. A blocked message is stored as `blocked` and the gate adds a `moderator_alert` addressed to the sender. If the moderator throws, the message is blocked. Errors are `ConvexError`s whose `data.kind` is `NotFound`, `RoomClosed`, `NotParticipant`, `InvalidArgument` or, for an agent once the room used its turns, `TurnLimitReached`. |
 | `gate.history` | reactive query | The latest messages of a room (up to 500, and no more than 4 MiB of them), in chronological order and filtered for `viewerParticipantId`. |

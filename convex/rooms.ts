@@ -11,6 +11,7 @@ import {
   action,
   internalMutation,
   internalQuery,
+  mutation,
   type QueryCtx,
   query,
 } from "./_generated/server";
