@@ -72,7 +72,7 @@ const STEPS = [
 
 export function HowItWorks() {
   return (
-    <section className="landing-section landing-paper" aria-labelledby="how">
+    <section className="landing-section landing-alt" aria-labelledby="how">
       <header className="landing-section-head">
         <p>Cómo funciona</p>
         <h2 id="how">

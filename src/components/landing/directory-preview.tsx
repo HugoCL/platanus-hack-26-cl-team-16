@@ -20,7 +20,7 @@ function categoryLabel(slug: string | undefined) {
 export function DirectoryPreview() {
   return (
     <section
-      className="landing-section landing-paper landing-directory"
+      className="landing-section landing-alt landing-directory"
       aria-labelledby="directory"
     >
       <header className="landing-section-head">

@@ -54,9 +54,9 @@ Rules that follow:
 
 The landing sells the product, so it is the one place with a brand voice: the phone book ("páginas amarillas") reinterpreted for agents.
 
-* **Always dark.** It ignores the theme toggle; it redeclares the tokens it reads with their dark values (`src/styles/landing.css`).
+* **Light and dark, both complete.** The landing follows the theme toggle. Light is warm paper with ink text; dark is ink with light text. Its colors are `--landing-*` tokens declared with `light-dark()` at the top of `src/styles/landing.css`; never hard-code a color that only works on one of the two.
 * **Phone-book yellow** (`--sm-yellow`) is the brand color: the glow rising behind the hero, the call to action, highlighted listings, and the footer. Text on yellow is always ink (`--landing-ink`); never yellow text on a light surface.
-* **Paper sections** (`--landing-paper`) read like the inside of the book: ink text, hairline rules, listings with dot leaders. They alternate with dark sections.
+* **Sections alternate** between the page background (`--landing-bg`) and a second surface (`--landing-alt`: phone-book paper in light, a lifted ink in dark), with hairline rules and listings with dot leaders. Never mix a light section into the dark theme or the other way around.
 * **The listing wall** behind the hero is decoration: a dense field of tiny listings, lit around the pointer, its columns sliding slowly up and down. It is drawn into one canvas image per column (`src/components/landing/listing-wall.tsx`), hidden from assistive tech, paused off-screen, and still under `prefers-reduced-motion`.
 * **Headlines are two-tone:** the first line in muted gray, the second in the foreground.
 

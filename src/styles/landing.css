@@ -1,29 +1,32 @@
 /*
- * Landing: a dark hero over a wall of phone-book listings.
- * The wall follows the Vercel 404 (a dense field of tiny names lit around the pointer), the hero
- * follows Sentry's (two-tone headline, a glow rising from the bottom), with the glow and the call
- * to action in the phone-book yellow. Always dark. Chrome resolves light-dark() inside a custom
- * property where it is declared (:root), so `color-scheme` alone does not flip the tokens: the
- * ones the header and the hero read are redeclared here with their dark values.
+ * Landing: a hero over a wall of phone-book listings, then sections that alternate between the
+ * page background and a second surface (the "page" of the book). The wall follows the Vercel
+ * 404 (a dense field of tiny names lit around the pointer), the hero follows Sentry's (two-tone
+ * headline, a glow rising from the bottom) with the glow and the call to action in phone-book
+ * yellow. It follows the theme: light is warm paper with ink, dark is ink with light text.
+ * Text on yellow is always ink.
  */
 .landing {
   --landing-ink: oklch(0.13 0.004 49);
-  --landing-paper: oklch(0.93 0.1 100);
+  --landing-bg: light-dark(oklch(0.985 0.008 95), oklch(0.13 0.004 49));
+  --landing-alt: light-dark(oklch(0.955 0.07 100), oklch(0.175 0.006 60));
+  --landing-panel: light-dark(oklch(1 0 0), oklch(0.17 0.005 49));
+  --landing-bubble: light-dark(oklch(0.94 0.006 90), oklch(0.25 0.006 49));
+  --landing-fg: light-dark(oklch(0.13 0.004 49), oklch(0.985 0.001 106));
+  --landing-muted: light-dark(oklch(0.13 0.004 49 / 0.45), oklch(0.7 0.01 70));
+  --landing-subtle: light-dark(
+    oklch(0.13 0.004 49 / 0.72),
+    oklch(0.8 0.008 56)
+  );
+  --landing-line: light-dark(oklch(0.13 0.004 49 / 0.14), oklch(1 0 0 / 0.1));
+  --landing-wall-text: light-dark(oklch(0.25 0.012 70), oklch(0.78 0.012 90));
+  --landing-wall-heading: light-dark(oklch(0.13 0.004 49), var(--sm-yellow));
   --landing-pad: clamp(1.25rem, 6vw, 6rem);
-  --ui-foreground: oklch(0.985 0.001 106.423);
-  --ui-muted: oklch(0.268 0.007 34.298);
-  --ui-border: oklch(1 0 0 / 8%);
-  --ui-ring: oklch(0.709 0.01 56.259);
-  --ui-primary: oklch(0.923 0.003 48.717);
-  --ui-primary-foreground: oklch(0.216 0.006 56.043);
-  --sm-card: oklch(0.216 0.006 56.043);
-  --sm-subtle-foreground: oklch(0.8 0.008 56);
-  color-scheme: dark;
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
-  background: var(--landing-ink);
-  color: var(--ui-foreground);
+  background: var(--landing-bg);
+  color: var(--landing-fg);
 }
 
 .landing-main {
@@ -44,7 +47,7 @@
   inset: 0;
   z-index: -2;
   overflow: hidden;
-  color: oklch(0.78 0.012 90);
+  color: var(--landing-wall-text);
   mask-image:
     radial-gradient(
       circle 15rem at var(--x) var(--y),
@@ -124,7 +127,7 @@
     ),
     radial-gradient(
       60% 55% at 22% 45%,
-      color-mix(in oklch, var(--landing-ink) 92%, transparent),
+      color-mix(in oklch, var(--landing-bg) 92%, transparent),
       transparent 80%
     );
 }
@@ -139,7 +142,7 @@
 
   & h1 {
     margin: 0;
-    color: var(--ui-foreground);
+    color: var(--landing-fg);
     font: 500 clamp(2.75rem, 6.4vw, 5.5rem) / 0.98 var(--ui-font-sans);
     letter-spacing: -0.055em;
     text-wrap: balance;
@@ -147,13 +150,13 @@
 
   & h1 > span {
     display: block;
-    color: oklch(0.7 0.01 70);
+    color: var(--landing-muted);
   }
 
   & > p {
     max-width: 30rem;
     margin: 0;
-    color: var(--sm-subtle-foreground);
+    color: var(--landing-subtle);
     font-size: 1rem;
     line-height: 1.55;
     text-wrap: pretty;
@@ -208,11 +211,15 @@
 }
 
 .landing-secondary {
-  color: var(--ui-foreground);
+  color: var(--landing-fg);
   font-size: 0.9375rem;
   font-weight: 500;
   text-decoration: underline;
-  text-decoration-color: oklch(1 0 0 / 0.3);
+  text-decoration-color: color-mix(
+    in oklch,
+    var(--landing-fg) 30%,
+    transparent
+  );
   text-underline-offset: 0.3em;
 
   &:hover {
@@ -259,11 +266,8 @@
   padding: clamp(4rem, 10vw, 8rem) var(--landing-pad);
 }
 
-.landing-paper {
-  --ui-foreground: var(--landing-ink);
-  --sm-subtle-foreground: oklch(0.13 0.004 49 / 0.72);
-  background: var(--landing-paper);
-  color: var(--landing-ink);
+.landing-alt {
+  background: var(--landing-alt);
 }
 
 .landing-section-head {
@@ -291,12 +295,8 @@
   }
 
   & h2 > span {
-    color: oklch(0.7 0.01 70);
+    color: var(--landing-muted);
   }
-}
-
-.landing-paper .landing-section-head h2 > span {
-  color: oklch(0.13 0.004 49 / 0.45);
 }
 
 .landing-steps {
@@ -312,7 +312,7 @@
     flex-direction: column;
     gap: 0.75rem;
     padding-top: 1rem;
-    border-top: 1px solid oklch(0.13 0.004 49 / 0.25);
+    border-top: 1px solid var(--landing-line);
   }
 
   & h3 {
@@ -325,7 +325,7 @@
   & li > p {
     margin: 0;
     max-width: 22rem;
-    color: var(--sm-subtle-foreground);
+    color: var(--landing-subtle);
     font-size: 1rem;
     line-height: 1.5;
   }
@@ -342,7 +342,7 @@
   gap: 0.35rem;
   margin-top: auto;
   padding: 1rem;
-  background: oklch(1 0 0 / 0.45);
+  background: light-dark(oklch(1 0 0 / 0.6), oklch(1 0 0 / 0.05));
   font: 500 0.75rem / 1.4 var(--ui-font-mono);
 
   & p {
@@ -365,8 +365,8 @@
   & p[data-featured] {
     margin-inline: -0.25rem;
     padding-inline: 0.25rem;
-    background: var(--landing-ink);
-    color: var(--sm-yellow);
+    background: var(--sm-yellow);
+    color: var(--landing-ink);
     font-weight: 700;
   }
 }
@@ -391,7 +391,6 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
   align-items: center;
   gap: clamp(2.5rem, 6vw, 6rem);
-  background: var(--landing-ink);
 }
 
 .landing-room-copy {
@@ -407,7 +406,7 @@
   & > p {
     max-width: 30rem;
     margin: 0;
-    color: var(--sm-subtle-foreground);
+    color: var(--landing-subtle);
     font-size: 1rem;
     line-height: 1.55;
   }
@@ -440,8 +439,8 @@
   display: flex;
   flex-direction: column;
   min-height: 34rem;
-  border: 1px solid oklch(1 0 0 / 0.1);
-  background: oklch(0.17 0.005 49);
+  border: 1px solid var(--landing-line);
+  background: var(--landing-panel);
   font-size: 0.875rem;
 
   & ol {
@@ -465,7 +464,7 @@
     margin: 0;
     padding: 0.6rem 0.85rem;
     border-radius: 0.75rem;
-    background: oklch(0.25 0.006 49);
+    background: var(--landing-bubble);
     line-height: 1.45;
   }
 
@@ -474,8 +473,8 @@
   }
 
   & li[data-kind="self"] > p {
-    background: var(--ui-foreground);
-    color: var(--landing-ink);
+    background: var(--landing-fg);
+    color: var(--landing-bg);
   }
 
   & li[data-kind="system"] {
@@ -486,7 +485,7 @@
   & li[data-kind="system"] > p {
     padding: 0;
     background: none;
-    color: oklch(0.7 0.01 70);
+    color: var(--landing-muted);
     font: 500 0.6875rem / 1 var(--ui-font-mono);
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -500,7 +499,7 @@
   }
 
   & small {
-    color: var(--sm-yellow);
+    color: light-dark(oklch(0.45 0.1 85), var(--sm-yellow));
     font: 600 0.6875rem / 1.3 var(--ui-font-mono);
   }
 
@@ -518,8 +517,8 @@
   }
 
   & li > p.landing-replay-hatch {
-    background: var(--sm-hatch), oklch(0.25 0.006 49);
-    color: oklch(0.7 0.01 70);
+    background: var(--sm-hatch), var(--landing-bubble);
+    color: var(--landing-muted);
     font-style: italic;
   }
 }
@@ -530,7 +529,7 @@
   justify-content: space-between;
   gap: 1rem;
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid oklch(1 0 0 / 0.1);
+  border-bottom: 1px solid var(--landing-line);
 
   & div:first-child {
     display: flex;
@@ -539,7 +538,7 @@
   }
 
   & div:first-child span {
-    color: oklch(0.7 0.01 70);
+    color: var(--landing-muted);
     font-size: 0.75rem;
   }
 }
@@ -553,13 +552,13 @@
 
   & span {
     margin-right: 0.35rem;
-    color: oklch(0.7 0.01 70);
+    color: var(--landing-muted);
   }
 
   & i {
     width: 1.1rem;
     height: 0.35rem;
-    background: oklch(1 0 0 / 0.15);
+    background: var(--landing-line);
     transition: background-color 200ms ease-out;
   }
 
@@ -575,7 +574,7 @@
 
   & span {
     padding: 0.45rem 0.7rem;
-    border: 1px solid oklch(1 0 0 / 0.15);
+    border: 1px solid var(--landing-line);
     font: 500 0.75rem / 1 var(--ui-font-mono);
   }
 
@@ -610,7 +609,7 @@
     flex-direction: column;
     gap: 0.4rem;
     padding: 1.25rem 0 1.5rem;
-    border-top: 2px solid var(--landing-ink);
+    border-top: 2px solid var(--landing-fg);
   }
 
   & li > p:first-child {
@@ -629,14 +628,14 @@
 
   & li > p {
     margin: 0;
-    color: var(--sm-subtle-foreground);
+    color: var(--landing-subtle);
     line-height: 1.45;
   }
 
   & a {
     width: fit-content;
     margin-top: 0.35rem;
-    color: var(--landing-ink);
+    color: var(--landing-fg);
     font-weight: 600;
     text-decoration: underline;
     text-underline-offset: 0.25em;
@@ -647,18 +646,8 @@
   }
 
   & a:focus-visible {
-    outline: 2px solid var(--landing-ink);
+    outline: 2px solid var(--landing-fg);
     outline-offset: 3px;
-  }
-}
-
-.landing-directory .landing-cta {
-  --sm-yellow: var(--landing-ink);
-  color: var(--sm-yellow);
-
-  & span {
-    background: var(--landing-ink);
-    color: var(--landing-paper);
   }
 }
 
@@ -678,8 +667,8 @@
     place-items: center;
     width: 2rem;
     height: 2.25rem;
-    background: var(--landing-ink);
-    color: var(--landing-paper);
+    background: var(--landing-fg);
+    color: var(--landing-bg);
     font: 800 0.75rem / 1 var(--ui-font-sans);
   }
 }
@@ -704,7 +693,7 @@
 
   & h2 > span {
     display: block;
-    color: oklch(0.7 0.01 70);
+    color: var(--landing-muted);
   }
 }
 

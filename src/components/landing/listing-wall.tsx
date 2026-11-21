@@ -1,5 +1,6 @@
 "use client";
 
+import { useTheme } from "next-themes";
 import { useEffect, useRef, useState } from "react";
 
 const CATEGORIES = [
@@ -140,6 +141,7 @@ const HEADING_GAP = { before: 8, after: 3 };
 
 type Palette = {
   text: string;
+  heading: string;
   yellow: string;
   ink: string;
   mono: string;
@@ -174,6 +176,7 @@ function drawColumn(
     y += HEADING_GAP.before;
     context.fillStyle = palette.yellow;
     context.fillRect(0, y, width, 2);
+    context.fillStyle = palette.heading;
     context.font = `800 10px ${palette.sans}`;
     context.fillText(
       section.category.toUpperCase(),
@@ -221,6 +224,7 @@ type Column = { src: string; width: number; height: number };
 export function ListingWall() {
   const ref = useRef<HTMLDivElement>(null);
   const [columns, setColumns] = useState<Column[]>([]);
+  const { resolvedTheme } = useTheme();
 
   useEffect(() => {
     const element = ref.current;
@@ -239,7 +243,7 @@ export function ListingWall() {
         Math.ceil((element.clientWidth - rem) / (width + 1.25 * rem)),
       );
       const scale = Math.min(window.devicePixelRatio || 1, 2);
-      const next = `${count}:${width}:${scale}`;
+      const next = `${count}:${width}:${scale}:${resolvedTheme}`;
       if (next === layout) return;
       layout = next;
 
@@ -247,6 +251,7 @@ export function ListingWall() {
       const style = getComputedStyle(element);
       const palette: Palette = {
         text: style.color,
+        heading: style.getPropertyValue("--landing-wall-heading"),
         yellow: style.getPropertyValue("--sm-yellow"),
         ink: style.getPropertyValue("--landing-ink"),
         mono: style.fontFamily,
@@ -291,7 +296,7 @@ export function ListingWall() {
       observer.disconnect();
       for (const url of urls) URL.revokeObjectURL(url);
     };
-  }, []);
+  }, [resolvedTheme]);
 
   return (
     <div
