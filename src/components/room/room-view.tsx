@@ -11,6 +11,13 @@ import {
   DialogTitle,
 } from "@ui-sdk/react/dialog";
 import {
+  Drawer,
+  DrawerBackdrop,
+  DrawerClose,
+  DrawerContent,
+  DrawerTitle,
+} from "@ui-sdk/react/drawer";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -149,6 +156,7 @@ export function RoomView({
 }) {
   const role = viewer.role;
   const [panelOpen, setPanelOpen] = useState(true);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [control, setControl] = useState(false);
   const [auditFor, setAuditFor] = useState<string | null>(null);
   const [highlighted, setHighlighted] = useState<string | null>(null);
@@ -174,6 +182,7 @@ export function RoomView({
   const canControl = role !== "observer";
 
   function jumpTo(messageId: string) {
+    setSheetOpen(false);
     document
       .getElementById(`msg-${messageId}`)
       ?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -182,6 +191,17 @@ export function RoomView({
   }
 
   const auditMessage = messages.find((m) => m.messageId === auditFor);
+
+  const sidePanel = contract ? (
+    <SidePanel
+      contract={contract}
+      otherName={other?.name ?? "el proveedor"}
+      messages={messages}
+      participants={people}
+      role={role}
+      onJump={jumpTo}
+    />
+  ) : null;
 
   return (
     <div className="flex h-dvh flex-col bg-background">
@@ -204,7 +224,11 @@ export function RoomView({
               status={status}
               violations={violations}
               panelOpen={panelOpen}
-              onTogglePanel={() => setPanelOpen((o) => !o)}
+              onTogglePanel={() => {
+                if (window.matchMedia("(min-width: 64rem)").matches)
+                  setPanelOpen((o) => !o);
+                else setSheetOpen(true);
+              }}
             />
           ) : (
             <p className="px-4">
@@ -276,17 +300,22 @@ export function RoomView({
             aria-label="Contrato y auditoría"
             className="hidden w-[340px] shrink-0 flex-col overflow-y-auto lg:flex"
           >
-            <SidePanel
-              contract={contract}
-              otherName={other?.name ?? "el proveedor"}
-              messages={messages}
-              participants={people}
-              role={role}
-              onJump={jumpTo}
-            />
+            {sidePanel}
           </aside>
         ) : null}
       </div>
+      <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
+        <DrawerBackdrop />
+        <DrawerContent className="max-h-[85dvh] overflow-y-auto">
+          <div className="flex items-center justify-between gap-2 px-4 pt-3">
+            <DrawerTitle className="font-medium text-sm">
+              Contrato y auditoría
+            </DrawerTitle>
+            <DrawerClose data-size="sm">Cerrar</DrawerClose>
+          </div>
+          {sidePanel}
+        </DrawerContent>
+      </Drawer>
       <Dialog
         open={auditFor !== null}
         onOpenChange={(open) => {
@@ -519,15 +548,25 @@ function SessionHeader({
         <Button
           data-size="sm"
           data-variant="ghost"
-          aria-label={panelOpen ? "Ocultar contrato" : "Mostrar contrato"}
-          aria-pressed={panelOpen}
+          aria-label="Contrato y auditoría"
+          aria-expanded={panelOpen}
           className="hidden lg:inline-flex"
           onClick={onTogglePanel}
         >
           <PanelRightIcon size={16} />
         </Button>
+        <Button
+          data-size="sm"
+          data-variant="ghost"
+          aria-label="Contrato y auditoría"
+          aria-haspopup="dialog"
+          className="lg:hidden"
+          onClick={onTogglePanel}
+        >
+          <PanelRightIcon size={16} />
+        </Button>
+        <ThemeToggle variant="icon" />
       </div>
-      <ThemeToggle variant="icon" />
     </header>
   );
 }
