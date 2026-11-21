@@ -64,6 +64,16 @@ export const takeJudgeTokens = internalMutation({
   },
 });
 
+export const takeOpenerToken = internalMutation({
+  args: { opener: v.string() },
+  handler: async (ctx, { opener }) => {
+    await judgeRateLimiter.limit(ctx, "roomJudgeSender", {
+      key: opener,
+      throws: true,
+    });
+  },
+});
+
 export async function judgeRetryAfter(
   ctx: ActionCtx,
   { sender, room }: JudgeBuckets,

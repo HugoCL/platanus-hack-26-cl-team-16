@@ -4,7 +4,7 @@ import { agentWithRole } from "../lib/agents/turn";
 import { MAX_TEXT_LENGTH, type Message } from "../shared/messages";
 import { CONSUMER_AGENT_SLUG } from "../shared/seedData";
 import type { Session } from "../shared/session";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { action } from "./_generated/server";
 import { sendThroughGate } from "./gate";
@@ -21,7 +21,7 @@ export const start = action({
     room: Session;
     opening: Message;
   } | null> => {
-    await requireRoomIdentity(ctx);
+    const { tokenIdentifier } = await requireRoomIdentity(ctx);
     const text = request.trim();
     if (!text || text.length > MAX_TEXT_LENGTH) {
       throw new ConvexError({
@@ -36,6 +36,9 @@ export const start = action({
         message: "reference agents need a model with structured output",
       });
     }
+    await ctx.runMutation(internal.moderator.takeOpenerToken, {
+      opener: `user:${tokenIdentifier}`,
+    });
     const consumer = await ctx.runQuery(api.directory.get, {
       slug: CONSUMER_AGENT_SLUG,
     });
