@@ -111,6 +111,8 @@ describe("MCP endpoint over raw HTTP", () => {
     for (const origin of [
       "https://evil.example",
       "http://localhost.evil.example",
+      "https://localhost",
+      "http://localhost/api/mcp",
       "null",
     ]) {
       expect((await post(initialize, { authorization, origin })).status).toBe(
@@ -121,5 +123,22 @@ describe("MCP endpoint over raw HTTP", () => {
       (await post(initialize, { authorization, origin: "http://localhost" }))
         .status,
     ).toBe(200);
+
+    const proxy = {
+      authorization,
+      "x-forwarded-proto": "https",
+      "x-forwarded-host": "directorio.example",
+    };
+    expect(
+      (
+        await post(initialize, {
+          ...proxy,
+          origin: "https://directorio.example",
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (await post(initialize, { ...proxy, origin: "http://localhost" })).status,
+    ).toBe(403);
   });
 });
