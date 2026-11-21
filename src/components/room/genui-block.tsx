@@ -41,7 +41,7 @@ import {
   type UiResponse,
   UiSpec,
 } from "@/shared/genui";
-import { formatTime, groupSlotsByDay } from "./room-format";
+import { formatTime, groupSlotsByDay, uiInteractionState } from "./room-format";
 
 export type GenUiAnswer = { response: UiResponse; at: number };
 
@@ -66,11 +66,13 @@ export function GenUiBlock({
   spec: raw,
   answer,
   canInteract,
+  readOnly = false,
   onRespond,
 }: {
   spec: unknown;
   answer?: GenUiAnswer;
   canInteract: boolean;
+  readOnly?: boolean;
   onRespond: (response: UiResponse) => void;
 }) {
   const parsed = UiSpec.safeParse(raw);
@@ -87,7 +89,11 @@ export function GenUiBlock({
 
   const spec = parsed.data;
   const meta = TYPE_META[spec.type];
-  const disabled = !canInteract || answer !== undefined;
+  const { disabled, showOwnerOnly } = uiInteractionState(
+    canInteract,
+    readOnly,
+    answer !== undefined,
+  );
   const props = { answer, disabled, onRespond };
   const title = "title" in spec ? spec.title : undefined;
 
@@ -110,7 +116,7 @@ export function GenUiBlock({
             <CheckIcon size={13} />
             Respondido {formatTime(answer.at)}
           </span>
-        ) : !canInteract ? (
+        ) : showOwnerOnly ? (
           <span className="text-xs text-subtle-foreground">
             Solo el dueño puede responder
           </span>

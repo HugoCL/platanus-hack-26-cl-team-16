@@ -9,10 +9,11 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 
-// API keys for agents that connect from outside, through the MCP server in app/api/mcp.
+// API keys for agents that connect from outside, through the MCP server in src/app/api/mcp.
 // `issue` shows a key in clear once; only its SHA-256 hash and a short visible prefix are stored.
 // The caller's identity always comes from the key, through `agentForApiKey`: no public function
-// takes an agentId as the caller. A key works while it is not revoked and its agent is active.
+// takes an agentId as the caller. Keys are only for external agents: the platform speaks for hosted
+// ones. A key works while it is not revoked and its agent is still active and external.
 
 const KEY_PREFIX = "dak_";
 const VISIBLE_PREFIX_LENGTH = 12;
@@ -20,7 +21,9 @@ const API_KEY_FORMAT = /^dak_[0-9a-f]{64}$/;
 const LAST_USED_RESOLUTION_MS = MINUTE;
 
 // Every MCP request spends one token of its key's bucket, so one client in a loop cannot use up
-// the deployment for the rest.
+// the deployment for the rest. The endpoint spends it through `authenticate`, and every public
+// function that takes a key (convex/mcpRooms.ts) spends it again, so calling Convex directly does
+// not skip the quota.
 const rateLimiter = new RateLimiter(components.rateLimiter, {
   mcpRequest: { kind: "token bucket", rate: 120, period: MINUTE, capacity: 60 },
 });
@@ -45,7 +48,31 @@ export async function agentForApiKey(
   return (await credentialForApiKey(ctx, apiKey))?.agent ?? null;
 }
 
-async function credentialForApiKey(
+// Called again by the mutation that finally writes for an MCP caller (rooms.create and the gate's
+// commit):
+// moderation runs between the first check and that write, and a key revoked in between must not
+// still open a room or send.
+export async function requireLiveCredential(
+  ctx: Pick<QueryCtx, "db">,
+  keyId: Id<"agentApiKeys">,
+  agentId: string,
+) {
+  const key = await ctx.db.get(keyId);
+  const agent =
+    key && key.revokedAt === undefined ? await ctx.db.get(key.agentId) : null;
+  if (
+    agent?._id !== agentId ||
+    agent.status !== "active" ||
+    agent.kind !== "external"
+  ) {
+    throw new ConvexError({
+      kind: "Unauthorized",
+      message: "the API key is not valid",
+    });
+  }
+}
+
+export async function credentialForApiKey(
   ctx: Pick<QueryCtx, "db">,
   apiKey: string,
 ): Promise<{ key: Doc<"agentApiKeys">; agent: Doc<"agents"> } | null> {
@@ -57,11 +84,12 @@ async function credentialForApiKey(
     .unique();
   if (!key || key.revokedAt !== undefined) return null;
   const agent = await ctx.db.get(key.agentId);
-  return agent?.status === "active" ? { key, agent } : null;
+  return agent?.status === "active" && agent.kind === "external"
+    ? { key, agent }
+    : null;
 }
 
-// Called once per MCP request: checks the key, spends a token of its bucket and records when it
-// was last used, to the minute so a busy key does not write on every request.
+// Checks the key, spends a token of its bucket and records its last use to the minute.
 export const authenticate = mutation({
   args: { apiKey: v.string() },
   returns: v.union(
@@ -114,7 +142,7 @@ export const revoke = internalMutation({
   },
 });
 
-// `pnpm mcp:key '{"slug":"mi-agente-juan"}'`. An action, so the key comes from real randomness
+// `pnpm mcp:key '{"slug":"asistente-externo-demo"}'`. An action, so the key comes from real randomness
 // rather than a mutation's seeded generator.
 export const issue = internalAction({
   args: { slug: v.string(), label: v.optional(v.string()) },
@@ -151,10 +179,10 @@ export const store = internalMutation({
         message: `no agent with slug ${slug}`,
       });
     }
-    if (agent.status !== "active") {
+    if (agent.status !== "active" || agent.kind !== "external") {
       throw new ConvexError({
         kind: "InvalidArgument",
-        message: `agent ${slug} is ${agent.status}, not active`,
+        message: `agent ${slug} is ${agent.status} and ${agent.kind}: keys are only for active external agents`,
       });
     }
     await ctx.db.insert("agentApiKeys", { agentId: agent._id, ...key });
