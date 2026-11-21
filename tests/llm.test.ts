@@ -77,6 +77,40 @@ describe("LLM provider", () => {
     await expect(llm.embed("cardiólogo")).resolves.toEqual(vector);
   });
 
+  it.each([
+    ["moderator", 1],
+    ["agent", 3],
+  ] as const)(
+    "structured %s makes %i HTTP attempts on retryable errors",
+    async (role, attempts) => {
+      vi.useFakeTimers();
+      try {
+        const llm = createLlmProvider({
+          LLM_PROVIDER: "openrouter",
+          OPENROUTER_API_KEY: "test-key",
+        });
+        vi.mocked(fetch).mockImplementation(async () =>
+          Response.json(
+            { error: { message: "rate limited" } },
+            { status: 429 },
+          ),
+        );
+        const rejected = expect(
+          llm.generateObject({
+            role,
+            prompt: "Availability",
+            schema: z.object({ ok: z.boolean() }),
+          }),
+        ).rejects.toThrow();
+        await vi.runAllTimersAsync();
+        await rejected;
+        expect(fetch).toHaveBeenCalledTimes(attempts);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
   it("fake text and embeddings are deterministic", async () => {
     const llm = createFakeLlmProvider();
     const prompt = {

@@ -197,6 +197,7 @@ export default defineSchema({
   )
     .index("by_sessionId", ["sessionId"])
     .index("by_agentId_and_sessionId", ["agentId", "sessionId"])
+    .index("by_tokenIdentifier_and_leftAt", ["tokenIdentifier", "leftAt"])
     .index("by_tokenIdentifier_and_sessionId", [
       "tokenIdentifier",
       "sessionId",
