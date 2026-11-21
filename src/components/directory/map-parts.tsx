@@ -44,9 +44,12 @@ export function useMapPins(cards: DirectoryCard[], selectedId: string | null) {
 export function revealCard(onSelect: (agentId: string) => void) {
   return (agentId: string) => {
     onSelect(agentId);
-    document
-      .getElementById(`agent-${agentId}`)
-      ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    document.getElementById(`agent-${agentId}`)?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth",
+      block: "nearest",
+    });
   };
 }
 
@@ -86,16 +89,16 @@ export function PinMark({
   return (
     <span
       aria-hidden
-      className={`relative grid place-items-center rounded-[50%_50%_50%_0] transition-transform [rotate:-45deg] ${
+      className={`relative grid size-9 origin-bottom-left place-items-center rounded-[50%_50%_50%_0] transition-[scale] duration-200 ease-[var(--ease-out)] [rotate:-45deg] motion-reduce:transition-none ${
         isSelected
-          ? "z-20 size-11 bg-primary text-primary-foreground shadow-[0_0_0_4px_color-mix(in_oklch,var(--ui-primary)_20%,transparent)]"
+          ? "z-20 scale-[1.2] bg-primary text-primary-foreground shadow-[0_0_0_3px_color-mix(in_oklch,var(--ui-primary)_20%,transparent)]"
           : prospect
-            ? "z-10 size-9 border-2 border-foreground bg-card text-foreground"
-            : "z-10 size-9 bg-card text-foreground shadow-card"
+            ? "z-10 border-2 border-foreground bg-card text-foreground active:scale-[0.92]"
+            : "z-10 bg-card text-foreground shadow-card active:scale-[0.92]"
       } ${className}`}
       style={style}
     >
-      <Icon size={isSelected ? 20 : 16} className="rotate-45" />
+      <Icon size={16} className="rotate-45" />
       {pin.length > 1 ? (
         <span
           aria-hidden
@@ -153,7 +156,7 @@ export function SelectedCard({
 }) {
   return (
     <div
-      className={`flex w-70 flex-col gap-2 rounded-3xl bg-card p-4 text-foreground shadow-card ${className}`}
+      className={`flex w-70 flex-col gap-2 rounded-3xl bg-card p-4 text-foreground shadow-card transition-[opacity,scale] duration-200 ease-[var(--ease-out)] starting:scale-[0.96] starting:opacity-0 motion-reduce:transition-none ${className}`}
       style={style}
     >
       <span className="text-[15px] font-medium">{selected.name}</span>
@@ -181,7 +184,7 @@ export function SelectedCard({
       ) : null}
       <Link
         href={`/directory/${selected.slug}`}
-        className="inline-flex h-8 items-center self-start rounded-full border border-input px-3 text-[13px] font-medium text-foreground no-underline hover:bg-muted"
+        className="press inline-flex h-8 items-center self-start rounded-full border border-input px-3 text-[13px] font-medium text-foreground no-underline hover:bg-muted"
       >
         Ver ficha
       </Link>

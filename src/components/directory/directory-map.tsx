@@ -231,10 +231,11 @@ export function DirectoryMap({
 
             {selectedPin && selected && selectedAt ? (
               <SelectedCard
+                key={selected.agentId}
                 pin={selectedPin}
                 selected={selected}
                 onSelect={select}
-                className="absolute z-30"
+                className="absolute z-30 origin-left"
                 style={{
                   left: Math.min(
                     Math.max(selectedAt.x + 32, 16),
