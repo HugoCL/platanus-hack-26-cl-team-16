@@ -79,6 +79,20 @@ describe("agent turn limit", () => {
 });
 
 describe("live room mapping", () => {
+  it.each([true, false, undefined])(
+    "preserves verification without inventing a badge (%s)",
+    (verified) => {
+      const mapped = mapLiveRoom(
+        session,
+        [{ participantId: "provider", name: "Servicio", verified }],
+        "human",
+      );
+      expect(
+        mapped.participants.find((p) => p.participantId === "provider")
+          ?.verified,
+      ).toBe(verified === true);
+    },
+  );
   it("assigns the caller and initiator to self, with names and representation", () => {
     const mapped = mapLiveRoom(session, names, "human");
     expect(mapped.viewer).toEqual({
@@ -90,12 +104,14 @@ describe("live room mapping", () => {
         participantId: "consumer",
         name: "Mi agente",
         kind: "agent",
+        verified: false,
         side: "self",
       },
       {
         participantId: "provider",
         name: "Clínica",
         kind: "agent",
+        verified: false,
         side: "other",
       },
       {

@@ -49,6 +49,7 @@ const ALL = "all";
 const MAX_INTENT_FILTERS = 6;
 const DEFAULT_RADIUS_KM = 5;
 const PAGE_SIZE = 20;
+const FIRST_PAGE = [0];
 
 const GoogleDirectoryMap = dynamic(() => import("./google-directory-map"), {
   ssr: false,
@@ -101,19 +102,24 @@ export function DirectorySearch() {
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [fixture, setFixture] = useFixtureState();
-  const filterKey = `${category}|${comuna}`;
+  const origin = geo.state === "on" ? geo.origin : null;
+  const near = sort === "distance" ? origin : null;
+  // Changing only the order keeps how many pages the visitor loaded.
+  const filterKey = `${category}|${comuna}|${verifiedOnly}|${includeProspects}`;
   const [more, setMore] = useState({ key: filterKey, pages: 1 });
   const pages = more.key === filterKey ? more.pages : 1;
-  const { result: liveResult, loadingMore } = usePagedSearch(
-    category,
-    comuna,
+  const {
+    result: liveResult,
+    loadingMore,
+    loadedPages,
+  } = usePagedSearch(
+    { category, comuna, near, verifiedOnly, includeProspects },
     pages,
   );
   const result =
     fixture === "demo" ? liveResult : fixtureResult(fixture, liveResult);
   const categories = useQuery(api.directory.categories, {});
 
-  const origin = geo.state === "on" ? geo.origin : null;
   const radiusFilter = origin && withinRadius ? radiusKm : null;
 
   const distances = useMemo(() => {
@@ -251,7 +257,9 @@ export function DirectorySearch() {
           {
             key: "near",
             label: radiusFilter ? `A ${radiusFilter} km de ti` : "Cerca de ti",
-            remove: () => setGeo({ state: "off" }),
+            remove: radiusFilter
+              ? () => setWithinRadius(false)
+              : () => setGeo({ state: "off" }),
           },
         ]
       : []),
@@ -599,14 +607,14 @@ export function DirectorySearch() {
                     onConverse={setConverse}
                   />
                 )}
-                {result.truncated ? (
+                {result.nextOffset !== undefined ? (
                   <Button
                     data-testid="load-more"
                     className="self-center"
                     aria-busy={loadingMore}
                     disabled={loadingMore}
                     onClick={() =>
-                      setMore({ key: filterKey, pages: pages + 1 })
+                      setMore({ key: filterKey, pages: loadedPages + 1 })
                     }
                   >
                     {loadingMore ? "Cargando…" : "Ver más agentes"}
@@ -758,31 +766,49 @@ function TextSearch({
 }
 
 function usePagedSearch(
-  category: string | null,
-  comuna: string | null,
+  filters: {
+    category: string | null;
+    comuna: string | null;
+    near: LatLng | null;
+    verifiedOnly: boolean;
+    includeProspects: boolean;
+  },
   pages: number,
 ) {
+  const { category, comuna, near, verifiedOnly, includeProspects } = filters;
+  const args = useMemo(
+    () => ({
+      ...(category ? { category } : {}),
+      ...(comuna ? { comuna } : {}),
+      ...(near ? { near: { lat: near.lat, lng: near.lng } } : {}),
+      ...(verifiedOnly ? { verifiedOnly } : {}),
+      ...(includeProspects ? {} : { includeProspects }),
+    }),
+    [category, comuna, near, verifiedOnly, includeProspects],
+  );
+  const argsKey = JSON.stringify(args);
+  // Each order pages from its own nextOffset, so the next page is requested once the previous one arrives.
+  const [chain, setChain] = useState({ key: argsKey, offsets: FIRST_PAGE });
+  const offsets = useMemo(
+    () => (chain.key === argsKey ? chain.offsets : FIRST_PAGE).slice(0, pages),
+    [chain, argsKey, pages],
+  );
   const requests = useMemo(
     () =>
       Object.fromEntries(
-        Array.from({ length: pages }, (_, page) => [
+        offsets.map((offset, page) => [
           String(page),
           {
             query: api.directory.search,
-            args: {
-              ...(category ? { category } : {}),
-              ...(comuna ? { comuna } : {}),
-              limit: PAGE_SIZE,
-              offset: page * PAGE_SIZE,
-            },
+            args: { ...args, limit: PAGE_SIZE, offset },
           },
         ]),
       ),
-    [category, comuna, pages],
+    [args, offsets],
   );
   const results = useQueries(requests);
   const loaded: DirectorySearchResult[] = [];
-  for (let page = 0; page < pages; page++) {
+  for (let page = 0; page < offsets.length; page++) {
     const value: DirectorySearchResult | Error | undefined =
       results[String(page)];
     if (value instanceof Error) throw value;
@@ -804,11 +830,21 @@ function usePagedSearch(
       result: last && {
         agents: loaded.flatMap((page) => page.agents),
         truncated: last.truncated && last.agents.length > 0,
+        nextOffset: last.nextOffset,
       },
     };
   }
+  const last = loaded.at(-1);
+  const hasNext = last?.nextOffset !== undefined;
+  if (loaded.length === offsets.length && offsets.length < pages && hasNext) {
+    setChain({ key: argsKey, offsets: [...offsets, last?.nextOffset ?? 0] });
+  }
   return {
     result: cache.current.result,
-    loadingMore: loaded.length > 0 && loaded.length < pages,
+    loadedPages: loaded.length,
+    loadingMore:
+      loaded.length > 0 &&
+      loaded.length < pages &&
+      (loaded.length < offsets.length || hasNext),
   };
 }
