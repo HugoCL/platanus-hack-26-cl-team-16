@@ -62,6 +62,7 @@ export async function insertRoom(
   const provider = await agentBySlug(ctx, providerSlug);
   const contract: SessionContract = {
     intent,
+    purpose: provider.purpose,
     capabilities: provider.capabilities,
     allowedIntents: effectiveAllowedIntents(provider),
     forbiddenTopics: provider.scope.forbiddenTopics,

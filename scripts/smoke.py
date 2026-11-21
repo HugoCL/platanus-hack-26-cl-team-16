@@ -168,6 +168,12 @@ def check():
     if page_errors:
         print("FAIL: uncaught page errors", *page_errors, sep="\n  ")
         return 1
+    subprocess.run(
+        ["pnpm", "test", "tests/convex/gate.test.ts",
+         "tests/convex/roomAuthorization.test.ts", "tests/convex/roomAgent.test.ts",
+         "tests/convex/rooms.test.ts"],
+        cwd=ROOT, check=True, timeout=30,
+    )
     print(
         f"PASS: {URL} rendered the template page and Convex stored a number"
         f" ({before} -> {after} shown: {shown}), /directorio listed {listed} cards,"
