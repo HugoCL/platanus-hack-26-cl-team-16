@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { api, internal } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
+import * as referenceModel from "../convex/referenceLlm";
 import schema from "../convex/schema";
 import { type ConvexCaller, createMcpEndpoint } from "../lib/mcp";
 import { REFERENCE_ATTACK } from "../shared/fixtures/moderation-set";
@@ -27,6 +28,8 @@ import {
   CONSUMER_AGENT_SLUG,
   EXTERNAL_AGENT_SLUG,
 } from "../shared/seed-data";
+import { errorKind } from "./convex/roomFixture";
+import { NOW } from "./convex/rooms";
 
 const modules = import.meta.glob("../convex/**/*.ts");
 const MCP_URL = "http://localhost/api/mcp";
@@ -547,6 +550,7 @@ describe("MCP room tools", () => {
     const { session, sessionId, me } = await openRoom();
 
     expect(session).toMatchObject({ status: "active", contract: { intent } });
+    expect(session.participants).toHaveLength(2);
     expect(session.participants).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -629,6 +633,123 @@ describe("MCP room tools", () => {
     expect(replies).toMatchObject([
       { senderParticipantId: provider, recipient: me, status: "allowed" },
     ]);
+  });
+
+  it("books through the reference provider when the external agent's human owner selects a slot", async () => {
+    vi.useFakeTimers({ now: NOW });
+    try {
+      const identity = {
+        subject: "mcp-owner",
+        tokenIdentifier: "https://clerk.example|mcp-owner",
+      };
+      const owner = t.withIdentity(identity);
+      const other = t.withIdentity({
+        subject: "other",
+        tokenIdentifier: "https://clerk.example|other",
+      });
+      await t.run((ctx) =>
+        ctx.db.patch("agents", agents.external, {
+          ownerTokenIdentifier: identity.tokenIdentifier,
+        }),
+      );
+      vi.spyOn(referenceModel, "referenceLlm").mockReturnValue(
+        providers.createFakeLlmProvider({
+          object: () => ({ action: "offer_slots", offerings: [], text: "" }),
+        }),
+      );
+
+      const { session, sessionId, provider } = await openRoom();
+      const human = roleIn(session, "owner");
+      expect(session.participants).toContainEqual(
+        expect.objectContaining({
+          kind: "human",
+          role: "owner",
+          onBehalfOfAgentId: agents.external,
+        }),
+      );
+      expect(JSON.stringify(session)).not.toContain(identity.tokenIdentifier);
+      expect(await owner.query(api.rooms.view, { sessionId })).toMatchObject({
+        humanParticipantId: human,
+      });
+      expect(await errorKind(other.query(api.rooms.view, { sessionId }))).toBe(
+        "NotParticipant",
+      );
+
+      await use("send_message", {
+        sessionId,
+        recipient: provider,
+        content: text("Hola, ¿tienen una hora de cardiología?"),
+      });
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      const picker = (await owner.query(api.gate.history, { sessionId })).at(
+        -1,
+      );
+      if (
+        picker?.content.kind !== "ui" ||
+        picker.content.spec.type !== "slot_picker"
+      ) {
+        throw new Error("missing slot picker");
+      }
+      expect(picker).toMatchObject({
+        senderParticipantId: provider,
+        recipient: human,
+        status: "allowed",
+      });
+      const { id: pickerId, slots } = picker.content.spec;
+      const slotId = slots[0].id;
+      const choice = {
+        sessionId,
+        recipient: provider,
+        content: {
+          kind: "ui_response",
+          inReplyTo: picker.messageId,
+          response: { type: "slot_selected", pickerId, slotId },
+        },
+      } as const;
+      expect(await refusal("send_message", choice)).toContain(
+        "inReplyTo must name a delivered UI block sent to the sender",
+      );
+      expect(await errorKind(other.action(api.gate.send, choice))).toBe(
+        "NotParticipant",
+      );
+      await owner.action(api.gate.send, choice);
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      expect(await owner.query(api.gate.history, { sessionId })).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            recipient: human,
+            status: "allowed",
+            content: {
+              kind: "ui",
+              spec: expect.objectContaining({
+                type: "confirmation",
+                id: `reserva-${slotId}`,
+              }),
+            },
+          }),
+        ]),
+      );
+      expect(
+        (await use("wait_for_messages", { sessionId, timeoutMs: 0 }))
+          .sessionStatus,
+      ).toBe("closed");
+      expect(
+        await t.run((ctx) =>
+          ctx.db
+            .query("transactions")
+            .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+            .take(2),
+        ),
+      ).toMatchObject([
+        {
+          kind: "booking",
+          status: "confirmed",
+          lines: [{ availabilityId: slotId }],
+        },
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("criterion 3: the gate blocks the reference attack from an external agent as it does from a hosted one", async () => {
@@ -969,6 +1090,38 @@ describe("MCP room tools", () => {
           .collect(),
       ),
     );
+  });
+
+  it("open_session opens no room if the bound owner changes during moderation", async () => {
+    const setOwner = (ownerTokenIdentifier: string) =>
+      t.run((ctx) =>
+        ctx.db.patch("agents", agents.external, { ownerTokenIdentifier }),
+      );
+    await setOwner("https://clerk.example|original-owner");
+    const llm = providers.createFakeLlmProvider({
+      object: () => ({ decision: "allow", rule: "purpose" }),
+    });
+    vi.spyOn(providers, "createLlmProvider").mockReturnValue({
+      ...llm,
+      async generateObject(args) {
+        await setOwner("https://clerk.example|new-owner");
+        return llm.generateObject(args);
+      },
+    });
+
+    expect(
+      await refusal("open_session", { targetAgentId: agents.clinic, intent }),
+    ).toContain("RoomOwnerChanged");
+    expect(
+      await t.run((ctx) =>
+        ctx.db
+          .query("sessions")
+          .withIndex("by_initiatorAgentId_and_status", (q) =>
+            q.eq("initiatorAgentId", agents.external),
+          )
+          .first(),
+      ),
+    ).toBeNull();
   });
 
   it("limits how often one external agent can ask the moderator, across its keys", async () => {
