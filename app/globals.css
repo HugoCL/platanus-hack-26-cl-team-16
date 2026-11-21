@@ -7,17 +7,34 @@
 @theme inline {
   --color-background: var(--ui-background);
   --color-foreground: var(--ui-foreground);
+  --color-card: var(--sm-card);
   --color-muted: var(--ui-muted);
   --color-muted-foreground: var(--ui-muted-foreground);
+  --color-subtle-foreground: var(--sm-subtle-foreground);
   --color-border: var(--ui-border);
+  --color-input: var(--ui-input);
+  --color-ring: var(--ui-ring);
   --color-primary: var(--ui-primary);
   --color-primary-foreground: var(--ui-primary-foreground);
+  --color-destructive: var(--ui-destructive);
+  --color-destructive-text: var(--sm-destructive-text);
+  --color-destructive-soft: var(--sm-destructive-soft);
+  --color-success: var(--sm-success);
+  --color-warning: var(--sm-warning);
+  --radius-lg: var(--sm-radius-lg);
+  --radius-2xl: var(--sm-radius-2xl);
+  --radius-3xl: var(--sm-radius-3xl);
+  --radius-4xl: var(--sm-radius-4xl);
+  --shadow-card: var(--ui-shadow);
   --font-sans: var(--ui-font-sans);
   --font-mono: var(--ui-font-mono);
+  --font-display: var(--sm-font-display);
 }
 
 body {
   background: var(--ui-background);
   color: var(--ui-foreground);
   font-family: var(--ui-font-sans);
+  font-size: var(--ui-font-size);
+  line-height: var(--ui-line-height);
 }
