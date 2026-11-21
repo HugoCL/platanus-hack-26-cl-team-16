@@ -85,6 +85,20 @@ describe("public room authorization", () => {
     }
   });
 
+  it("refuses a user with two memberships in the room with a typed error", async () => {
+    const { t, human, member } = await setup();
+    await t.run(async (ctx) => {
+      const row = await ctx.db.get("participants", human);
+      if (row?.kind !== "human") throw new Error("missing human");
+      const { _id, _creationTime, ...copy } = row;
+      await ctx.db.insert("participants", copy);
+    });
+
+    for (const call of Object.values(member)) {
+      expect(await errorKind(call())).toBe("DuplicateParticipant");
+    }
+  });
+
   it("opens a room for a human only on behalf of an agent they own or a shared agent", async () => {
     const { t, consumerId, open } = await seededRooms();
     const shared = await open({ human: { displayName: "Juan" } });

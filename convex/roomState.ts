@@ -22,12 +22,19 @@ export async function requireRoomHuman(
   sessionId: Id<"sessions">,
 ) {
   const { tokenIdentifier } = await requireRoomIdentity(ctx);
-  const participant = await ctx.db
+  const rows = await ctx.db
     .query("participants")
     .withIndex("by_tokenIdentifier_and_sessionId", (q) =>
       q.eq("tokenIdentifier", tokenIdentifier).eq("sessionId", sessionId),
     )
-    .unique();
+    .take(2);
+  if (rows.length > 1) {
+    throw new ConvexError({
+      kind: "DuplicateParticipant",
+      message: "you have more than one membership in this room",
+    });
+  }
+  const [participant] = rows;
   if (participant?.kind !== "human" || participant.leftAt !== undefined) {
     throw new ConvexError({
       kind: "NotParticipant",
