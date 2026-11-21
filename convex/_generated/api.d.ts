@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as agentKeys from "../agentKeys.js";
 import type * as directory from "../directory.js";
 import type * as jobs from "../jobs.js";
 import type * as migrations from "../migrations.js";
@@ -21,6 +22,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  agentKeys: typeof agentKeys;
   directory: typeof directory;
   jobs: typeof jobs;
   migrations: typeof migrations;

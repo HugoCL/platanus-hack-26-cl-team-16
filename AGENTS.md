@@ -14,6 +14,7 @@ Next.js 16 (App Router, Turbopack), Convex, Clerk, Tailwind 4, [UI SDK](https://
 | `pnpm lint`, `pnpm format` | `biome check .`, `biome check --write .`. Markdown is not linted. |
 | `pnpm typecheck`, `pnpm build` | `tsc --noEmit`, then `next build` (it passes without `.env.local`; running needs `NEXT_PUBLIC_CONVEX_URL`). `pnpm start` serves the build. |
 | `pnpm seed`, `pnpm seed:reset`, `pnpm migrate` | `convex run seed:ensure` (idempotent), a wipe plus reseed (local deployments only), and `convex run migrations:runAll`. They talk to the running deployment, so start `pnpm dev` first. |
+| `pnpm mcp:key '{"slug":"<agent-slug>"}'` | Issues an API key for that agent to call the MCP server at `/api/mcp` (`Authorization: Bearer <key>`). The key prints once; only its SHA-256 hash and prefix are stored. Talks to the running deployment like `pnpm seed`. |
 | `pnpm test` | Vitest, offline: contract examples, seed data, fake LLM, business fixture, and `seed:ensure` through convex-test. No network or keys (`fetch` is stubbed to throw). |
 | `pnpm smoke` | Playwright smoke test. Starts `pnpm dev` itself, bootstraps `.venv` and Chromium on first run, saves `artifacts/smoke.png` and `artifacts/dev.log`. With a server already running: `SMOKE_REUSE=1 pnpm smoke`. `PORT` changes the port. |
 | `pnpm browser:install` | Download Chrome for `agent-browser`. |
