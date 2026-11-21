@@ -350,21 +350,19 @@ function SlotPickerBlock({
   const shownDays = showAll ? days : days.slice(0, visibleDays);
   const hiddenDays = days.length - shownDays.length;
 
+  function confirmSlot(id: string) {
+    if (disabled) return;
+    setSlotId(id);
+    onRespond({ type: "slot_selected", pickerId: spec.id, slotId: id });
+  }
+
   return (
     <div className="flex flex-col gap-3">
       <p className="m-0 text-xs text-subtle-foreground">Hora de Santiago</p>
       <RadioGroup
         aria-label={spec.title}
         value={slotId}
-        onValueChange={(next, details) => {
-          setSlotId(next);
-          if (next && details.reason === "item-press")
-            onRespond({
-              type: "slot_selected",
-              pickerId: spec.id,
-              slotId: next,
-            });
-        }}
+        onValueChange={setSlotId}
         disabled={disabled}
         className="flex flex-col gap-3"
       >
@@ -381,17 +379,13 @@ function SlotPickerBlock({
                   <Radio
                     value={slot.id}
                     className="sr-only"
+                    onClick={() => confirmSlot(slot.id)}
                     onKeyDownCapture={(event) => {
                       if (event.key !== " " || disabled) return;
                       event.preventDefault();
                       event.stopPropagation();
                       if (event.repeat) return;
-                      setSlotId(slot.id);
-                      onRespond({
-                        type: "slot_selected",
-                        pickerId: spec.id,
-                        slotId: slot.id,
-                      });
+                      confirmSlot(slot.id);
                     }}
                   >
                     <RadioIndicator />

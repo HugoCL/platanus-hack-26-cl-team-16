@@ -83,9 +83,24 @@ it("submits an arrow-selected slot on Space without another value change", () =>
   expect(onRespond).toHaveBeenCalledTimes(1);
 });
 
-it("keeps click-to-book", () => {
+it("confirms a click even when arrow navigation already selected the slot", () => {
   const onRespond = render();
-  change(captured.radios[0].value, "item-press");
+  const radio = captured.radios[1];
+  change(radio.value, "list-navigation");
+  expect(onRespond).not.toHaveBeenCalled();
+  radio.onClick?.({} as Parameters<NonNullable<typeof radio.onClick>>[0]);
+  expect(onRespond).toHaveBeenCalledExactlyOnceWith({
+    type: "slot_selected",
+    pickerId: "slots-cardio",
+    slotId: radio.value,
+  });
+});
+
+it("sends only once when a click also changes the value", () => {
+  const onRespond = render();
+  const radio = captured.radios[0];
+  change(radio.value, "item-press");
+  radio.onClick?.({} as Parameters<NonNullable<typeof radio.onClick>>[0]);
   expect(onRespond).toHaveBeenCalledTimes(1);
 });
 
@@ -95,6 +110,8 @@ it("does not submit for other keys or when disabled", () => {
   expect(onRespond).not.toHaveBeenCalled();
   const disabledRespond = render(false);
   captured.radios.at(-1)?.onKeyDownCapture?.(key(" "));
+  const radio = captured.radios.at(-1);
+  radio?.onClick?.({} as Parameters<NonNullable<typeof radio.onClick>>[0]);
   expect(disabledRespond).not.toHaveBeenCalled();
 });
 
