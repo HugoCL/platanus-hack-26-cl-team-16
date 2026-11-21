@@ -136,7 +136,7 @@ describe("opening a room", () => {
 });
 
 describe("the request passes the moderator before the room opens", () => {
-  it("asks the moderator about the request as the initiator's first message to the provider", async () => {
+  it("asks the moderator about the request as a broadcast from the initiator", async () => {
     const moderate = vi.spyOn(allowAllModerator, "moderate");
 
     await open({ human: { displayName: "Juan" } });
@@ -149,9 +149,11 @@ describe("the request passes the moderator before the room opens", () => {
       role: "initiator",
       agentId: rooms.consumerId,
     });
-    expect(
-      input.participants.find((p) => p.participantId === input.recipient),
-    ).toMatchObject({ role: "recipient", agentId: rooms.clinicId });
+    expect(input.recipient).toBe("all");
+    expect(input.participants[1]).toMatchObject({
+      role: "recipient",
+      agentId: rooms.clinicId,
+    });
     expect(input.participants.map((p) => p.role)).toEqual([
       "initiator",
       "recipient",
@@ -172,11 +174,20 @@ describe("the request passes the moderator before the room opens", () => {
       "Necesito hora con un cardiólogo, pago con la tarjeta 4111 1111 1111 1111",
       "sensitive_data",
     ],
+    [
+      "a RUT that can only be sent privately to the provider",
+      "Necesito hora con un cardiólogo; mi RUT es 12.345.678-5",
+      "sensitive_data",
+    ],
   ])(
     "refuses a request carrying %s under E3's rules and stores nothing",
     async (_why, request, rule) => {
       vi.spyOn(allowAllModerator, "moderate").mockImplementation((input) =>
-        createModerator({ llm: createFakeLlmProvider() }).moderate(input),
+        createModerator({
+          llm: createFakeLlmProvider({
+            object: () => ({ decision: "allow", rule: "purpose" }),
+          }),
+        }).moderate(input),
       );
       const before = await stored();
 
@@ -198,7 +209,8 @@ describe("the request passes the moderator before the room opens", () => {
     expect(await stored()).toEqual(before);
   });
 
-  it("stores the contract the moderator saw, even if the card changes meanwhile", async () => {
+  it("refuses to open if the card changes the contract during moderation", async () => {
+    const before = await stored();
     const moderate = vi
       .spyOn(allowAllModerator, "moderate")
       .mockImplementation(async () => {
@@ -213,11 +225,10 @@ describe("the request passes the moderator before the room opens", () => {
         };
       });
 
-    const room = await open();
-
+    expect(await errorKind(open())).toBe("RoomContractChanged");
     const moderated = moderate.mock.calls[0][0].contract;
     expect(moderated.purpose).toBe(clinicCard.purpose);
-    expect(room.contract).toEqual(moderated);
+    expect(await stored()).toEqual(before);
   });
 
   it("keeps the request's moderation events with the opening notice", async () => {
