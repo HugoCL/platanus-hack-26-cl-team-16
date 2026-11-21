@@ -183,7 +183,7 @@ async function codeRow(ctx: QueryCtx, code: string) {
     .query("agentLinkCodes")
     .withIndex("by_codeHash", (q) => q.eq("codeHash", codeHash))
     .unique();
-  return row && row.expiresAt > Date.now() ? row : null;
+  return row;
 }
 
 export const linkInfo = query({
@@ -203,6 +203,7 @@ export const linkInfo = query({
     const identity = await ctx.auth.getUserIdentity();
     const linkedToCurrentUser =
       !!identity && agent.ownerTokenIdentifier === identity.tokenIdentifier;
+    if (row.expiresAt <= Date.now() && !linkedToCurrentUser) return null;
     if (row.usedAt !== undefined && !linkedToCurrentUser) return null;
     return {
       ...toSummary(agent),
@@ -220,7 +221,8 @@ export const link = mutation({
     if (!identity) fail("Unauthorized", "sign in to link an agent");
     const row = await codeRow(ctx, code);
     const agent = row && (await ctx.db.get(row.agentId));
-    if (!row || !agent) fail("InvalidArgument", "invalid or expired link code");
+    if (!row || !agent || row.expiresAt <= Date.now())
+      fail("InvalidArgument", "invalid or expired link code");
     if (
       agent.ownerTokenIdentifier &&
       agent.ownerTokenIdentifier !== identity.tokenIdentifier

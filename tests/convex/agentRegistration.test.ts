@@ -267,6 +267,49 @@ describe("agent self-onboarding", () => {
     }
   });
 
+  it("keeps an expired linked code accessible only to its owner for publication controls", async () => {
+    const agent = await register();
+    await owner().mutation(api.agentRegistration.link, {
+      code: agent.linkCode,
+    });
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.advanceTimersByTime(24 * 60 * 60 * 1000 + 1);
+      await expect(
+        owner().query(api.agentRegistration.linkInfo, { code: agent.linkCode }),
+      ).resolves.toMatchObject({
+        linkedToCurrentUser: true,
+        alreadyLinked: true,
+        status: "draft",
+      });
+      await expect(
+        rooms.t.query(api.agentRegistration.linkInfo, { code: agent.linkCode }),
+      ).resolves.toBeNull();
+      await expect(
+        other().query(api.agentRegistration.linkInfo, { code: agent.linkCode }),
+      ).resolves.toBeNull();
+      await expect(
+        other().mutation(api.agentRegistration.link, { code: agent.linkCode }),
+      ).rejects.toThrow(/invalid or expired/);
+      await owner().mutation(api.agentRegistration.publish, {
+        agentId: agent.agentId,
+        purpose: "Responder consultas",
+        category: "asistente_personal",
+      });
+      await expect(
+        owner().query(api.agentRegistration.linkInfo, { code: agent.linkCode }),
+      ).resolves.toMatchObject({ status: "active" });
+      await owner().mutation(api.agentRegistration.unpublish, {
+        agentId: agent.agentId,
+      });
+      await expect(
+        owner().query(api.agentRegistration.linkInfo, { code: agent.linkCode }),
+      ).resolves.toMatchObject({ status: "draft" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("rate limits missing IPs and the global registration bucket", async () => {
     for (let i = 0; i < 5; i++) await register();
     await expect(register()).rejects.toThrow(/registration quota exhausted/);
