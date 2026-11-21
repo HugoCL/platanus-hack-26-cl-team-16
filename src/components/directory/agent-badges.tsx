@@ -1,25 +1,5 @@
-import { BadgeCheck, Circle } from "lucide-react";
+import { Circle } from "lucide-react";
 import type { DirectoryCard } from "@/convex/directory";
-
-export function VerifiedMark({
-  verified,
-  size = 14,
-}: {
-  verified: boolean;
-  size?: number;
-}) {
-  return verified ? (
-    <span className="inline-flex items-center gap-1 font-medium text-foreground">
-      <BadgeCheck aria-hidden size={size} />
-      Verificada
-    </span>
-  ) : (
-    <span className="inline-flex items-center gap-1">
-      <Circle aria-hidden size={size} />
-      Sin verificar
-    </span>
-  );
-}
 
 export function ProspectBadge() {
   return (

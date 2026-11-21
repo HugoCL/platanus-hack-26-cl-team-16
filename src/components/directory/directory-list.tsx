@@ -4,7 +4,8 @@ import type { DirectoryCard } from "@/convex/directory";
 import type { Category } from "@/shared/catalog";
 import { CONSUMER_AGENT_SLUG } from "@/shared/seed-data";
 import { intentLabel } from "../room/room-format";
-import { isProspect, ProspectBadge, VerifiedMark } from "./agent-badges";
+import { VerifiedBadge } from "../verified-badge";
+import { isProspect, ProspectBadge } from "./agent-badges";
 import { categoryIcon, formatKm, KIND_LABELS } from "./directory-format";
 
 const VISIBLE_INTENTS = 3;
@@ -72,21 +73,16 @@ function AgentResult({
   ].filter(Boolean);
 
   return (
-    // Hover and focus only mirror the selection on the map; the card's actions are its links and buttons.
+    // The title is the card's select button; its ::before stretches over the card so a click
+    // anywhere selects it. Links, buttons and the badge sit above it (relative z-10).
     <li
       id={`agent-${card.agentId}`}
       data-testid="agent-card"
       data-slug={card.slug}
       data-status={card.status}
-      onMouseEnter={() => onSelect?.(card.agentId)}
-      onFocus={() => onSelect?.(card.agentId)}
-      className={`flex scroll-m-4 flex-col gap-3 rounded-4xl p-4.5 transition-shadow ${
-        prospect
-          ? "bg-muted [background-image:var(--sm-hatch)]"
-          : selected
-            ? "bg-card shadow-[0_0_0_2px_var(--ui-foreground)]"
-            : "bg-card shadow-card"
-      }`}
+      className={`relative flex scroll-m-4 flex-col gap-3 rounded-4xl p-4.5 transition-shadow has-[[data-select]:focus-visible]:outline-2 has-[[data-select]:focus-visible]:outline-offset-2 has-[[data-select]:focus-visible]:outline-ring ${
+        prospect ? "bg-muted [background-image:var(--sm-hatch)]" : "bg-card"
+      } ${selected ? "shadow-[0_0_0_2px_var(--ui-foreground)]" : prospect ? "" : "shadow-card"}`}
     >
       <div className="flex items-start gap-3">
         <span
@@ -96,17 +92,26 @@ function AgentResult({
           <Icon size={20} />
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <h2 className="m-0 text-base leading-snug font-medium tracking-tight">
-            {card.name}
+          <h2 className="m-0 flex min-w-0 items-center gap-1 text-base leading-snug font-medium tracking-tight">
+            <button
+              type="button"
+              data-select
+              aria-pressed={selected}
+              onClick={() => onSelect?.(card.agentId)}
+              className="min-w-0 cursor-pointer truncate border-0 bg-transparent p-0 text-left font-[inherit] text-inherit outline-none before:absolute before:inset-0 before:rounded-4xl"
+            >
+              {card.name}
+            </button>
+            {!prospect && card.verified ? (
+              <VerifiedBadge className="relative z-10" />
+            ) : null}
           </h2>
-          {prospect ? (
-            <ProspectBadge />
-          ) : (
-            <span className="flex flex-wrap items-center gap-1.5 text-[13px] text-subtle-foreground">
-              {card.entityName ? <span>{card.entityName}</span> : null}
-              <VerifiedMark verified={card.verified} />
-            </span>
-          )}
+          {meta.length > 0 ? (
+            <p className="m-0 text-[13px] text-subtle-foreground tabular-nums">
+              {meta.join(" · ")}
+            </p>
+          ) : null}
+          {prospect ? <ProspectBadge /> : null}
         </div>
       </div>
 
@@ -137,13 +142,7 @@ function AgentResult({
         </ul>
       ) : null}
 
-      {meta.length > 0 ? (
-        <p className="m-0 flex flex-wrap items-center gap-2 text-xs text-subtle-foreground tabular-nums">
-          {meta.join(" · ")}
-        </p>
-      ) : null}
-
-      <div className="flex gap-2">
+      <div className="relative z-10 flex gap-2">
         {prospect || card.slug === CONSUMER_AGENT_SLUG ? null : (
           <Button
             data-variant="solid"
