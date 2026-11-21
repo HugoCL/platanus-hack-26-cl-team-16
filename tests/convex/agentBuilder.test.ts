@@ -31,7 +31,7 @@ const profile = {
 
 describe("agent builder", () => {
   it.each([
-    ["a".repeat(250) + ".pdf", "a".repeat(200)],
+    [`${"a".repeat(250)}.pdf`, "a".repeat(200)],
     ["C:\\docs\\ catálogo\n.pdf ", "catálogo.pdf"],
     ["/docs/horarios.pdf", "horarios.pdf"],
     ["  ", "Documento.pdf"],
@@ -51,8 +51,10 @@ describe("agent builder", () => {
         await rooms.t.run((ctx) => ctx.db.get("agentSources", sourceId)),
       ).toMatchObject({ label, storageId });
       expect(
-        await rooms.t.run((ctx) => ctx.storage.get(storageId)),
-      ).not.toBeNull();
+        await rooms.t.run(
+          async (ctx) => (await ctx.storage.get(storageId)) !== null,
+        ),
+      ).toBe(true);
     },
   );
   it("rejects PDF storage reuse by the uploader or another owner without changing the original file", async () => {
@@ -82,8 +84,10 @@ describe("agent builder", () => {
       ).rejects.toThrow(/ya está asociado/);
     }
     expect(
-      await rooms.t.run((ctx) => ctx.storage.get(storageId)),
-    ).not.toBeNull();
+      await rooms.t.run(
+        async (ctx) => (await ctx.storage.get(storageId)) !== null,
+      ),
+    ).toBe(true);
     expect(
       await rooms.t.run((ctx) => ctx.db.get("agentSources", sourceId)),
     ).toMatchObject({ agentId, storageId });
