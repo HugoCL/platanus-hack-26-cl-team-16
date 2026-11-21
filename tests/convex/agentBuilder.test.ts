@@ -30,6 +30,46 @@ const profile = {
 };
 
 describe("agent builder", () => {
+  it("rejects PDF storage reuse by the uploader or another owner without changing the original file", async () => {
+    const { agentId } = await draft();
+    const otherAgent = await other().mutation(api.agentBuilder.createDraft, {
+      name: "Otro negocio",
+      summary: "Otro agente",
+    });
+    const storageId = await rooms.t.run((ctx) =>
+      ctx.storage.store(new Blob(["pdf"], { type: "application/pdf" })),
+    );
+    const sourceId = await owner().mutation(api.agentBuilder.addPdf, {
+      agentId,
+      storageId,
+      filename: "info.pdf",
+    });
+    for (const [caller, target] of [
+      [owner(), agentId],
+      [other(), otherAgent.agentId],
+    ] as const) {
+      await expect(
+        caller.mutation(api.agentBuilder.addPdf, {
+          agentId: target,
+          storageId,
+          filename: "copy.pdf",
+        }),
+      ).rejects.toThrow(/ya está asociado/);
+    }
+    expect(
+      await rooms.t.run((ctx) => ctx.storage.get(storageId)),
+    ).not.toBeNull();
+    expect(
+      await rooms.t.run((ctx) => ctx.db.get("agentSources", sourceId)),
+    ).toMatchObject({ agentId, storageId });
+    expect(
+      (
+        await other().query(api.agentBuilder.get, {
+          agentId: otherAgent.agentId,
+        })
+      ).sources,
+    ).toEqual([]);
+  });
   it("deletes owned drafts and their data but refuses published agents, other owners, and agents with conversations", async () => {
     const { agentId } = await draft();
     const storageId = await rooms.t.run((ctx) =>

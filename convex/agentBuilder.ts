@@ -188,6 +188,12 @@ export const addPdf = mutation({
   returns: v.id("agentSources"),
   handler: async (ctx, args) => {
     await roomForSource(ctx, args.agentId);
+    const existing = await ctx.db
+      .query("agentSources")
+      .withIndex("by_storageId", (q) => q.eq("storageId", args.storageId))
+      .first();
+    if (existing)
+      fail("Este archivo ya está asociado a un agente. Sube una copia nueva.");
     const metadata = await ctx.db.system.get("_storage", args.storageId);
     if (
       !metadata ||

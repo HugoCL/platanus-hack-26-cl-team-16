@@ -175,7 +175,9 @@ export default defineSchema({
     ),
     text: v.optional(v.string()),
     error: v.optional(v.string()),
-  }).index("by_agentId", ["agentId"]),
+  })
+    .index("by_agentId", ["agentId"])
+    .index("by_storageId", ["storageId"]),
 
   hostedAgentConfigs: defineTable({
     agentId: v.id("agents"),
