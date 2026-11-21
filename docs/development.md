@@ -82,7 +82,7 @@ Everything has an offline default. You set these variables only to use real serv
 
 Code in Convex reads these variables from the deployment's environment. A human sets them with `npx convex env set`. Next.js reads them from `.env.local`.
 
-For interactive room sends, configure `LLM_PROVIDER=openrouter` and its key in the Convex deployment. The default `fake` provider has no judge script outside tests, so requests and messages that need the judge fail closed.
+For interactive room sends, configure `LLM_PROVIDER=openrouter` and its key in the Convex deployment. The default `fake` provider has no judge script outside tests, so requests and messages that need the judge fail closed. With `openrouter`, every message that passes the deterministic rules goes to OpenRouter in the judge prompt, together with the room contract and the last 8 messages; see section 3.5 of `docs/architecture.md` for exactly what leaves the platform.
 
 ### Try Claude through OpenRouter locally
 
