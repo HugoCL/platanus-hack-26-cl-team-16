@@ -93,7 +93,7 @@ Corre en cada mensaje antes de guardarlo y entregarlo, **fail-closed**: si falla
 
 `ModerationResult` (con `redact`, `escalate` y `terminate`) queda en el código para después de E8; nada de la fase 1 lo usa.
 
-El set versionado de casos, con su veredicto esperado, está en `shared/fixtures/moderationSet.ts`, y `pnpm test` lo corre con el LLM falso.
+El set versionado de casos, con su veredicto esperado, está en `shared/fixtures/moderationSet.ts`, y `pnpm test` lo corre con el LLM falso. `pnpm eval:moderator` lo corre contra el modelo real en OpenRouter (10 veces por defecto, fuera de CI) y reporta, para el moderador completo y para el juez solo, el ataque de referencia bloqueado, los bloqueos falsos del set legítimo, el p95 de latencia y el costo.
 
 Todo queda auditado en `moderationEvents` (un evento por etapa que corrió), visible en la UI de la sala. Es la pieza diferenciadora del pitch, así que el demo debe mostrar un bloqueo en vivo.
 
