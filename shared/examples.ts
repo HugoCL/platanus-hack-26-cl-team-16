@@ -543,6 +543,20 @@ export const CONTRACT_EXAMPLES: Record<string, ContractExamples> = {
       },
     ],
   },
+  waitForMessagesInput: {
+    schema: WaitForMessagesInput,
+    valid: [
+      { sessionId: "s1" },
+      { sessionId: "s1", after: "s:12", timeoutMs: 0 },
+    ],
+    invalid: [
+      {
+        why: "a numeric cursor from before the cursor was opaque",
+        value: { sessionId: "s1", after: 1795276959927 },
+      },
+      { why: "an empty cursor", value: { sessionId: "s1", after: "" } },
+    ],
+  },
   searchAgentsOutput: {
     schema: SearchAgentsOutput,
     valid: [
@@ -558,20 +572,6 @@ export const CONTRACT_EXAMPLES: Record<string, ContractExamples> = {
         why: "an unresolved field the search does not have",
         value: { agents: [], truncated: true, unresolved: ["near"] },
       },
-    ],
-  },
-  waitForMessagesInput: {
-    schema: WaitForMessagesInput,
-    valid: [
-      { sessionId: "s1" },
-      { sessionId: "s1", after: "s:12", timeoutMs: 0 },
-    ],
-    invalid: [
-      {
-        why: "a numeric cursor from before the cursor was opaque",
-        value: { sessionId: "s1", after: 1795276959927 },
-      },
-      { why: "an empty cursor", value: { sessionId: "s1", after: "" } },
     ],
   },
 };
