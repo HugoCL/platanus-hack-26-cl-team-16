@@ -136,8 +136,8 @@ export async function providerTurn(
 
 // Books the slot a human picked in one of this provider's pickers, confirms it to that human and
 // closes the room. A room holds one booking: a choice of another slot gets no answer, and the
-// booked slot is confirmed again only while no confirmation went out, so a turn cut short after
-// booking can be retried.
+// booked slot is confirmed again only while its confirmation (`reserva-<slot>`) has not reached
+// that human, so a turn cut short after booking can be retried.
 async function bookChoice(
   turn: AgentTurn,
   context: ProviderContext,
@@ -176,11 +176,13 @@ async function bookChoice(
     );
   }
   if (booking.slotId !== slotId) return [];
+  const confirmationId = `reserva-${booking.slotId}`;
   const confirmed = seen.some(
     (m) =>
       m.senderParticipantId === turn.self &&
+      m.recipient === human.participantId &&
       m.content.kind === "ui" &&
-      m.content.spec.type === "confirmation",
+      m.content.spec.id === confirmationId,
   );
   if (confirmed) return [{ kind: "close" }];
   const when = formatWhen(booking.start);
@@ -193,7 +195,7 @@ async function bookChoice(
         kind: "ui",
         spec: {
           type: "confirmation",
-          id: `${pickerId}-reserva`,
+          id: confirmationId,
           title: "Reserva confirmada",
           summary: `${booking.offeringName}, ${when}.`,
           details: [
