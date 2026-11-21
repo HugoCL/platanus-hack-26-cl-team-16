@@ -307,6 +307,49 @@
   animation: room-flash 1.6s ease-out;
 }
 
+/* Desktop contract panel: the column opens from the right edge and the content follows it in. */
+.room-panel {
+  width: 0;
+  transition: width 260ms var(--ease-out);
+
+  &[data-open] {
+    width: 340px;
+  }
+}
+
+.room-panel-inner {
+  opacity: 0;
+  transform: translateX(12px);
+  transition:
+    opacity 200ms var(--ease-out),
+    transform 260ms var(--ease-out);
+
+  [data-open] > & {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The audit dialog fades in from just below full size; it is centered, so it scales from center. */
+.room-dialog {
+  transition:
+    opacity 200ms var(--ease-out),
+    scale 200ms var(--ease-out);
+
+  &:is([data-starting-style], [data-ending-style]) {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+
+.room-dialog-backdrop {
+  transition: opacity 200ms var(--ease-out);
+
+  &:is([data-starting-style], [data-ending-style]) {
+    opacity: 0;
+  }
+}
+
 .room-typing {
   display: inline-block;
   width: 0.5rem;
@@ -334,6 +377,23 @@
   .room-composer-icon,
   [data-slot="textarea"].room-composer-input {
     transition: none;
+  }
+
+  .room-panel {
+    transition: none;
+  }
+
+  .room-panel-inner {
+    transform: none;
+    transition: opacity 200ms ease-out;
+  }
+
+  .room-dialog {
+    transition: opacity 200ms ease-out;
+
+    &:is([data-starting-style], [data-ending-style]) {
+      scale: none;
+    }
   }
 
   .room-stage,

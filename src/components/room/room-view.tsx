@@ -302,12 +302,16 @@ export function RoomView({
             onRestart={onRestart}
           />
         </main>
-        {panelOpen && contract ? (
+        {contract ? (
           <aside
             aria-label="Contrato y auditoría"
-            className="hidden w-[340px] shrink-0 flex-col overflow-y-auto lg:flex"
+            data-open={panelOpen || undefined}
+            inert={!panelOpen}
+            className="room-panel hidden shrink-0 overflow-hidden lg:block"
           >
-            {sidePanel}
+            <div className="room-panel-inner flex h-full w-[340px] flex-col overflow-y-auto">
+              {sidePanel}
+            </div>
           </aside>
         ) : null}
       </div>
@@ -329,8 +333,8 @@ export function RoomView({
           if (!open) setAuditFor(null);
         }}
       >
-        <DialogBackdrop />
-        <DialogContent className="max-w-md">
+        <DialogBackdrop className="room-dialog-backdrop" />
+        <DialogContent className="room-dialog max-w-md">
           <DialogTitle>Auditoría del mensaje</DialogTitle>
           <DialogDescription>
             {auditMessage
