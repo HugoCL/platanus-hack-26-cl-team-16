@@ -21,7 +21,8 @@ import type { DirectoryCard } from "@/convex/directory";
 import type { Category } from "@/shared/catalog";
 import { CONSUMER_AGENT_SLUG } from "@/shared/seed-data";
 import { dataFieldLabel, intentLabel } from "../room/room-format";
-import { isProspect, ProspectBadge, VerifiedMark } from "./agent-badges";
+import { VerifiedBadge } from "../verified-badge";
+import { isProspect, ProspectBadge } from "./agent-badges";
 import {
   categoryIcon,
   categoryLabels,
@@ -95,17 +96,15 @@ function Detail({
           <Icon size={30} />
         </span>
         <div className="flex min-w-0 flex-[1_1_400px] flex-col gap-1.5">
-          <h1 className="m-0 text-[28px] leading-tight font-semibold tracking-tight">
+          <h1 className="m-0 flex items-center gap-1.5 text-[28px] leading-tight font-semibold tracking-tight">
             {card.name}
+            {!prospect && card.verified ? <VerifiedBadge size={18} /> : null}
           </h1>
-          <div className="flex flex-wrap items-center gap-2 text-subtle-foreground">
-            {card.entityName ? <span>{card.entityName}</span> : null}
-            {prospect ? (
-              <ProspectBadge />
-            ) : (
-              <VerifiedMark verified={card.verified} size={15} />
-            )}
-          </div>
+          {prospect ? (
+            <ProspectBadge />
+          ) : card.entityName && card.entityName !== card.name ? (
+            <span className="text-subtle-foreground">{card.entityName}</span>
+          ) : null}
           <p className="m-0 text-[13px] text-subtle-foreground">
             {[
               categoryLabels(card.categories, categories),

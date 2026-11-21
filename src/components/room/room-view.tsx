@@ -20,11 +20,9 @@ import {
 } from "@ui-sdk/react/select";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@ui-sdk/react/tabs";
 import { Textarea } from "@ui-sdk/react/textarea";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-sdk/react/tooltip";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
-  BadgeCheckIcon,
   PanelRightIcon,
   ShieldCheckIcon,
   UserIcon,
@@ -33,6 +31,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { UiSpec } from "@/shared/genui";
 import { MAX_TEXT_LENGTH } from "@/shared/messages";
 import type { SessionContract, SessionStatus } from "@/shared/session";
+import { VerifiedBadge } from "../verified-badge";
 import {
   DEMO_CONTRACT,
   DEMO_PARTICIPANTS,
@@ -373,17 +372,7 @@ function SessionHeader({
         <div className="flex min-w-0 flex-col gap-0.5">
           <h1 className="m-0 flex min-w-0 items-center gap-1 text-lg leading-tight font-semibold tracking-tight">
             <span className="truncate">{other?.name}</span>
-            <Tooltip>
-              <TooltipTrigger
-                aria-label="Ficha verificada"
-                data-size="sm"
-                data-variant="ghost"
-                className="!h-6 !w-6 shrink-0 !p-0 text-subtle-foreground"
-              >
-                <BadgeCheckIcon size={15} />
-              </TooltipTrigger>
-              <TooltipContent>Ficha verificada</TooltipContent>
-            </Tooltip>
+            <VerifiedBadge />
           </h1>
           <p className="m-0 truncate text-sm text-subtle-foreground">
             {self?.name} pide: “{contract.intent.description}”
