@@ -26,7 +26,12 @@ import {
   query,
 } from "./_generated/server";
 import { moderate } from "./moderator";
-import { fakeRoomLlm, testRoomAgent } from "./roomAgent";
+import { roomAgentFor } from "./roomAgent";
+import {
+  HISTORY_BYTE_BUDGET,
+  insertMessage,
+  messageBytes,
+} from "./roomMessages";
 import {
   loadSession,
   requireRoomHuman,
@@ -36,8 +41,6 @@ import {
 import { visibleTo } from "./visibility";
 
 const HISTORY_LIMIT = 500;
-const HISTORY_BYTE_BUDGET = 4 * 1024 * 1024;
-const encoder = new TextEncoder();
 
 const recipientValidator = v.union(v.literal("all"), v.id("participants"));
 
@@ -80,6 +83,7 @@ export async function sendThroughGate(
     senderParticipantId: Id<"participants">;
     recipient: Doc<"messages">["recipient"];
     content: unknown;
+    hostedReply?: true;
   },
 ): Promise<Message> {
   const parsed = SendableContent.safeParse(args.content);
@@ -94,6 +98,7 @@ export async function sendThroughGate(
     sessionId: args.sessionId,
     senderParticipantId: args.senderParticipantId,
     recipient: args.recipient,
+    inReplyTo: content.kind === "ui_response" ? content.inReplyTo : undefined,
   });
 
   const outcome = await moderate({
@@ -112,6 +117,7 @@ export async function sendThroughGate(
     content,
     verdict: outcome.verdict,
     events: outcome.events,
+    hostedReply: args.hostedReply,
   });
 }
 
@@ -120,6 +126,7 @@ export const moderationContext = internalQuery({
     sessionId: v.id("sessions"),
     senderParticipantId: v.id("participants"),
     recipient: recipientValidator,
+    inReplyTo: v.optional(v.string()),
   },
   handler: async (
     ctx,
@@ -130,12 +137,19 @@ export const moderationContext = internalQuery({
     participants: Participant[];
     history: Message[];
   }> => {
-    const { session, sender } = await checkSend(ctx, args);
+    const { session, sender, replyTarget } = await checkSend(ctx, args);
+    const history = await recentMessages(ctx, args.sessionId);
+    if (
+      replyTarget &&
+      !history.some((m) => m.messageId === replyTarget.messageId)
+    ) {
+      history.unshift(replyTarget);
+    }
     return {
       contract: session.contract,
       sender,
       participants: session.participants,
-      history: await recentMessages(ctx, args.sessionId),
+      history,
     };
   },
 });
@@ -148,6 +162,17 @@ export const eventValidator = v.object({
   latencyMs: v.optional(v.number()),
 });
 
+const canonical = (value: unknown) =>
+  JSON.stringify(value, (_key, field) =>
+    field && typeof field === "object" && !Array.isArray(field)
+      ? Object.fromEntries(
+          Object.entries(field).sort(([a], [b]) =>
+            a < b ? -1 : a > b ? 1 : 0,
+          ),
+        )
+      : field,
+  );
+
 export const commit = internalMutation({
   args: {
     sessionId: v.id("sessions"),
@@ -156,14 +181,48 @@ export const commit = internalMutation({
     content: zodToConvex(SendableContent),
     verdict: zodToConvex(Verdict),
     events: v.array(eventValidator),
+    hostedReply: v.optional(v.literal(true)),
   },
   handler: async (ctx, args): Promise<Message> => {
-    const { session, sender } = await checkSend(ctx, args);
+    const { session, sender } = await checkSend(ctx, {
+      ...args,
+      inReplyTo:
+        args.content.kind === "ui_response"
+          ? args.content.inReplyTo
+          : undefined,
+    });
+    const { content, verdict } = args;
+    if (
+      args.hostedReply &&
+      verdict.decision === "allow" &&
+      sender.kind === "agent" &&
+      content.kind === "ui" &&
+      content.spec.type === "confirmation"
+    ) {
+      const confirmationId = content.spec.id;
+      const previous = await ctx.db
+        .query("messages")
+        .withIndex("by_sessionId_and_moderation_status", (q) =>
+          q.eq("sessionId", args.sessionId).eq("moderation.status", "allowed"),
+        )
+        .filter((q) =>
+          q.and(
+            q.eq(q.field("senderParticipantId"), args.senderParticipantId),
+            q.eq(q.field("recipient"), args.recipient),
+            q.eq(q.field("content.kind"), "ui"),
+            q.eq(q.field("content.spec.type"), "confirmation"),
+            q.eq(q.field("content.spec.id"), confirmationId),
+          ),
+        )
+        .first();
+      if (previous && canonical(previous.content) === canonical(content)) {
+        return toMessage(previous);
+      }
+    }
     const agentTurn = sender.kind === "agent";
     const turnCount = session.turnCount + (agentTurn ? 1 : 0);
     const exhausted = turnCount >= session.contract.maxTurns;
-    const { verdict } = args;
-    const messageId = await ctx.db.insert("messages", {
+    const messageId = await insertMessage(ctx, {
       sessionId: args.sessionId,
       senderParticipantId: args.senderParticipantId,
       recipient: args.recipient,
@@ -211,15 +270,13 @@ export const commit = internalMutation({
         );
       }
     }
-    if (
-      !exhausted &&
-      verdict.decision === "allow" &&
-      args.recipient !== args.senderParticipantId &&
-      session.participants.some(
-        (p) => p.kind === "agent" && p.participantId === args.recipient,
-      )
-    ) {
-      await ctx.scheduler.runAfter(0, internal.gate.reply, { messageId });
+    if (!exhausted && verdict.decision === "allow") {
+      for (const responder of responders(session.participants, sender, args)) {
+        await ctx.scheduler.runAfter(0, internal.gate.reply, {
+          messageId,
+          participantId: responder.participantId as Id<"participants">,
+        });
+      }
     }
     const stored = await ctx.db.get(messageId);
     if (!stored) throw new Error("message vanished right after it was stored");
@@ -228,27 +285,52 @@ export const commit = internalMutation({
 });
 
 type ReplyContext = {
+  agent: Doc<"agents">;
+  self: Id<"participants">;
+  sessionId: Id<"sessions">;
   message: Message;
   contract: SessionContract;
+  participants: Participant[];
   history: Message[];
-  senderParticipantId: Id<"participants">;
-  recipientParticipantId: Id<"participants">;
-  sessionId: Id<"sessions">;
 };
 
+// The agents that get a turn for an allowed message: the agent it is addressed to, or, for a
+// human's message to everyone, every agent in the room. An agent's message to everyone gets no
+// turn, so two agents can never keep each other talking through broadcasts.
+function responders(
+  participants: Participant[],
+  sender: Participant,
+  { recipient }: { recipient: Doc<"messages">["recipient"] },
+) {
+  return participants.filter(
+    (p) =>
+      p.kind === "agent" &&
+      p.participantId !== sender.participantId &&
+      (p.participantId === recipient ||
+        (recipient === "all" && sender.kind === "human")),
+  );
+}
+
 export const replyContext = internalQuery({
-  args: { messageId: v.id("messages") },
-  handler: async (ctx, { messageId }): Promise<ReplyContext | null> => {
+  args: { messageId: v.id("messages"), participantId: v.id("participants") },
+  handler: async (
+    ctx,
+    { messageId, participantId },
+  ): Promise<ReplyContext | null> => {
     const source = await ctx.db.get("messages", messageId);
     if (
       !source?.senderParticipantId ||
       source.moderation.status !== "allowed" ||
-      source.recipient === "all"
+      (source.recipient !== participantId && source.recipient !== "all")
     ) {
       return null;
     }
-    const recipient = await ctx.db.get("participants", source.recipient);
-    if (recipient?.kind !== "agent" || recipient.leftAt !== undefined)
+    const recipient = await ctx.db.get("participants", participantId);
+    if (
+      recipient?.kind !== "agent" ||
+      recipient.sessionId !== source.sessionId ||
+      recipient.leftAt !== undefined
+    )
       return null;
     const agent = await ctx.db.get("agents", recipient.agentId);
     if (agent?.kind !== "hosted") return null;
@@ -266,43 +348,54 @@ export const replyContext = internalQuery({
     if (!viewer) return null;
     const recent = await recentMessages(ctx, source.sessionId);
     return {
+      agent,
+      self: recipient._id,
+      sessionId: source.sessionId,
       message: toMessage(source),
       contract: room.contract,
+      participants: room.participants,
       history: recent.filter((message) => visibleTo(message, viewer)),
-      senderParticipantId: recipient._id,
-      recipientParticipantId: source.senderParticipantId,
-      sessionId: source.sessionId,
     };
   },
 });
 
 export const reply = internalAction({
-  args: { messageId: v.id("messages") },
-  handler: async (ctx, { messageId }): Promise<null> => {
-    const input = await ctx.runQuery(internal.gate.replyContext, { messageId });
+  args: { messageId: v.id("messages"), participantId: v.id("participants") },
+  handler: async (ctx, args): Promise<null> => {
+    const input = await ctx.runQuery(internal.gate.replyContext, args);
     if (!input) return null;
-    const {
-      message,
-      contract,
-      history,
-      senderParticipantId,
-      recipientParticipantId,
-      sessionId,
-    } = input;
-    const content = await testRoomAgent.reply({
-      message,
-      contract,
-      history,
-      llm: fakeRoomLlm,
-    });
-    if (content) {
+    const { agent, self, sessionId, ...room } = input;
+    const { agent: roomAgent, llm } = roomAgentFor(agent, ctx);
+    const actions = await roomAgent.reply({ self, ...room, llm });
+    const strangers = actions.filter(
+      (action) =>
+        action.kind === "send" &&
+        action.recipient !== "all" &&
+        !room.participants.some((p) => p.participantId === action.recipient),
+    );
+    if (strangers.length > 0) {
+      console.error(
+        `gate.reply: dropped the reply of ${self}, which addressed someone outside the room`,
+      );
+      return null;
+    }
+    for (const action of actions) {
       try {
-        await sendThroughGate(ctx, {
-          sessionId,
-          senderParticipantId,
-          recipient: recipientParticipantId,
-          content,
-        });
+        if (action.kind === "close") {
+          await ctx.runMutation(internal.rooms.closeAsParticipant, {
+            sessionId,
+            participantId: self,
+          });
+        } else {
+          const sent = await sendThroughGate(ctx, {
+            sessionId,
+            senderParticipantId: self,
+            recipient: action.recipient as Doc<"messages">["recipient"],
+            content: action.content,
+            hostedReply: true,
+          });
+          if (sent.status !== "allowed") return null;
+        }
       } catch (error) {
         if (
           !(error instanceof ConvexError) ||
@@ -311,6 +404,7 @@ export const reply = internalAction({
         ) {
           throw error;
         }
+        return null;
       }
     }
     return null;
@@ -324,7 +418,7 @@ async function recentMessages(ctx: QueryCtx, sessionId: Id<"sessions">) {
     .query("messages")
     .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
     .order("desc")) {
-    bytes += encoder.encode(JSON.stringify(doc)).length;
+    bytes += messageBytes(doc);
     if (bytes > HISTORY_BYTE_BUDGET && recent.length > 0) break;
     recent.push(toMessage(doc));
     if (recent.length === HISTORY_LIMIT) break;
@@ -442,7 +536,7 @@ async function insertPlatformMessage(
   recipient: Doc<"messages">["recipient"],
   content: MessageContent,
 ) {
-  return ctx.db.insert("messages", {
+  return insertMessage(ctx, {
     sessionId,
     recipient,
     content,
@@ -461,6 +555,7 @@ async function checkSend(
     sessionId: Id<"sessions">;
     senderParticipantId: Id<"participants">;
     recipient: Doc<"messages">["recipient"];
+    inReplyTo?: string;
   },
 ) {
   const session = await loadSession(ctx, args.sessionId);
@@ -491,5 +586,36 @@ async function checkSend(
       gateError("InvalidArgument", "the recipient is not in this room");
     }
   }
-  return { session: { ...session, contract: session.contract }, sender };
+  return {
+    session: { ...session, contract: session.contract },
+    sender,
+    replyTarget:
+      args.inReplyTo === undefined
+        ? null
+        : await replyTarget(ctx, args.sessionId, sender, args.inReplyTo),
+  };
+}
+
+async function replyTarget(
+  ctx: QueryCtx,
+  sessionId: Id<"sessions">,
+  sender: Participant,
+  inReplyTo: string,
+): Promise<Message> {
+  const id = ctx.db.normalizeId("messages", inReplyTo);
+  const target = id ? await ctx.db.get(id) : null;
+  if (
+    !target ||
+    target.sessionId !== sessionId ||
+    target.content.kind !== "ui" ||
+    (target.moderation.status !== "allowed" &&
+      target.moderation.status !== "redacted") ||
+    (target.recipient !== "all" && target.recipient !== sender.participantId)
+  ) {
+    gateError(
+      "InvalidArgument",
+      "inReplyTo must name a delivered UI block sent to the sender in this room",
+    );
+  }
+  return toMessage(target);
 }

@@ -121,11 +121,7 @@ export const create = internalMutation({
     events: v.array(eventValidator),
   },
   handler: async (ctx, { contract, events, ...args }): Promise<Session> => {
-    const {
-      cardName,
-      contract: currentContract,
-      humanName,
-    } = await planRoom(ctx, args);
+    const { contract: currentContract, humanName } = await planRoom(ctx, args);
     if (
       JSON.stringify(convexToJson(contract)) !==
       JSON.stringify(convexToJson(currentContract))
@@ -172,10 +168,7 @@ export const create = internalMutation({
       ctx,
       sessionId,
       "session_opened",
-      `Sala abierta con ${cardName}. Petición: ${contract.intent.description}`.slice(
-        0,
-        4000,
-      ),
+      `Sala abierta. Petición: ${contract.intent.description}`.slice(0, 4000),
     );
     for (const event of events) {
       await ctx.db.insert("moderationEvents", {
@@ -246,7 +239,7 @@ async function planRoom(ctx: QueryCtx, args: ObjectType<typeof openArgs>) {
   ) {
     invalidArgument("the human's display name must have 1 to 120 characters");
   }
-  return { cardName: card.name, contract: parsed.data, humanName };
+  return { contract: parsed.data, humanName };
 }
 
 export const get = query({
@@ -301,7 +294,10 @@ export async function closeRoom(
     });
   }
   if (session.status === "active") {
-    await ctx.db.patch("sessions", sessionId, { status: "closed" });
+    await ctx.db.patch("sessions", sessionId, {
+      status: "closed",
+      closedReason: `closed_by_${participant.role}`,
+    });
     await publishNotice(ctx, sessionId, "session_closed", "Sala cerrada.");
   } else if (session.status !== "closed") {
     throw new ConvexError({

@@ -162,7 +162,10 @@ export default defineSchema({
   sessions: defineTable({
     initiatorAgentId: v.id("agents"),
     intent: zodToConvex(SessionIntent),
-    contract: v.union(zodToConvex(SessionContract), v.null()),
+    contract: v.union(
+      zodToConvex(SessionContract.partial({ purpose: true })),
+      v.null(),
+    ),
     mode: zodToConvex(SessionMode),
     status: zodToConvex(SessionStatus),
     turnCount: v.number(),
@@ -205,8 +208,10 @@ export default defineSchema({
     recipient: v.union(v.literal("all"), v.id("participants")),
     content: zodToConvex(MessageContent),
     moderation: zodToConvex(MessageModeration),
+    seq: v.optional(v.number()),
   })
     .index("by_sessionId", ["sessionId"])
+    .index("by_sessionId_and_seq", ["sessionId", "seq"])
     .index("by_sessionId_and_moderation_status", [
       "sessionId",
       "moderation.status",
