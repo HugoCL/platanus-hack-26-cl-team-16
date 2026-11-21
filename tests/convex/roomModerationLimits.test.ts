@@ -64,10 +64,13 @@ describe("the judge's rate limit", () => {
     });
   });
 
-  it("shares an agent's bucket between opening rooms and sending in them", async () => {
-    for (let i = 0; i < 9; i++) await send(room.consumer);
-    expect(await errorKind(send(room.consumer))).toBe("RateLimited");
-    expect(await errorKind(rooms.open())).toBe("RateLimited");
+  it("gives an agent a separate bucket in each room", async () => {
+    const other = await roomWithHuman(rooms, 40);
+    for (let i = 0; i < 10; i++) await send(room.provider);
+    expect(await errorKind(send(room.provider))).toBe("RateLimited");
+    expect(await send(other.provider, undefined, other)).toMatchObject({
+      status: "allowed",
+    });
   });
 
   it("rate limits opening rooms per initiator before the judge runs", async () => {

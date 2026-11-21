@@ -64,6 +64,20 @@ export const takeJudgeTokens = internalMutation({
   },
 });
 
+export async function judgeRetryAfter(
+  ctx: ActionCtx,
+  { sender, room }: JudgeBuckets,
+): Promise<number | undefined> {
+  const statuses = [
+    await judgeRateLimiter.check(ctx, "roomJudgeSender", { key: sender }),
+    await judgeRateLimiter.check(ctx, "roomJudgeRoom", { key: room }),
+  ];
+  const waits = statuses.flatMap((status) =>
+    status.ok ? [] : [status.retryAfter],
+  );
+  return waits.length > 0 ? Math.max(...waits) : undefined;
+}
+
 export async function moderate(
   ctx: ActionCtx,
   input: ModerationInput,

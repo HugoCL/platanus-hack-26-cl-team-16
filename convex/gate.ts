@@ -26,7 +26,7 @@ import {
   type QueryCtx,
   query,
 } from "./_generated/server";
-import { moderate } from "./moderator";
+import { type JudgeBuckets, judgeRetryAfter, moderate } from "./moderator";
 import { roomAgentFor } from "./roomAgent";
 import {
   loadSession,
@@ -74,6 +74,16 @@ export const sendAsParticipant = internalAction({
   handler: (ctx, args): Promise<Message> => sendThroughGate(ctx, args),
 });
 
+function judgeBuckets(
+  sessionId: Id<"sessions">,
+  senderParticipantId: Id<"participants">,
+): JudgeBuckets {
+  return {
+    sender: `participant:${senderParticipantId}`,
+    room: `session:${sessionId}`,
+  };
+}
+
 export async function sendThroughGate(
   ctx: ActionCtx,
   args: {
@@ -109,13 +119,7 @@ export async function sendThroughGate(
       contract: room.contract,
       history: room.history,
     },
-    {
-      sender:
-        room.sender.kind === "agent"
-          ? `agent:${room.sender.agentId}`
-          : `participant:${args.senderParticipantId}`,
-      room: `session:${args.sessionId}`,
-    },
+    judgeBuckets(args.sessionId, args.senderParticipantId),
   );
 
   return ctx.runMutation(internal.gate.commit, {
@@ -397,6 +401,14 @@ export const reply = internalAction({
     const input = await ctx.runQuery(internal.gate.replyContext, args);
     if (!input) return null;
     const { agent, self, sessionId, ...room } = input;
+    const retryAfter = await judgeRetryAfter(
+      ctx,
+      judgeBuckets(sessionId, self),
+    );
+    if (retryAfter !== undefined) {
+      await ctx.scheduler.runAfter(retryAfter, internal.gate.reply, args);
+      return null;
+    }
     const { agent: roomAgent, llm } = roomAgentFor(agent, ctx);
     const actions = await roomAgent.reply({ self, ...room, llm });
     const strangers = actions.filter(
