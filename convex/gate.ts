@@ -7,7 +7,6 @@ import {
 } from "../shared/messages";
 import {
   ModerationAction,
-  type ModerationOutcome,
   ModerationReason,
   ModerationStage,
   Verdict,
@@ -24,18 +23,14 @@ import {
   type QueryCtx,
   query,
 } from "./_generated/server";
-import { currentModerator } from "./moderator";
+import { moderate } from "./moderator";
 import { loadSession, toMessage } from "./roomState";
 
 const HISTORY_LIMIT = 500;
+const HISTORY_BYTE_BUDGET = 4 * 1024 * 1024;
+const encoder = new TextEncoder();
 
 const recipientValidator = v.union(v.literal("all"), v.id("participants"));
-
-const MODERATOR_FAILED: Verdict = {
-  decision: "block",
-  rule: "purpose",
-  reason: "El moderador no respondió; el mensaje se bloqueó.",
-};
 
 function gateError(kind: string, message: string): never {
   throw new ConvexError({ kind, message });
@@ -74,34 +69,14 @@ export async function sendThroughGate(
     recipient: args.recipient,
   });
 
-  let outcome: ModerationOutcome;
-  try {
-    outcome = await currentModerator().moderate({
-      content,
-      sender: room.sender,
-      recipient: args.recipient,
-      participants: room.participants,
-      contract: room.contract,
-      history: room.history,
-    });
-  } catch {
-    outcome = {
-      verdict: MODERATOR_FAILED,
-      events: [
-        {
-          stage: "purpose",
-          action: "block",
-          reasons: [
-            {
-              code: "moderator_error",
-              stage: "purpose",
-              detail: "the moderator threw instead of returning a verdict",
-            },
-          ],
-        },
-      ],
-    };
-  }
+  const outcome = await moderate({
+    content,
+    sender: room.sender,
+    recipient: args.recipient,
+    participants: room.participants,
+    contract: room.contract,
+    history: room.history,
+  });
 
   return ctx.runMutation(internal.gate.commit, {
     sessionId: args.sessionId,
@@ -129,21 +104,16 @@ export const moderationContext = internalQuery({
     history: Message[];
   }> => {
     const { session, sender } = await checkSend(ctx, args);
-    const recent = await ctx.db
-      .query("messages")
-      .withIndex("by_sessionId", (q) => q.eq("sessionId", args.sessionId))
-      .order("desc")
-      .take(HISTORY_LIMIT);
     return {
       contract: session.contract,
       sender,
       participants: session.participants,
-      history: recent.reverse().map(toMessage),
+      history: await recentMessages(ctx, args.sessionId),
     };
   },
 });
 
-const eventValidator = v.object({
+export const eventValidator = v.object({
   stage: zodToConvex(ModerationStage),
   action: zodToConvex(ModerationAction),
   reasons: v.array(zodToConvex(ModerationReason)),
@@ -206,15 +176,25 @@ export const commit = internalMutation({
   },
 });
 
+async function recentMessages(ctx: QueryCtx, sessionId: Id<"sessions">) {
+  const recent: Message[] = [];
+  let bytes = 0;
+  for await (const doc of ctx.db
+    .query("messages")
+    .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+    .order("desc")) {
+    bytes += encoder.encode(JSON.stringify(doc)).length;
+    if (bytes > HISTORY_BYTE_BUDGET && recent.length > 0) break;
+    recent.push(toMessage(doc));
+    if (recent.length === HISTORY_LIMIT) break;
+  }
+  return recent.reverse();
+}
+
 export const history = query({
   args: { sessionId: v.id("sessions") },
-  handler: async (ctx, { sessionId }): Promise<Message[]> => {
-    const messages = await ctx.db
-      .query("messages")
-      .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
-      .take(HISTORY_LIMIT);
-    return messages.map(toMessage);
-  },
+  handler: (ctx, { sessionId }): Promise<Message[]> =>
+    recentMessages(ctx, sessionId),
 });
 
 export async function publishNotice(
@@ -223,7 +203,7 @@ export async function publishNotice(
   code: Extract<MessageContent, { kind: "system" }>["code"],
   text: string,
 ) {
-  await insertPlatformMessage(ctx, sessionId, "all", {
+  return insertPlatformMessage(ctx, sessionId, "all", {
     kind: "system",
     code,
     text,
@@ -236,7 +216,7 @@ async function insertPlatformMessage(
   recipient: Doc<"messages">["recipient"],
   content: MessageContent,
 ) {
-  await ctx.db.insert("messages", {
+  return ctx.db.insert("messages", {
     sessionId,
     recipient,
     content,
