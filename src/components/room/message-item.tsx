@@ -14,6 +14,7 @@ import type { UiResponse, UiSpec } from "@/shared/genui";
 import { type GenUiAnswer, GenUiBlock } from "./genui-block";
 import { ModerationBadge, PendingStages } from "./moderation";
 import {
+  canAnswerUi,
   canSeeContent,
   describeUiResponse,
   formatTime,
@@ -33,6 +34,7 @@ type MessageItemProps = {
   // UI specs by the id of the message that carried them; `ui_response.inReplyTo` points there.
   uiSpecsByMessage: Record<string, UiSpec>;
   highlighted?: boolean;
+  readOnly?: boolean;
   onRespond: (response: UiResponse) => void;
   onShowAudit: (messageId: string) => void;
   onReview?: (messageId: string, approve: boolean) => void;
@@ -62,13 +64,15 @@ function Bubble({
   onRespond,
   onShowAudit,
   onReview,
+  readOnly,
 }: MessageItemProps) {
   const self = sender?.side === "self";
   const { content, status } = message;
   const isUi = content.kind === "ui";
   const visible = canSeeContent(status, message.senderParticipantId, viewer);
   const reason = primaryReason(message.reasons);
-  const canAct = viewer.role === "owner" || viewer.role === "operator";
+  const canAct =
+    !readOnly && (viewer.role === "owner" || viewer.role === "operator");
 
   const frame =
     status === "blocked"
@@ -107,7 +111,8 @@ function Bubble({
       <GenUiBlock
         spec={content.spec}
         answer={answers[content.spec.id]}
-        canInteract={canAct && status !== "pending"}
+        canInteract={canAnswerUi(viewer)}
+        readOnly={readOnly || status === "pending"}
         onRespond={onRespond}
       />
     );
