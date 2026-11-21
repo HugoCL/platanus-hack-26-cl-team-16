@@ -64,7 +64,7 @@ const MapView = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 function useIsDesktop() {
   const [desktop, setDesktop] = useState(false);
   useEffect(() => {
-    const query = window.matchMedia("(min-width: 1024px)");
+    const query = window.matchMedia("(min-width: 64rem)");
     setDesktop(query.matches);
     const onChange = () => setDesktop(query.matches);
     query.addEventListener("change", onChange);
@@ -94,6 +94,7 @@ export function DirectorySearch() {
   const [includeProspects, setIncludeProspects] = useState(true);
   const [geo, setGeo] = useState<Geo>({ state: "off" });
   const [radiusKm, setRadiusKm] = useState(DEFAULT_RADIUS_KM);
+  const [withinRadius, setWithinRadius] = useState(true);
   const [sort, setSort] = useState<Sort>("relevance");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [converse, setConverse] = useState<DirectoryCard | null>(null);
@@ -114,6 +115,7 @@ export function DirectorySearch() {
   const categories = useQuery(api.directory.categories, {});
 
   const origin = geo.state === "on" ? geo.origin : null;
+  const radiusFilter = origin && withinRadius ? radiusKm : null;
 
   const distances = useMemo(() => {
     const map = new Map<string, number>();
@@ -143,7 +145,8 @@ export function DirectorySearch() {
         (includeProspects || card.status !== "prospect") &&
         (!verifiedOnly || card.verified) &&
         intents.every((i) => card.allowedIntents.includes(i)) &&
-        (!origin || (distances.get(card.agentId) ?? Infinity) <= radiusKm),
+        (radiusFilter === null ||
+          (distances.get(card.agentId) ?? Infinity) <= radiusFilter),
     );
     if (sort === "name")
       return [...list].sort((a, b) => a.name.localeCompare(b.name, "es"));
@@ -159,9 +162,8 @@ export function DirectorySearch() {
     includeProspects,
     verifiedOnly,
     intents,
-    origin,
     distances,
-    radiusKm,
+    radiusFilter,
     sort,
   ]);
 
@@ -176,7 +178,7 @@ export function DirectorySearch() {
     navigator.permissions
       ?.query({ name: "geolocation" })
       .then((status) => {
-        if (status.state === "granted") startLocating();
+        if (status.state === "granted") startLocating(false);
         else if (status.state === "prompt") setOfferLocation(true);
       })
       .catch(() => {});
@@ -188,11 +190,13 @@ export function DirectorySearch() {
       if (sort === "distance") setSort("relevance");
       return;
     }
-    startLocating();
+    startLocating(true);
   }
 
-  function startLocating() {
+  // `filter` false only reorders by distance, as the invite promises; true also applies the radius.
+  function startLocating(filter: boolean) {
     setOfferLocation(false);
+    setWithinRadius(filter);
     if (!("geolocation" in navigator)) {
       setGeo({
         state: "error",
@@ -226,6 +230,7 @@ export function DirectorySearch() {
     setIncludeProspects(true);
     setGeo({ state: "off" });
     setRadiusKm(DEFAULT_RADIUS_KM);
+    setWithinRadius(true);
     setSort("relevance");
   }
 
@@ -246,7 +251,7 @@ export function DirectorySearch() {
       ? [
           {
             key: "near",
-            label: `A ${radiusKm} km de ti`,
+            label: radiusFilter ? `A ${radiusFilter} km de ti` : "Cerca de ti",
             remove: () => setGeo({ state: "off" }),
           },
         ]
@@ -279,7 +284,7 @@ export function DirectorySearch() {
   const summary = [
     categoryLabel,
     comuna,
-    origin ? `a ${radiusKm} km de ti` : null,
+    radiusFilter ? `a ${radiusFilter} km de ti` : origin ? "cerca de ti" : null,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -385,9 +390,10 @@ export function DirectorySearch() {
                   min={1}
                   max={50}
                   value={radiusKm}
-                  onValueChange={(value) =>
-                    setRadiusKm(Array.isArray(value) ? value[0] : value)
-                  }
+                  onValueChange={(value) => {
+                    setRadiusKm(Array.isArray(value) ? value[0] : value);
+                    setWithinRadius(true);
+                  }}
                   className="w-30"
                 >
                   <SliderControl>
@@ -398,7 +404,7 @@ export function DirectorySearch() {
                   </SliderControl>
                 </Slider>
                 <span className="min-w-12 text-[13px] tabular-nums">
-                  {radiusKm} km
+                  {withinRadius ? `${radiusKm} km` : "Sin límite"}
                 </span>
               </div>
             ) : null}
@@ -466,7 +472,7 @@ export function DirectorySearch() {
               <Button
                 data-variant="solid"
                 data-size="sm"
-                onClick={startLocating}
+                onClick={() => startLocating(false)}
               >
                 Usar mi ubicación
               </Button>
@@ -640,7 +646,7 @@ export function DirectorySearch() {
                     </span>
                   </Button>
                 ) : null}
-                {origin && radiusKm < 50 ? (
+                {radiusFilter && radiusFilter < 50 ? (
                   <p className="m-0 text-center text-xs text-subtle-foreground">
                     No hay más resultados en {radiusKm} km.{" "}
                     <Button
@@ -665,7 +671,7 @@ export function DirectorySearch() {
             selectedId={selectedId}
             onSelect={setSelectedId}
             origin={origin}
-            radiusKm={origin ? radiusKm : null}
+            radiusKm={radiusFilter}
             className="flex-1"
           />
         ) : null}

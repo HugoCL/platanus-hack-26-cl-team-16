@@ -131,6 +131,7 @@ export default function GoogleDirectoryMap({
                 pin={selectedPin}
                 selected={selected}
                 onSelect={select}
+                className="pointer-events-auto"
               />
             </AdvancedMarker>
           ) : null}
@@ -166,7 +167,10 @@ function FitBounds({
     }
     return list;
   }, [points, origin, radiusKm]);
-  const key = all.map((p) => `${p.lat},${p.lng}`).join("|");
+  const key = all
+    .map((p) => `${p.lat},${p.lng}`)
+    .sort()
+    .join("|");
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: refit only when the coordinates change
   useEffect(() => {
