@@ -39,7 +39,7 @@ A room is a `session` in `convex/rooms.ts`. E4 calls these public functions with
 
 These calls return `Unauthorized` without a Clerk identity, and `NotParticipant` for an authenticated user without active membership. Both agents and the human see allowed messages; only the sender and humans see a blocked message and its alert. A client that falls behind the `gate.history` window reads the gap with `gate.historyPage`.
 
-For the E4 launch form, E8 provides a server action that authenticates the user, chooses the consumer agent on the server and calls `openRoom(ctx, args)` from `convex/rooms.ts`. The internal `rooms.open` action takes the same arguments: `initiatorAgentId`, `providerAgentId`, `request`, and optionally `intent`, `maxTurns` and `human: { displayName }`. If `human` is set, the server attaches the signed-in user as the room owner; it never uses a shared anonymous identity. The moderator checks the request as a broadcast before any write and raises `RequestBlocked` if it refuses the request. If the provider card changes the contract during moderation, retry after `RoomContractChanged`.
+The E4 launch form needs an authenticated Convex action from E8. That action must choose the consumer agent on the server and call `openRoom(ctx, args)` from `convex/rooms.ts`. The internal `rooms.open` action takes the same arguments: `initiatorAgentId`, `providerAgentId`, `request`, and optionally `intent`, `maxTurns` and `human: { displayName }`. If `human` is set, the server attaches the signed-in user as the room owner; it never uses a shared anonymous identity. The moderator checks the request as a broadcast before any write and raises `RequestBlocked` if it refuses the request. If the card now yields a different valid contract, retry after `RoomContractChanged`. If the card no longer allows the intent, opening fails with `InvalidArgument`.
 
 Trusted agent code sends through `sendThroughGate(ctx, args)` with its server-resolved participant ID. To close from an action, call `internal.rooms.closeAsParticipant` with `sessionId` and the server-resolved `participantId`. Existing anonymous room fixtures are not memberships for signed-in users.
 
@@ -62,7 +62,7 @@ This runs Vitest offline, with no network and no credentials. `tests/setup.ts` r
 - the fake LLM, model selection from the environment, and the business sources,
 - `seed:ensure` against an in-memory Convex (convex-test): every seeded agent is a valid card.
 
-`pnpm smoke` starts `pnpm dev` and drives the home and directory pages in Chromium. It also runs the offline room checks for message order, visibility and membership. Those checks don't need a Clerk account or a Convex deployment.
+`pnpm smoke` starts `pnpm dev` and drives the home and directory pages in Chromium. It also runs offline room checks for message order, visibility and membership. These checks don't cover live subscriptions; verify those with a signed-in client when integrating the E4/E8 room view.
 
 ## Configuration
 
