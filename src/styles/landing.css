@@ -56,10 +56,9 @@
 }
 
 /*
- * Each column holds its listings twice and slides by one copy (-50%), so the loop is seamless.
- * flow-root keeps the first heading's top margin inside the track: escaped, it made the track
- * shorter than two copies and the loop jumped by half that margin.
- * Even columns run up, odd ones down.
+ * The wall is drawn into one image per column (listing-wall.tsx). Each track shows that image
+ * twice and slides by one copy (-50%), so the loop is seamless; even columns run up, odd ones
+ * down. Only transform animates, so the compositor moves it without layout or repaint.
  */
 @keyframes landing-scroll {
   from {
@@ -76,57 +75,28 @@
   height: 100%;
   padding-inline: 1rem;
   font: 500 0.5625rem / 1.45 var(--ui-font-mono);
-  letter-spacing: -0.01em;
-  user-select: none;
+  opacity: 0;
+  transition: opacity 300ms ease-out;
 
-  & strong {
-    display: block;
-    margin-block: 0.5rem 0.2rem;
-    padding-top: 0.15rem;
-    border-top: 2px solid var(--sm-yellow);
-    color: var(--sm-yellow);
-    font: 800 0.625rem / 1.5 var(--ui-font-sans);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-
-  & p {
-    display: flex;
-    gap: 0.4em;
-    margin: 0;
-    white-space: nowrap;
-  }
-
-  & p > span:first-child {
-    flex: 1;
-    overflow: hidden;
-  }
-
-  & p > span:first-child::after {
-    content: " . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .";
-    opacity: 0.5;
-  }
-
-  & p[data-featured] {
-    padding-inline: 0.2em;
-    background: var(--sm-yellow);
-    color: var(--landing-ink);
-    font-weight: 700;
+  &[data-ready] {
+    opacity: 1;
   }
 }
 
 .landing-column {
-  flex: 0 0 13rem;
-  min-width: 0;
+  flex: 0 0 auto;
 }
 
 .landing-track {
-  display: flow-root;
   animation: landing-scroll 140s linear infinite;
   will-change: transform;
 
   &[data-direction="down"] {
     animation-direction: reverse;
+  }
+
+  & img {
+    display: block;
   }
 }
 
@@ -763,15 +733,11 @@
 }
 
 .landing-footer-logo {
-  font: italic 800 1.5rem / 1 var(--sm-font-display);
-  letter-spacing: -0.02em;
+  font: 700 1.25rem / 1 var(--ui-font-sans);
+  letter-spacing: -0.03em;
 }
 
 @media (max-width: 40rem) {
-  .landing-column {
-    flex-basis: 9.5rem;
-  }
-
   .landing-spotlight {
     --x: 90%;
     --y: 10%;
@@ -779,7 +745,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .landing-cta span {
+  .landing-cta span,
+  .landing-wall {
     transition: none;
   }
 
