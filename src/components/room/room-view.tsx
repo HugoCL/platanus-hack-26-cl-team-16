@@ -33,12 +33,8 @@ import type { UiSpec } from "@/shared/genui";
 import { MAX_TEXT_LENGTH } from "@/shared/messages";
 import type { SessionContract, SessionStatus } from "@/shared/session";
 import { VerifiedBadge } from "../verified-badge";
-import {
-  DEMO_CONTRACT,
-  DEMO_PARTICIPANTS,
-  DEMO_VIEWER,
-  MODERATOR_MODEL,
-} from "./demo-session";
+import { DataToggle } from "./data-toggle";
+import { MODERATOR_MODEL } from "./demo-session";
 import { MessageItem } from "./message-item";
 import { ReasonList } from "./moderation";
 import {
@@ -55,6 +51,7 @@ import {
   violationTone,
 } from "./room-format";
 import { useDemoRoom } from "./use-demo-room";
+import { ROOM_DATASETS, type RoomDataset } from "./worst-case-session";
 
 const STATUS_DOT: Record<SessionStatus, string> = {
   requested: "bg-muted-foreground",
@@ -75,23 +72,30 @@ const ROLE_LABELS: Record<Viewer["role"], string> = {
   operator: "Operador",
 };
 
-export function DemoRoom() {
-  const room = useDemoRoom();
+export function DemoRoom({
+  dataset = "demo",
+  showDataToggle = false,
+}: {
+  dataset?: RoomDataset;
+  showDataToggle?: boolean;
+}) {
+  const fixture = ROOM_DATASETS[dataset].fixture;
+  const room = useDemoRoom(fixture.script, dataset !== "demo");
   const [role, setRole] = useState<Viewer["role"]>("owner");
   const [panelOpen, setPanelOpen] = useState(true);
   const [control, setControl] = useState(false);
   const [auditFor, setAuditFor] = useState<string | null>(null);
   const [highlighted, setHighlighted] = useState<string | null>(null);
 
-  const viewer: Viewer = { ...DEMO_VIEWER, role };
+  const viewer: Viewer = { ...fixture.viewer, role };
   const participants = useMemo(
-    () => new Map(DEMO_PARTICIPANTS.map((p) => [p.participantId, p])),
-    [],
+    () => new Map(fixture.participants.map((p) => [p.participantId, p])),
+    [fixture],
   );
-  const other = DEMO_PARTICIPANTS.find(
+  const other = fixture.participants.find(
     (p) => p.side === "other" && p.kind === "agent",
   );
-  const self = DEMO_PARTICIPANTS.find(
+  const self = fixture.participants.find(
     (p) => p.side === "self" && p.kind === "agent",
   );
 
@@ -128,8 +132,9 @@ export function DemoRoom() {
       <DemoToolbar role={role} onRole={setRole} onReset={room.reset} />
       <div className="flex min-h-0 flex-1">
         <SessionList
-          otherName={other?.name ?? ""}
-          intent={DEMO_CONTRACT.intent.name}
+          self={self}
+          other={other}
+          intent={fixture.contract.intent.name}
           lastAt={room.messages.at(-1)?.sentAt}
           status={status}
         />
@@ -137,7 +142,7 @@ export function DemoRoom() {
           <SessionHeader
             self={self}
             other={other}
-            contract={DEMO_CONTRACT}
+            contract={fixture.contract}
             status={status}
             violations={violations}
             panelOpen={panelOpen}
@@ -186,16 +191,17 @@ export function DemoRoom() {
             className="hidden w-[340px] shrink-0 flex-col overflow-y-auto lg:flex"
           >
             <SidePanel
-              contract={DEMO_CONTRACT}
+              contract={fixture.contract}
               otherName={other?.name ?? "el proveedor"}
               messages={room.messages}
-              participants={DEMO_PARTICIPANTS}
+              participants={fixture.participants}
               role={role}
               onJump={jumpTo}
             />
           </aside>
         ) : null}
       </div>
+      {showDataToggle ? <DataToggle current={dataset} /> : null}
       <Dialog
         open={auditFor !== null}
         onOpenChange={(open) => {
@@ -294,12 +300,14 @@ function Avatar({
 }
 
 function SessionList({
-  otherName,
+  self,
+  other,
   intent,
   lastAt,
   status,
 }: {
-  otherName: string;
+  self?: RoomParticipant;
+  other?: RoomParticipant;
   intent: string;
   lastAt?: number;
   status: SessionStatus;
@@ -316,11 +324,11 @@ function SessionList({
         className="relative flex items-start gap-3 rounded-2xl bg-muted px-3 py-2.5 !text-foreground !no-underline before:absolute before:inset-y-3 before:left-0 before:w-[3px] before:rounded-full before:bg-foreground"
       >
         <span className="flex -space-x-2">
-          <Avatar participant={DEMO_PARTICIPANTS[0]} size={28} />
-          <Avatar participant={DEMO_PARTICIPANTS[1]} size={28} />
+          <Avatar participant={self} size={28} />
+          <Avatar participant={other} size={28} />
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-sm font-medium">{otherName}</span>
+          <span className="truncate text-sm font-medium">{other?.name}</span>
           <span className="truncate text-xs text-subtle-foreground">
             {intentLabel(intent)}
           </span>
