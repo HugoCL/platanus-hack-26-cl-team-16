@@ -43,7 +43,7 @@ The E4 launch form needs an authenticated Convex action from E8. That action mus
 
 Trusted agent code sends through `sendThroughGate(ctx, args)` with its server-resolved participant ID. To close from an action, call `internal.rooms.closeAsParticipant` with `sessionId` and the server-resolved `participantId`. Existing anonymous room fixtures are not memberships for signed-in users.
 
-Only `convex/gate.ts` writes to `messages` (the seed is the one exception), and a test fails if another module does. Platform notices go through the same module without asking the moderator; the request quoted in `session_opened` was already moderated by `rooms.open`, and its `moderationEvents` rows point to that notice. The moderator sits behind the shared `Moderator` interface in `shared/moderation.ts`: `moderate({ content, sender, recipient, participants, contract, history })` (history holds the same latest messages as `gate.history`, in order) returns `{ verdict, events }`, and the gate stores one `moderationEvents` row per event. Until E3, `currentModerator()` returns `allowAllModerator`, which allows everything; E3 replaces it there and nowhere else.
+Only `convex/gate.ts` writes to `messages` (the seed is the one exception), and a test fails if another module does. Platform notices go through the same module without asking the moderator; the request quoted in `session_opened` was already moderated by `rooms.open`, and its `moderationEvents` rows point to that notice. The compound moderator runs deterministic rules and then, if needed, the configured judge. The gate stores an event for each stage, and a failed provider or judge blocks the send with a fixed reason.
 
 An allowed message addressed to a hosted agent schedules a reply after the message is stored. The agent gets only the history it could see as a participant. The reply goes back to the original sender through the same gate and gets its own verdict. E2 uses a deterministic acknowledgment backed by the fake LLM; E8 supplies real room agents.
 
@@ -66,7 +66,7 @@ This runs Vitest offline, with no network and no credentials. `tests/setup.ts` r
 - the fake LLM, model selection from the environment, and the business sources,
 - `seed:ensure` against an in-memory Convex (convex-test): every seeded agent is a valid card.
 
-`pnpm smoke` starts `pnpm dev` and drives the home and directory pages in Chromium. It also runs offline room checks for message order, visibility and membership. These checks don't cover live subscriptions; verify those with a signed-in client when integrating the E4/E8 room view.
+`pnpm smoke` starts `pnpm dev` and drives the home and directory pages in Chromium. The room checks run offline with a scripted judge and Convex test identities. They re-read the live history query as a member and the internal views as each agent after sends, and check membership, pagination and hosted replies. This verifies the visibility of successive snapshots, not authenticated WebSocket delivery; verify the latter with a signed-in client when integrating the E4/E8 room view.
 
 ## Configuration
 
@@ -85,6 +85,8 @@ Everything has an offline default. You set these variables only to use real serv
 | `OVERPASS_URL` | `overpass-api.de` | Another Overpass endpoint. |
 
 Code in Convex reads these variables from the deployment's environment. A human sets them with `npx convex env set`. Next.js reads them from `.env.local`.
+
+For interactive room sends, configure `LLM_PROVIDER=openrouter` and its key in the Convex deployment. The default `fake` provider has no judge script outside tests, so requests and messages that need the judge fail closed. With `openrouter`, every message that passes the deterministic rules goes to OpenRouter in the judge prompt, together with the room contract and the last 8 messages; see section 3.5 of `docs/architecture.md` for exactly what leaves the platform.
 
 ### Try Claude through OpenRouter locally
 

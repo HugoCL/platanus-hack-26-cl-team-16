@@ -170,7 +170,8 @@ def check():
         return 1
     subprocess.run(
         ["pnpm", "test", "tests/convex/gate.test.ts",
-         "tests/convex/roomAuthorization.test.ts"],
+         "tests/convex/roomAuthorization.test.ts", "tests/convex/roomAgent.test.ts",
+         "tests/convex/rooms.test.ts"],
         cwd=ROOT, check=True, timeout=30,
     )
     print(

@@ -11,7 +11,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { api, internal } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
-import { allowAllModerator } from "../convex/moderator";
 import schema from "../convex/schema";
 import { type ConvexCaller, createMcpEndpoint } from "../lib/mcp";
 import { REFERENCE_ATTACK } from "../shared/fixtures/moderationSet";
@@ -22,8 +21,8 @@ import {
   type McpToolName,
   SearchAgentsOutput,
 } from "../shared/mcp";
-import { createModerator } from "../shared/moderator/moderator";
-import { createFakeLlmProvider } from "../shared/providers/llm";
+import * as rules from "../shared/moderator/rules";
+import * as providers from "../shared/providers/llm";
 import {
   CLINIC_AGENT_SLUG,
   CONSUMER_AGENT_SLUG,
@@ -430,6 +429,11 @@ describe("MCP room tools", () => {
   let agents: Record<"external" | "consumer" | "clinic", Id<"agents">>;
   let intent: { name: string; description: string };
   beforeEach(async () => {
+    vi.spyOn(providers, "createLlmProvider").mockReturnValue(
+      providers.createFakeLlmProvider({
+        object: () => ({ decision: "allow", rule: "purpose" }),
+      }),
+    );
     client = await connect("auto", apiKey);
     const agentId = (slug: string) =>
       t.run(async (ctx) => {
@@ -507,15 +511,6 @@ describe("MCP room tools", () => {
       provider: roleIn(session, "recipient"),
     };
   }
-
-  const withE3Moderator = () =>
-    vi.spyOn(allowAllModerator, "moderate").mockImplementation((input) =>
-      createModerator({
-        llm: createFakeLlmProvider({
-          object: () => ({ decision: "allow", rule: "purpose" }),
-        }),
-      }).moderate(input),
-    );
 
   const history = (sessionId: Id<"sessions">, viewer: Id<"participants">) =>
     t.query(internal.gate.historyForParticipant, {
@@ -613,7 +608,7 @@ describe("MCP room tools", () => {
 
   it("criterion 3: the gate blocks the reference attack from an external agent as it does from a hosted one", async () => {
     const { sessionId, me, provider } = await openRoom();
-    const moderate = withE3Moderator();
+    const moderate = vi.spyOn(rules, "checkRules");
 
     const { message } = await use("send_message", {
       sessionId,
@@ -672,7 +667,6 @@ describe("MCP room tools", () => {
   });
 
   it("criterion 3: open_session refuses a request carrying the reference attack and opens no room", async () => {
-    withE3Moderator();
     const stored = async () => {
       const [sessions, messages] = await t.run(async (ctx) => [
         await ctx.db.query("sessions").collect(),
@@ -705,7 +699,7 @@ describe("MCP room tools", () => {
 
   it("criterion 5: a key cannot read, write or close a room its agent is not in", async () => {
     const { sessionId, provider } = await hostedRoom();
-    const moderate = vi.spyOn(allowAllModerator, "moderate");
+    const moderate = vi.spyOn(rules, "checkRules");
     const before = await history(sessionId, provider);
 
     for (const [name, args] of [
