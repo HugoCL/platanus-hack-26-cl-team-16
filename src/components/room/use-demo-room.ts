@@ -2,24 +2,44 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { UiResponse } from "@/shared/genui";
-import { DEMO_SCRIPT } from "./demo-session";
+import type { ScriptStep } from "./demo-session";
 import type { GenUiAnswer } from "./genui-block";
 import { type RoomMessage, responseTargetId } from "./room-format";
 
 const TYPING_MS = 1000;
 const REVIEW_MS = 900;
 
+// A stress dataset starts with every message already delivered and every answered card answered.
+function played(script: ScriptStep[]) {
+  const messages = script.map((s) => s.message);
+  const answers: Record<string, GenUiAnswer> = {};
+  for (const m of messages)
+    if (m.content.kind === "ui_response")
+      answers[responseTargetId(m.content.response)] = {
+        response: m.content.response,
+        at: m.sentAt,
+      };
+  return { messages, answers, step: script.length };
+}
+
+const EMPTY = { messages: [], answers: {}, step: 0 };
+
 function asPending(message: RoomMessage): RoomMessage {
   return { ...message, status: "pending", verdict: null, reasons: undefined };
 }
 
 // Plays DEMO_SCRIPT like a live session: each agent message arrives pending, then gets its verdict.
-// The script pauses on a GenUI card until the human answers it.
-export function useDemoRoom() {
+// The script pauses on a GenUI card until the human answers it. `instant` skips the playback.
+export function useDemoRoom(script: ScriptStep[], instant = false) {
+  const initial = () => (instant ? played(script) : EMPTY);
   const [run, setRun] = useState(0);
-  const [step, setStep] = useState(0);
-  const [messages, setMessages] = useState<RoomMessage[]>([]);
-  const [answers, setAnswers] = useState<Record<string, GenUiAnswer>>({});
+  const [step, setStep] = useState(() => initial().step);
+  const [messages, setMessages] = useState<RoomMessage[]>(
+    () => initial().messages,
+  );
+  const [answers, setAnswers] = useState<Record<string, GenUiAnswer>>(
+    () => initial().answers,
+  );
   const [waitingFor, setWaitingFor] = useState<string | null>(null);
   const [typing, setTyping] = useState<string | null>(null);
 
@@ -37,11 +57,11 @@ export function useDemoRoom() {
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `run` restarts the script on reset.
   useEffect(() => {
-    if (waitingFor || step >= DEMO_SCRIPT.length) {
+    if (waitingFor || step >= script.length) {
       setTyping(null);
       return;
     }
-    const { message, awaitsResponse } = DEMO_SCRIPT[step];
+    const { message, awaitsResponse } = script[step];
     const timers: number[] = [];
     setTyping(message.senderParticipantId);
     timers.push(
@@ -63,7 +83,7 @@ export function useDemoRoom() {
     return () => {
       for (const t of timers) window.clearTimeout(t);
     };
-  }, [step, waitingFor, deliver, run]);
+  }, [step, waitingFor, deliver, run, script]);
 
   const respond = useCallback(
     (response: UiResponse, inReplyTo: string) => {
@@ -106,18 +126,19 @@ export function useDemoRoom() {
   );
 
   const reset = useCallback(() => {
-    setMessages([]);
-    setAnswers({});
+    const start = instant ? played(script) : EMPTY;
+    setMessages(start.messages);
+    setAnswers(start.answers);
     setWaitingFor(null);
-    setStep(0);
+    setStep(start.step);
     setRun((r) => r + 1);
-  }, []);
+  }, [instant, script]);
 
   return {
     messages,
     answers,
     typing,
-    finished: step >= DEMO_SCRIPT.length && !waitingFor,
+    finished: step >= script.length && !waitingFor,
     respond,
     sendText,
     reset,

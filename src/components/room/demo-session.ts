@@ -324,3 +324,17 @@ export const DEMO_SCRIPT: ScriptStep[] = [
     },
   },
 ];
+
+export type RoomFixture = {
+  participants: RoomParticipant[];
+  viewer: Viewer;
+  contract: SessionContract;
+  script: ScriptStep[];
+};
+
+export const DEMO_FIXTURE: RoomFixture = {
+  participants: DEMO_PARTICIPANTS,
+  viewer: DEMO_VIEWER,
+  contract: DEMO_CONTRACT,
+  script: DEMO_SCRIPT,
+};
