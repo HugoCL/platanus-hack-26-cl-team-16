@@ -85,16 +85,17 @@ Nada del modelo depende de un rubro: la clínica es solo la primera configuraci�
 - Un mensaje se escribe en `pending`, el moderador lo resuelve, y solo los `allowed`/`redacted` (`DELIVERABLE_STATUSES`) son visibles para el destinatario. Las queries reactivas hacen que la UI y los agentes hospedados lo reciban al instante.
 
 ### 3.5 Moderador
-Corre en cada mensaje antes de entregarlo, **fail-closed** (si falla, no se entrega):
+Corre en cada mensaje antes de guardarlo y entregarlo, **fail-closed**: si falla o tarda más de 3 s, el mensaje se bloquea con el motivo `moderator_error`. Es una lista blanca: pregunta si el mensaje sirve al propósito del contrato, no si se parece a un ataque conocido. Vive en `shared/moderator/` e implementa la interfaz `Moderator` de `shared/moderation.ts`.
 
-1. **Filtros deterministas** (etapa `deterministic`): tamaño, rate limit (componente ya incluido), URLs, patrones de PII (RUT, tarjetas), payloads raros.
-2. **Prompt injection** (etapa `injection`): clasificador LLM barato y rápido sobre el contenido entrante ("ignora tus instrucciones", exfiltración, cambio de rol).
-3. **Alineación con el propósito** (etapa `purpose`): LLM juez con el contrato de sesión + historial reciente. Revisa ambos lados: que el iniciador no pida fuera del scope y que el proveedor no entregue datos que no debe.
-4. **Veredicto** (`Verdict`, fase 1): `allow` o `block`, con la regla aplicada (`purpose` | `scope` | `injection` | `sensitive_data`) y un motivo legible. Un bloqueo publica un bloque `moderator_alert` a la sala y el destinatario nunca recibe el mensaje.
+1. **Reglas deterministas** (etapa `deterministic`, `rules.ts`), sin LLM: un RUT válido (módulo 11), salvo que el contrato lo pida y vaya del agente consumidor al proveedor; toda tarjeta que pase Luhn; frases típicas de inyección; una `ui_response` que no responde a un bloque ofrecido a ese humano; y contenido cifrado, que el moderador no puede leer.
+2. **Juez LLM** (etapa `purpose`, `judge.ts`): con el rol `moderator` de `LlmProvider`, ve el contrato, los participantes y los últimos 8 mensajes, y revisa ambos lados: que el iniciador no pida fuera del scope y que el proveedor no entregue datos que no debe. También atrapa la inyección parafraseada. En la fase 1 no hay un clasificador de inyección aparte, para que el veredicto salga de una sola llamada al LLM.
+3. **Veredicto** (`Verdict`, fase 1): `allow` o `block`, con la regla aplicada (`purpose` | `scope` | `injection` | `sensitive_data`) y un motivo legible. Un bloqueo publica un bloque `moderator_alert` a la sala y el destinatario nunca recibe el mensaje.
 
 `ModerationResult` (con `redact`, `escalate` y `terminate`) queda en el código para después de E8; nada de la fase 1 lo usa.
 
-Todo queda auditado en `moderationEvents` (un evento por etapa), visible en la UI de la sala. Es la pieza diferenciadora del pitch, así que el demo debe mostrar un bloqueo en vivo.
+El set versionado de casos, con su veredicto esperado, está en `shared/fixtures/moderationSet.ts`, y `pnpm test` lo corre con el LLM falso.
+
+Todo queda auditado en `moderationEvents` (un evento por etapa que corrió), visible en la UI de la sala. Es la pieza diferenciadora del pitch, así que el demo debe mostrar un bloqueo en vivo.
 
 ### 3.6 UI humana + UI generativa
 - Vista de sala: hilo de mensajes estilo chat, badges de moderación, panel del contrato de sesión, botón "tomar control" para que el humano hable en nombre de su agente.
