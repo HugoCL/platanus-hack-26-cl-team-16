@@ -44,10 +44,12 @@ export function createModerator({
   llm,
   model,
   timeoutMs = MODERATOR_TIMEOUT_MS,
+  beforeJudge,
 }: {
   llm: LlmProvider;
   model?: string;
   timeoutMs?: number;
+  beforeJudge?: () => Promise<void>;
 }): Moderator {
   return {
     async moderate(input) {
@@ -73,6 +75,7 @@ export function createModerator({
         };
       }
 
+      await beforeJudge?.();
       const started = Date.now();
       let verdict: Verdict;
       let reasons: ModerationReason[];
