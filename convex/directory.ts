@@ -10,6 +10,7 @@ import {
 } from "../lib/directory";
 import { AgentCard, effectiveAllowedIntents } from "../shared/agent";
 import type { Category } from "../shared/catalog";
+import { distanceKm } from "../shared/geo";
 import type { AgentDetail, AgentSummary } from "../shared/mcp";
 import { createLlmProvider } from "../shared/providers/llm";
 import type { AgentStatus } from "../shared/scope";
@@ -23,6 +24,8 @@ export type DirectoryCard = Omit<AgentDetail, "agentId"> &
 export type DirectorySearchResult = {
   agents: DirectoryCard[];
   truncated: boolean;
+  /** Where the next page starts, when more matches can be fetched. */
+  nextOffset?: number;
 };
 
 type ListedCard = { agent: Doc<"agents">; card: AgentCard };
@@ -112,6 +115,13 @@ function rank(a: ListedCard, b: ListedCard) {
   );
 }
 
+/** Nearest first; cards without a location go last; ties keep the relevance order. */
+function byDistanceFrom(near: { lat: number; lng: number }) {
+  const km = (c: ListedCard) =>
+    c.card.location ? distanceKm(near, c.card.location) : Infinity;
+  return (a: ListedCard, b: ListedCard) => km(a) - km(b) || rank(a, b);
+}
+
 function cardFields(agent: Doc<"agents">): AgentCard {
   return {
     slug: agent.slug,
@@ -161,6 +171,9 @@ export const search = query({
     comuna: v.optional(v.string()),
     limit: v.optional(v.number()),
     offset: v.optional(v.number()),
+    near: v.optional(v.object({ lat: v.number(), lng: v.number() })),
+    verifiedOnly: v.optional(v.boolean()),
+    includeProspects: v.optional(v.boolean()),
   },
   handler: async (ctx, args): Promise<DirectorySearchResult> => {
     checkLimit(args.limit);
@@ -189,7 +202,9 @@ export const search = query({
     let rows = 0;
     let bytes = 0;
     let scanStopped = false;
-    for (const status of LISTED_STATUSES) {
+    const statuses =
+      args.includeProspects === false ? ["active" as const] : LISTED_STATUSES;
+    for (const status of statuses) {
       if (scanStopped) break;
       const range = comuna
         ? ctx.db
@@ -211,14 +226,17 @@ export const search = query({
         bytes += byteSize(agent);
         if (wanted && !agent.categories.some((c) => wanted.has(c))) continue;
         const listed = listedCard(agent);
-        if (listed) matches.push(listed);
+        if (listed && (!args.verifiedOnly || listed.card.verified))
+          matches.push(listed);
       }
     }
     truncated ||= scanStopped || matches.length > offset + limit;
 
     const agents: DirectoryCard[] = [];
     let responseBytes = 0;
-    for (const match of matches.sort(rank).slice(offset, offset + limit)) {
+    for (const match of matches
+      .sort(args.near ? byDistanceFrom(args.near) : rank)
+      .slice(offset, offset + limit)) {
       const card = await toDirectoryCard(ctx, match);
       responseBytes += byteSize(card);
       if (responseBytes > RESPONSE_BYTE_BUDGET) {
@@ -227,7 +245,10 @@ export const search = query({
       }
       agents.push(card);
     }
-    return { agents, truncated };
+    const next = offset + agents.length;
+    return next < matches.length && agents.length > 0
+      ? { agents, truncated, nextOffset: next }
+      : { agents, truncated };
   },
 });
 

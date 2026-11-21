@@ -243,7 +243,7 @@ export function DirectoryMap({
                   ),
                   top: Math.min(
                     Math.max(selectedAt.y - 120, 64),
-                    Math.max(size.height - 200, 16),
+                    Math.max(size.height - 300, 16),
                   ),
                 }}
               />

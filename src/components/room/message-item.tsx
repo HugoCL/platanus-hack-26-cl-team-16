@@ -14,6 +14,7 @@ import type { UiResponse, UiSpec } from "@/shared/genui";
 import { type GenUiAnswer, GenUiBlock } from "./genui-block";
 import { ModerationBadge, PendingStages } from "./moderation";
 import {
+  canAnswerUi,
   canSeeContent,
   describeUiResponse,
   formatTime,
@@ -70,8 +71,7 @@ function Bubble({
   const isUi = content.kind === "ui";
   const visible = canSeeContent(status, message.senderParticipantId, viewer);
   const reason = primaryReason(message.reasons);
-  const canAct =
-    !readOnly && (viewer.role === "owner" || viewer.role === "operator");
+  const canModerate = viewer.role === "owner" || viewer.role === "operator";
 
   const frame =
     status === "blocked"
@@ -110,7 +110,8 @@ function Bubble({
       <GenUiBlock
         spec={content.spec}
         answer={answers[content.spec.id]}
-        canInteract={canAct && status !== "pending"}
+        canInteract={canAnswerUi(viewer)}
+        readOnly={readOnly || status === "pending"}
         onRespond={onRespond}
       />
     );
@@ -178,7 +179,7 @@ function Bubble({
           {reason?.detail ? (
             <span className="text-subtle-foreground">{reason.detail}</span>
           ) : null}
-          {canAct && onReview ? (
+          {canModerate && onReview ? (
             <>
               <Button
                 data-size="sm"

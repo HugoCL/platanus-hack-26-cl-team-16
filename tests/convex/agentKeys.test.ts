@@ -6,7 +6,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
 import { isApiKeyFormat, sha256Hex } from "../../convex/agentKeys";
 import schema from "../../convex/schema";
-import { CONSUMER_AGENT_SLUG } from "../../shared/seed-data";
+import {
+  CONSUMER_AGENT_SLUG,
+  EXTERNAL_AGENT_SLUG,
+} from "../../shared/seed-data";
 
 const modules = import.meta.glob("../../convex/**/*.ts");
 
@@ -20,7 +23,7 @@ beforeEach(async () => {
 
 const issue = () =>
   t.action(internal.agentKeys.issue, {
-    slug: CONSUMER_AGENT_SLUG,
+    slug: EXTERNAL_AGENT_SLUG,
     label: "test",
   });
 const authenticate = (apiKey: string) =>
@@ -100,7 +103,7 @@ describe("agent API keys", () => {
     const { apiKey, prefix } = await issue();
     const other = await issue();
     await t.mutation(internal.agentKeys.revoke, {
-      slug: CONSUMER_AGENT_SLUG,
+      slug: EXTERNAL_AGENT_SLUG,
       prefix,
     });
     await expect(authenticate(apiKey)).resolves.toBeNull();
@@ -111,7 +114,7 @@ describe("agent API keys", () => {
 
     const revokedAt = (await keyRow(apiKey))?.revokedAt;
     await t.mutation(internal.agentKeys.revoke, {
-      slug: CONSUMER_AGENT_SLUG,
+      slug: EXTERNAL_AGENT_SLUG,
       prefix,
     });
     expect((await keyRow(apiKey))?.revokedAt).toBe(revokedAt);
@@ -135,18 +138,29 @@ describe("agent API keys", () => {
     await expect(authenticate(apiKey)).resolves.toBeNull();
   });
 
-  it("stops accepting a key once its agent is no longer active", async () => {
+  it("stops accepting a key once its agent becomes a prospect", async () => {
     const { apiKey, agentId } = await issue();
-    await t.run((ctx) => ctx.db.patch(agentId, { status: "draft" }));
+    await t.run((ctx) => ctx.db.patch(agentId, { status: "prospect" }));
     await expect(authenticate(apiKey)).resolves.toBeNull();
   });
 
-  it("refuses to issue a key for an unknown or inactive agent", async () => {
+  it("refuses to issue a key for an unknown, inactive or hosted agent", async () => {
     await expect(
       t.action(internal.agentKeys.issue, { slug: "no-existe" }),
     ).rejects.toThrow(/no agent with slug no-existe/);
     await expect(
       t.action(internal.agentKeys.issue, { slug: "cafe-los-dominicos" }),
-    ).rejects.toThrow(/cafe-los-dominicos is prospect, not active/);
+    ).rejects.toThrow(
+      /cafe-los-dominicos is prospect and hosted: keys are only for active external agents/,
+    );
+    await expect(
+      t.action(internal.agentKeys.issue, { slug: CONSUMER_AGENT_SLUG }),
+    ).rejects.toThrow(/mi-agente-juan is active and hosted/);
+  });
+
+  it("stops accepting a key once its agent is no longer external", async () => {
+    const { apiKey, agentId } = await issue();
+    await t.run((ctx) => ctx.db.patch(agentId, { kind: "hosted" }));
+    await expect(authenticate(apiKey)).resolves.toBeNull();
   });
 });

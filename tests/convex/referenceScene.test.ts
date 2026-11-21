@@ -54,3 +54,61 @@ it("checks authentication before acquiring a model or opening a room", async () 
   ).toBe("Unauthorized");
   expect(referenceLlm).not.toHaveBeenCalled();
 });
+
+it("takes the opener's rate limit token before searching or calling a model", async () => {
+  const rooms = await seededRooms();
+  const object = vi.fn();
+  vi.mocked(referenceLlm).mockReturnValue(createFakeLlmProvider({ object }));
+  for (let i = 0; i < 10; i++) {
+    await rooms.open({ human: { displayName: "Juan" } });
+  }
+  rooms.createLlm.mockClear();
+  rooms.judge.mockClear();
+
+  expect(
+    await errorKind(
+      rooms.t.withIdentity(ROOM_OWNER).action(api.referenceScene.start, {
+        request: REQUEST,
+        displayName: "Juan",
+      }),
+    ),
+  ).toBe("RateLimited");
+  expect(object).not.toHaveBeenCalled();
+  expect(rooms.createLlm).not.toHaveBeenCalled();
+  expect(rooms.judge).not.toHaveBeenCalled();
+});
+
+it("spends a token on every launch, even one that opens no room", async () => {
+  const { t } = await seededRooms();
+  vi.mocked(referenceLlm).mockReturnValue(createFakeLlmProvider());
+  const start = () =>
+    t.withIdentity(ROOM_OWNER).action(api.referenceScene.start, {
+      request: "Necesito un gimnasio en Pirque",
+      displayName: "Juan",
+    });
+  for (let i = 0; i < 10; i++) expect(await start()).toBeNull();
+  expect(await errorKind(start())).toBe("RateLimited");
+});
+
+it("opens a room with the opener's last token, which the launch took once", async () => {
+  const rooms = await seededRooms();
+  vi.mocked(referenceLlm).mockReturnValue(
+    createFakeLlmProvider({
+      object: ({ prompt }) =>
+        prompt.includes("<proveedores>")
+          ? { choice: "p1:book", message: "Hola, ¿tienen hora de cardiología?" }
+          : { action: "reply", offerings: [], text: "Sí." },
+    }),
+  );
+  for (let i = 0; i < 9; i++) {
+    await rooms.open({ human: { displayName: "Juan" } });
+  }
+  const start = () =>
+    rooms.t.withIdentity(ROOM_OWNER).action(api.referenceScene.start, {
+      request: REQUEST,
+      displayName: "Juan",
+    });
+
+  expect((await start())?.room.status).toBe("active");
+  expect(await errorKind(start())).toBe("RateLimited");
+});

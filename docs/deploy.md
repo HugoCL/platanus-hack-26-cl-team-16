@@ -115,9 +115,20 @@ Clerk keyless mode works only under `next dev`. A deployed build runs `next star
    | `CONVEX_PREVIEW_DEPLOY_KEY` | Step 3 | Preview builds |
    | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Step 5 | Build and runtime |
    | `CLERK_SECRET_KEY` | Step 5 | Runtime |
+   | `AGENT_REGISTRATION_SECRET` | Same private random value as Convex; add manually (see below) | Registration runtime, production and previews |
 
 10. Leave the workspace without a payment method. If it has one, set a spend limit under Workspace Settings, Build Pipeline.
 11. After the first deploy, open the service's Previews tab and check that pull request previews are set to Manual.
+
+### Registration secret
+
+A human must set `AGENT_REGISTRATION_SECRET` to the **same private random value in Convex and Render**. This authenticates the Next.js registration route to Convex; it is not an agent API key and must never be sent to browsers/agents, logged, or prefixed with `NEXT_PUBLIC_`.
+
+1. Generate a strong random secret privately. Add it to the Render service's Environment page manually (it is not provisioned by the Blueprint), and ensure its previews inherit the same value. Redeploy existing services/previews to apply it.
+2. Set the matching value on the Convex production deployment and in the project's default environment variables for preview deployments. Existing preview deployments may need it set individually; Render variables do not propagate to Convex. Use the dashboard's secret field or the interactive `pnpm exec convex env set AGENT_REGISTRATION_SECRET` prompt with the correct deployment selected, not a value pasted on a command line.
+3. Enable the route's value on Render before enforcing it in Convex, and verify registration on both production and previews. Rotate both sides together; mismatches reject registration before consuming any rate-limit tokens.
+
+Rollout compatibility: if the variable is **unset in Convex**, registration is still accepted with one `console.warn` per call saying it is unprotected. Direct Convex callers can then supply their own IP and bypass the per-IP quota; this fallback is for local development and rollout only, not a protected deployment. If set in Convex, missing/wrong credentials are rejected. Local `pnpm dev` works without setting anything.
 
 ### GitHub
 
