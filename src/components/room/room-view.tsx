@@ -27,7 +27,7 @@ import {
   ShieldCheckIcon,
   UserIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { ThemeToggle } from "@/components/toggle-theme";
 import type { UiSpec } from "@/shared/genui";
 import { MAX_TEXT_LENGTH } from "@/shared/messages";
@@ -46,6 +46,7 @@ import {
   type RoomMessage,
   type RoomParticipant,
   SESSION_STATUS_LABELS,
+  sessionEnd,
   type Viewer,
   violationTone,
 } from "./room-format";
@@ -103,11 +104,8 @@ export function DemoRoom({
     return map;
   }, [room.messages]);
 
-  const status: SessionStatus = room.messages.some(
-    (m) => m.content.kind === "system" && m.content.code === "session_closed",
-  )
-    ? "closed"
-    : "active";
+  const end = sessionEnd(room.messages);
+  const status: SessionStatus = end?.status ?? "active";
   const violations = room.messages.filter(
     (m) => m.status === "blocked" && m.senderParticipantId !== null,
   ).length;
@@ -151,28 +149,36 @@ export function DemoRoom({
               room.typing ? participants.get(room.typing)?.name : undefined
             }
           >
-            {room.messages.map((message) => (
-              <MessageItem
-                key={message.messageId}
-                message={message}
-                sender={
-                  message.senderParticipantId
-                    ? participants.get(message.senderParticipantId)
-                    : undefined
-                }
-                viewer={viewer}
-                answers={room.answers}
-                uiSpecsByMessage={uiSpecsByMessage}
-                highlighted={highlighted === message.messageId}
-                onRespond={(response) =>
-                  room.respond(response, message.messageId)
-                }
-                onShowAudit={setAuditFor}
-              />
-            ))}
+            {room.messages.map((message, i) => {
+              const prev = room.messages[i - 1];
+              const day = formatLongDay(message.sentAt);
+              const newDay = !prev || formatLongDay(prev.sentAt) !== day;
+              return (
+                <Fragment key={message.messageId}>
+                  {newDay ? <DayDivider label={day} /> : null}
+                  <MessageItem
+                    message={message}
+                    sender={
+                      message.senderParticipantId
+                        ? participants.get(message.senderParticipantId)
+                        : undefined
+                    }
+                    viewer={viewer}
+                    answers={room.answers}
+                    uiSpecsByMessage={uiSpecsByMessage}
+                    highlighted={highlighted === message.messageId}
+                    onRespond={(response) =>
+                      room.respond(response, message.messageId)
+                    }
+                    onShowAudit={setAuditFor}
+                  />
+                </Fragment>
+              );
+            })}
           </Thread>
           <Composer
             readOnly={readOnly}
+            closedText={end?.text}
             control={control}
             canControl={canControl}
             selfName={self?.name ?? "tu agente"}
@@ -432,6 +438,16 @@ function SessionHeader({
   );
 }
 
+function DayDivider({ label }: { label: string }) {
+  return (
+    <p className="m-0 flex w-full items-center gap-3 text-xs font-medium text-subtle-foreground">
+      <span aria-hidden="true" className="h-px flex-1 bg-border" />
+      {label}
+      <span aria-hidden="true" className="h-px flex-1 bg-border" />
+    </p>
+  );
+}
+
 function Thread({
   messages,
   typingName,
@@ -482,11 +498,9 @@ function Thread({
         }}
         className="flex h-full flex-col gap-6 overflow-y-auto px-4 py-6"
       >
-        {messages[0] ? (
-          <p className="m-0 mx-auto flex w-full max-w-3xl items-center gap-3 text-xs font-medium text-subtle-foreground">
-            <span aria-hidden="true" className="h-px flex-1 bg-border" />
-            {formatLongDay(messages[0].sentAt)}
-            <span aria-hidden="true" className="h-px flex-1 bg-border" />
+        {messages.length === 0 && !typingName ? (
+          <p className="m-auto text-center text-sm text-subtle-foreground">
+            Esperando el primer mensaje de los agentes…
           </p>
         ) : null}
         <section
@@ -535,6 +549,7 @@ function Thread({
 
 function Composer({
   readOnly,
+  closedText,
   control,
   canControl,
   selfName,
@@ -544,6 +559,7 @@ function Composer({
   onRestart,
 }: {
   readOnly: boolean;
+  closedText?: string;
   control: boolean;
   canControl: boolean;
   selfName: string;
@@ -557,7 +573,7 @@ function Composer({
   if (readOnly) {
     return (
       <div className="flex flex-wrap items-center gap-3 border-t border-border bg-muted px-4 py-3 text-sm">
-        <span className="flex-1">Sala cerrada · objetivo cumplido</span>
+        <span className="flex-1">{closedText ?? "Sala cerrada"}</span>
         <Button data-size="sm" onClick={onRestart}>
           Abrir nueva sala
         </Button>
