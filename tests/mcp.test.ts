@@ -845,6 +845,29 @@ describe("MCP room tools", () => {
     await stalled.close();
   });
 
+  it("wait_for_messages errors after FIRST_READ_MS when its first read stalls", async () => {
+    const { sessionId } = await openRoom();
+    const convex = t as ConvexCaller;
+    endpoint = createMcpEndpoint({
+      query: () => new Promise<never>(() => {}),
+      mutation: (ref, ...args) => convex.mutation(ref, ...args),
+      action: (ref, ...args) => convex.action(ref, ...args),
+    });
+    const stalled = await connect("auto", apiKey);
+
+    const started = performance.now();
+    const result = await stalled.callTool({
+      name: "wait_for_messages",
+      arguments: { sessionId, timeoutMs: 300 },
+    });
+    const elapsed = performance.now() - started;
+    expect(result.isError).toBe(true);
+    expect(JSON.stringify(result.content)).toContain("Timeout");
+    expect(elapsed).toBeGreaterThanOrEqual(1990);
+    expect(elapsed).toBeLessThan(2600);
+    await stalled.close();
+  });
+
   const revokeKey = () =>
     t.run(async (ctx) => {
       for (const key of await ctx.db.query("agentApiKeys").collect()) {
@@ -896,26 +919,35 @@ describe("MCP room tools", () => {
     );
   });
 
-  it("limits how often one external agent can ask the moderator", async () => {
-    const { sessionId } = await openRoom();
-    const sent = [];
-    for (let i = 0; i < 9; i++) {
-      sent.push(
-        await use("send_message", {
-          sessionId,
-          recipient: "all",
-          content: text(`Mensaje ${i}`),
-        }),
-      );
+  it("limits how often one external agent can ask the moderator, across its keys", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const { sessionId } = await openRoom();
+      const sent = [];
+      for (let i = 0; i < 9; i++) {
+        sent.push(
+          await use("send_message", {
+            sessionId,
+            recipient: "all",
+            content: text(`Mensaje ${i}`),
+          }),
+        );
+      }
+      expect(sent).toHaveLength(9);
+      const { apiKey: otherKey } = await t.action(internal.agentKeys.issue, {
+        slug: EXTERNAL_AGENT_SLUG,
+      });
+      const other = await connect("auto", otherKey);
+      const result = await other.callTool({
+        name: "send_message",
+        arguments: { sessionId, recipient: "all", content: text("Uno más") },
+      });
+      expect(result.isError).toBe(true);
+      expect(JSON.stringify(result.content)).toContain("RateLimited");
+      await other.close();
+    } finally {
+      vi.useRealTimers();
     }
-    expect(sent).toHaveLength(9);
-    expect(
-      await refusal("send_message", {
-        sessionId,
-        recipient: "all",
-        content: text("Uno más"),
-      }),
-    ).toContain("RateLimited");
   });
 
   it("reads a room the agent rejoined, even if an older membership row has left", async () => {

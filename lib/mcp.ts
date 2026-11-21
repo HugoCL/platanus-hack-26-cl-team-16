@@ -48,6 +48,7 @@ type ToolRun<N extends McpToolName> = (
 
 const BEARER = /^Bearer\s+(\S+)$/i;
 const POLL_MS = 500;
+const FIRST_READ_MS = 2000;
 
 const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
@@ -196,31 +197,40 @@ async function sendMessage(
 
 // Polls until a visible message arrives, the room stops being active or `timeoutMs` passes. A read
 // still running at the deadline is abandoned; its cursor was never handed out, so nothing is lost.
+// The first read gets at least FIRST_READ_MS, so `timeoutMs: 0` still reads the room once; when it
+// misses even that there is no room state to return, so the call errors.
 async function waitForMessages(
   convex: ConvexCaller,
   apiKey: string,
   { sessionId, after, timeoutMs }: z.output<typeof WaitForMessagesInput>,
 ) {
-  const deadline = performance.now() + timeoutMs;
+  const started = performance.now();
+  const deadline = started + timeoutMs;
   const read = (cursor: string | null) =>
     convex.query(api.mcpRooms.messages, {
       apiKey,
       sessionId,
       after: cursor ?? undefined,
     });
-  const untilDeadline = <T>(promise: Promise<T>) => {
+  const until = <T>(promise: Promise<T>, end: number) => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     return Promise.race([
       promise,
       new Promise<undefined>((resolve) => {
-        timer = setTimeout(
-          () => resolve(undefined),
-          deadline - performance.now(),
-        );
+        timer = setTimeout(() => resolve(undefined), end - performance.now());
       }),
     ]).finally(() => clearTimeout(timer));
   };
-  let result = await read(after ?? null);
+  const first = await until(
+    read(after ?? null),
+    Math.max(deadline, started + FIRST_READ_MS),
+  );
+  if (!first) {
+    throw new Error(
+      "Timeout: the room could not be read in time; call again with the same after",
+    );
+  }
+  let result = first;
   while (result.messages.length === 0 && result.sessionStatus === "active") {
     const remaining = deadline - performance.now();
     if (remaining <= 0) break;
@@ -228,7 +238,7 @@ async function waitForMessages(
       setTimeout(resolve, Math.min(POLL_MS, remaining)),
     );
     if (performance.now() >= deadline) break;
-    const next = await untilDeadline(read(result.cursor));
+    const next = await until(read(result.cursor), deadline);
     if (!next) break;
     result = next;
   }
