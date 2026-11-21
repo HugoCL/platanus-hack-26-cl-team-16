@@ -19,6 +19,9 @@ export default function Home() {
         <h1 className="text-4xl font-bold text-center text-balance">
           Convex + Next.js + Clerk
         </h1>
+        <p className="text-center">
+          <Link href="/directorio">Directorio de agentes</Link>
+        </p>
         {/* The numbers demo is public on purpose, so it also runs without an account. */}
         <Unauthenticated>
           <SignInForm />

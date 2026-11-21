@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Smoke test: start the dev server (scripts/dev.mjs, what `pnpm dev` runs), open the home page in
-headless Chromium, add a number.
+headless Chromium, add a number, then check the agent directory.
 
 Run with `pnpm smoke`. It asserts the page renders, clicks `data-testid="add-number"` and waits
 until the Convex-backed `data-testid="numbers"` list changes, so the Convex backend is exercised
-end to end. It writes artifacts/smoke.png (also when the check fails) and the dev server log to
+end to end. Then it opens /directorio and waits for one data-testid="agent-card" per seed
+card. It writes artifacts/smoke.png (also when the check fails) and the dev server log to
 artifacts/dev.log, and prints the end of that log on failure.
 
 The first run creates .venv, installs requirements-dev.txt and Chromium, then writes
@@ -41,6 +42,16 @@ STAMP = VENV / ".smoke-ready"
 ARTIFACTS = ROOT / "artifacts"
 PORT = int(os.environ.get("PORT", "3000"))
 URL = f"http://localhost:{PORT}"
+DIRECTORY_PAGE_SIZE = 20
+SEED_COUNT_SCRIPT = """
+import { register } from "node:module";
+register("data:text/javascript," + encodeURIComponent(
+  "export async function resolve(s, c, next) { try { return await next(s, c); }"
+  + " catch (e) { if (s.startsWith('.') && !s.endsWith('.ts')) return next(s + '.ts', c); throw e; } }"
+));
+const { SEED_AGENTS } = await import("./shared/seedData.ts");
+console.log(SEED_AGENTS.filter(({ card }) => card.status !== "draft").length);
+"""
 
 
 def port_open(port):
@@ -104,6 +115,32 @@ def add_number(page):
     return count, int(numbers.get_attribute("data-count")), numbers.inner_text()
 
 
+def listed_seed_cards():
+    """Count the non-draft cards in SEED_AGENTS (shared/seedData.ts), read with Node's type
+    stripping so the number never drifts from the seed."""
+    out = subprocess.run(
+        ["node", "--no-warnings", "--input-type=module", "-e", SEED_COUNT_SCRIPT],
+        cwd=ROOT, check=True, capture_output=True, text=True,
+    )
+    return int(out.stdout.strip())
+
+
+def directory(page):
+    """Open /directorio and wait until it lists every listed seed card, up to one page.
+    Returns the number of cards shown."""
+    from playwright.sync_api import expect
+
+    expected = min(listed_seed_cards(), DIRECTORY_PAGE_SIZE)
+
+    page.goto(f"{URL}/directorio", wait_until="networkidle", timeout=120_000)
+    cards = page.get_by_test_id("agent-card")
+    try:
+        expect(cards).to_have_count(expected, timeout=30_000)
+    except AssertionError:
+        raise AssertionError(f"/directorio shows {cards.count()} cards, expected {expected}")
+    return cards.count()
+
+
 def check():
     from playwright.sync_api import sync_playwright
 
@@ -119,6 +156,7 @@ def check():
                 heading = page.locator("h1", has_text="Convex + Next.js + Clerk")
                 heading.wait_for(state="visible", timeout=60_000)
                 before, after, shown = add_number(page)
+                listed = directory(page)
             finally:
                 # Always keep the screenshot, and never let a failure here hide the real error.
                 try:
@@ -132,7 +170,8 @@ def check():
         return 1
     print(
         f"PASS: {URL} rendered the template page and Convex stored a number"
-        f" ({before} -> {after} shown: {shown}), screenshot at artifacts/smoke.png"
+        f" ({before} -> {after} shown: {shown}), /directorio listed {listed} cards,"
+        " screenshot of /directorio at artifacts/smoke.png"
     )
     return 0
 
