@@ -68,7 +68,7 @@ export default function Home() {
         <span>Hecho en Platanus Hack 26 · Santiago</span>
         <nav aria-label="Pie de página">
           <Link href="/directory">Directorio</Link>
-          <Link href="/room/demo">Salas</Link>
+          <Link href="/room">Salas</Link>
           <ThemeToggle />
         </nav>
       </footer>
