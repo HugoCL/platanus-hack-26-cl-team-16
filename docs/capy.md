@@ -36,7 +36,7 @@ Without a snapshot, every new thread, subagent machine and review pays the full 
 
 1. Start a new thread on the branch. Type `$`.
 2. Confirm the repo skills appear (`$gstack`, `$poteto-mode`, `$convex`, `$webapp-testing`, ...) and Capy built-ins such as `capy-setup`, `capy-docs`, `make-a-page`, `make-a-deck` and `make-a-prototype`.
-3. Currently 59 skills set `disable-model-invocation: true` (the pstack skills, `to-tickets` and `thermo-nuclear-code-quality-review`; count them with `grep -l '^disable-model-invocation' .agents/skills/*/SKILL.md`). Check whether they still appear in `$`. If Capy hides them, the Captain and threads cannot invoke them by name: report it, then add `"stripFrontmatter": ["disable-model-invocation"]` to the affected collection in `scripts/skills/sources.json` and run `pnpm skills:sync <collection-id>` (do not edit `.agents/` by hand).
+3. Currently 62 skills set `disable-model-invocation: true` (the pstack skills, `to-tickets`, `thermo-nuclear-code-quality-review`, `ask-emil`, `learn-taste` and `prototype`; count them with `grep -l '^disable-model-invocation' .agents/skills/*/SKILL.md`). Check whether they still appear in `$`. If Capy hides them, the Captain and threads cannot invoke them by name: report it, then add `"stripFrontmatter": ["disable-model-invocation"]` to the affected collection in `scripts/skills/sources.json` and run `pnpm skills:sync <collection-id>` (do not edit `.agents/` by hand).
 4. In the thread, run `$webapp-testing` or `pnpm smoke` to confirm the machine setup worked. For `agent-browser`, start `pnpm dev` first and run `agent-browser open http://localhost:3000`, or run `agent-browser open https://example.com`.
 
 ## 5. Captain and Drive files (not in this repo)
@@ -50,7 +50,7 @@ Append to the Captain's `CREW.md`:
 
 - Work happens in `HugoCL/hackathon-toolbox` (or the team's copy). Read its `AGENTS.md` first, including the "Phase to skill" table.
 - Tickets are Markdown in `.scratch/<feature>/issues/`, committed. Make them with `$to-tickets`. Fan out independent tickets with `$dispatching-parallel-agents`, one thread per ticket and one PR per ticket.
-- Every thread verifies with `pnpm lint && pnpm typecheck && pnpm smoke` before opening a PR (`$file-pr`).
+- Every thread verifies with `pnpm lint && pnpm typecheck && pnpm test && pnpm smoke` before opening a PR (`$file-pr`).
 - Commits and PR bodies follow `$git-conventions`. Subagent models and effort follow `$subagent-routing`.
 - No merge, deploy, or publish without a human. Agents never run `npx convex login`, `npx convex deploy`, or claim the Clerk app.
 - Handing a feature to a teammate: the giver runs `$poteto-mode` "Pause safely", the receiver runs `$takeover`.
