@@ -16,6 +16,7 @@ import {
   groupSlotsByDay,
   primaryReason,
   splitRedacted,
+  uiInteractionState,
   violationTone,
 } from "../src/components/room/room-format";
 
@@ -84,6 +85,27 @@ describe("visibility", () => {
     expect(canAnswerUi({ ...DEMO_VIEWER, role: "operator" })).toBe(true);
     expect(canAnswerUi({ ...DEMO_VIEWER, role: "observer" })).toBe(false);
   });
+});
+
+describe("GenUI interaction state", () => {
+  it.each(["owner", "operator", "observer"] as const)(
+    "distinguishes role permissions from read-only cards for %s",
+    (role) => {
+      const canInteract = canAnswerUi({ ...DEMO_VIEWER, role });
+      expect(uiInteractionState(canInteract, false, false)).toEqual({
+        disabled: role === "observer",
+        showOwnerOnly: role === "observer",
+      });
+      expect(uiInteractionState(canInteract, true, false)).toEqual({
+        disabled: true,
+        showOwnerOnly: role === "observer",
+      });
+      expect(uiInteractionState(canInteract, false, true)).toEqual({
+        disabled: true,
+        showOwnerOnly: false,
+      });
+    },
+  );
 });
 
 describe("formatting", () => {
