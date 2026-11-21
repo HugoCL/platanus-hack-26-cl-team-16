@@ -52,7 +52,8 @@
  * Scroll moves one section at a time: the header (with the hero under it), the demo, how it
  * works, and the closing call to action, which snaps to the end with the footer. Sections fill
  * the viewport and center their content. Only on screens tall and wide enough for a section to
- * fit; on phones the page scrolls freely.
+ * fit; on phones the page scrolls freely. On desktop, section-scroll.tsx takes over the wheel and
+ * arrow keys so a light scroll does not jump and the move between sections is slower.
  */
 @media (min-width: 48rem) and (min-height: 40rem) {
   html:has(.landing) {
@@ -78,6 +79,10 @@
   .landing-footer {
     scroll-snap-align: end;
   }
+}
+
+.landing > header {
+  padding-inline: var(--landing-pad);
 }
 
 .landing-main {

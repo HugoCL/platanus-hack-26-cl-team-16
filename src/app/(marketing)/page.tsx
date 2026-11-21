@@ -5,6 +5,7 @@ import { ListingWall } from "@/components/landing/listing-wall";
 import { RevealWords, revealAt } from "@/components/landing/reveal";
 import { RoomSection } from "@/components/landing/room-section";
 import { ScrollReveal } from "@/components/landing/scroll-reveal";
+import { SectionScroll } from "@/components/landing/section-scroll";
 import { ThemeToggle } from "@/components/toggle-theme";
 
 const AGENTS = ["Claude", "ChatGPT", "Grok", "Gemini"];
@@ -12,7 +13,7 @@ const AGENTS = ["Claude", "ChatGPT", "Grok", "Gemini"];
 export default function Home() {
   return (
     <div className="landing">
-      <SiteHeader />
+      <SiteHeader nav={false} themeToggle={false} />
       <main>
         <section className="landing-main">
           <ListingWall />
@@ -77,6 +78,7 @@ export default function Home() {
         </nav>
       </footer>
       <ScrollReveal />
+      <SectionScroll />
     </div>
   );
 }
