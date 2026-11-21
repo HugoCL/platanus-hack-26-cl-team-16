@@ -76,7 +76,7 @@ export function ModerationBadge({
   const badge = BADGES[status];
   const pill = (
     <span
-      className={`inline-flex h-6 items-center gap-1 rounded-full px-2 text-xs font-medium ${badge.className}`}
+      className={`inline-flex h-6 items-center gap-1 rounded-lg px-2 text-xs font-medium ${badge.className}`}
     >
       {badge.icon}
       {badge.label}
@@ -151,14 +151,14 @@ const STAGES = ["deterministic", "injection", "purpose"] as const;
 export function PendingStages() {
   return (
     <ol
-      className="flex items-center gap-1.5 text-[11px] text-subtle-foreground"
+      className="flex items-center gap-1.5 font-mono text-micro text-subtle-foreground uppercase"
       aria-label="Etapas de moderación en curso"
     >
       {STAGES.map((stage, i) => (
         <li key={stage} className="flex items-center gap-1.5">
           {i > 0 ? <span aria-hidden="true">→</span> : null}
           <span
-            className="room-stage rounded-full bg-muted px-2 py-0.5"
+            className="room-stage rounded-sm bg-muted px-2 py-0.5"
             style={{ animationDelay: `${i * 220}ms` }}
           >
             {STAGE_LABELS[stage]}

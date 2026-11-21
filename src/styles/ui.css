@@ -18,7 +18,7 @@
   ) {
     height: calc(var(--ui-spacing) * 9);
     padding-inline: calc(var(--ui-spacing) * 4);
-    border-radius: var(--sm-radius-full);
+    border-radius: var(--sm-radius-2xl);
     background: var(--sm-card);
     transition:
       transform 160ms var(--ease-out),
@@ -58,11 +58,31 @@
       background: var(--ui-primary);
     }
 
+    /* The landing's call to action: yellow with ink text, an ink edge on light so it reads as a
+       control against the paper. One per screen; everything else is solid or outline. */
+    &[data-variant="brand"] {
+      border-color: transparent;
+      background: var(--brand-yellow);
+      box-shadow:
+        inset 0 1px 0 oklch(1 0 0 / 0.45),
+        inset 0 0 0 1px light-dark(var(--brand-ink), transparent);
+      color: var(--brand-ink);
+      font-weight: 600;
+
+      @media (hover: hover) and (pointer: fine) {
+        &:hover:not([data-disabled]) {
+          background: var(--brand-yellow);
+          filter: brightness(1.06);
+        }
+      }
+    }
+
     /* Disabled: a flat muted fill with readable text, instead of web.css's half opacity. */
     &[data-disabled] {
       opacity: 1;
       border-color: transparent;
       background: var(--ui-muted);
+      box-shadow: none;
       color: var(--sm-subtle-foreground);
     }
   }
@@ -72,7 +92,7 @@
     [data-slot="textarea"],
     [data-slot="select-trigger"]
   ) {
-    border-radius: var(--sm-radius-3xl);
+    border-radius: var(--sm-radius-2xl);
     background: var(--sm-card);
     padding-inline: calc(var(--ui-spacing) * 3.5);
   }
@@ -91,7 +111,7 @@
     [data-slot="tooltip-content"],
     [data-slot="popover-content"]
   ) {
-    border-radius: var(--sm-radius-3xl);
+    border-radius: var(--sm-radius-2xl);
     background: var(--sm-card);
   }
 
@@ -123,7 +143,7 @@
     gap: 2px;
     padding: 3px;
     border-bottom: 0;
-    border-radius: var(--sm-radius-full);
+    border-radius: var(--sm-radius-2xl);
     background: var(--ui-muted);
   }
 
@@ -132,7 +152,7 @@
     justify-content: center;
     margin-bottom: 0;
     border-bottom: 0;
-    border-radius: var(--sm-radius-full);
+    border-radius: var(--ui-radius);
     color: var(--sm-subtle-foreground);
 
     &[data-selected] {
@@ -155,7 +175,7 @@
     text-align: start;
   }
 
-  /* Slot picker tiles: the time is the control; the chosen one takes the action color. */
+  /* Slot picker tiles: the time is the control; the chosen one turns yellow, as on the landing. */
   .room-slot {
     background: var(--ui-muted);
     transition: background-color 150ms ease-out;
@@ -169,8 +189,9 @@
     }
 
     &:has([data-checked]) {
-      background: var(--ui-primary);
-      color: var(--ui-primary-foreground);
+      background: var(--brand-yellow);
+      box-shadow: inset 0 0 0 1px light-dark(var(--brand-ink), transparent);
+      color: var(--brand-ink);
     }
 
     &:has(:focus-visible) {
@@ -238,11 +259,11 @@
   }
 
   [data-slot="meter-track"] {
-    border-radius: var(--sm-radius-full);
+    border-radius: 2px;
   }
 
   [data-slot="meter-indicator"] {
-    border-radius: var(--sm-radius-full);
+    border-radius: 2px;
     background: var(--ui-foreground);
   }
 }
@@ -330,4 +351,34 @@
   ):active {
     transform: none;
   }
+}
+
+/* The yellow footer of the landing, shared by the pages that scroll to an end. */
+.site-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+  padding: 1.5rem clamp(1.25rem, 6vw, 6rem);
+  background: var(--brand-yellow);
+  color: var(--brand-ink);
+  font: 500 0.75rem / 1.4 var(--ui-font-mono);
+
+  & nav {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+  }
+
+  & a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+  }
+}
+
+.site-footer-logo {
+  font: 700 1.25rem / 1 var(--ui-font-sans);
+  letter-spacing: -0.03em;
 }

@@ -91,7 +91,7 @@ export function PinMark({
       aria-hidden
       className={`relative grid size-9 origin-bottom-left translate-x-1/2 place-items-center rounded-[50%_50%_50%_0] transition-[scale] duration-200 ease-[var(--ease-out)] [rotate:-45deg] motion-reduce:transition-none ${
         isSelected
-          ? "z-20 scale-[1.2] bg-primary text-primary-foreground shadow-[0_0_0_3px_color-mix(in_oklch,var(--ui-primary)_20%,transparent)]"
+          ? "z-20 scale-[1.2] bg-brand text-brand-ink shadow-[0_0_0_1.5px_var(--brand-ink),0_0_0_4px_color-mix(in_oklch,var(--brand-yellow)_35%,transparent)]"
           : prospect
             ? "z-10 border-2 border-foreground bg-card text-foreground"
             : "z-10 bg-card text-foreground shadow-card"
@@ -102,7 +102,7 @@ export function PinMark({
       {pin.length > 1 ? (
         <span
           aria-hidden
-          className="absolute -top-1.5 -right-1.5 grid h-5 min-w-5 rotate-45 place-items-center rounded-full bg-foreground px-1 text-[11px] font-medium text-background tabular-nums"
+          className="absolute -top-1.5 -right-1.5 grid h-5 min-w-5 rotate-45 place-items-center rounded-full bg-foreground px-1 text-micro font-medium text-background tabular-nums"
         >
           {pin.length}
         </span>
@@ -159,8 +159,8 @@ export function SelectedCard({
       className={`flex w-70 flex-col gap-2 rounded-3xl bg-card p-4 text-foreground shadow-card transition-[opacity,scale] duration-200 ease-[var(--ease-out)] starting:scale-[0.96] starting:opacity-0 motion-reduce:transition-none ${className}`}
       style={style}
     >
-      <span className="text-[15px] font-medium">{selected.name}</span>
-      <span className="line-clamp-2 text-[13px] leading-normal text-subtle-foreground">
+      <span className="text-lead font-medium">{selected.name}</span>
+      <span className="line-clamp-2 text-caption leading-normal text-subtle-foreground">
         {selected.purpose}
       </span>
       {pin.length > 1 ? (
@@ -176,7 +176,7 @@ export function SelectedCard({
                   key={c.agentId}
                   type="button"
                   onClick={() => onSelect(c.agentId)}
-                  className="shrink-0 cursor-pointer truncate border-0 bg-transparent p-0 text-left text-[13px] font-medium text-foreground underline-offset-3 hover:underline"
+                  className="shrink-0 cursor-pointer truncate border-0 bg-transparent p-0 text-left text-caption font-medium text-foreground underline-offset-3 hover:underline"
                 >
                   {c.name}
                 </button>
@@ -186,7 +186,7 @@ export function SelectedCard({
       ) : null}
       <Link
         href={`/directory/${selected.slug}`}
-        className="press inline-flex h-8 items-center self-start rounded-full border border-input px-3 text-[13px] font-medium text-foreground no-underline hover:bg-muted"
+        className="press inline-flex h-8 items-center self-start rounded-2xl border border-input px-3 text-caption font-medium text-foreground no-underline hover:bg-muted"
       >
         Ver ficha
       </Link>
