@@ -168,6 +168,11 @@ def check():
     if page_errors:
         print("FAIL: uncaught page errors", *page_errors, sep="\n  ")
         return 1
+    subprocess.run(
+        ["node", "--env-file-if-exists=.env", "--env-file-if-exists=.env.local",
+         str(ROOT / "scripts" / "smoke-rooms.mjs")],
+        cwd=ROOT, check=True, timeout=30,
+    )
     print(
         f"PASS: {URL} rendered the template page and Convex stored a number"
         f" ({before} -> {after} shown: {shown}), /directorio listed {listed} cards,"

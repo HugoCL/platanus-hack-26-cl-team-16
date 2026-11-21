@@ -25,6 +25,26 @@ The directory lives in `convex/directory.ts` and the page at http://localhost:30
 
 Each card is an `AgentDetail` (the full `AgentCard` with purpose and scope) plus `comuna` and `allowedIntents`, so it also validates as an `AgentSummary`. Draft cards are never listed.
 
+## Rooms (E2)
+
+A room is a `session` in `convex/rooms.ts`. Call `rooms.close` with the room's `sessionId` and a `participantId` to close it. Closing publishes one system notice, even if called again, and later sends fail with `RoomClosed`.
+
+| Function | Kind | What it does |
+| --- | --- | --- |
+| `rooms.open` | mutation | Opens a room from `initiatorAgentId` (the consumer agent), `providerAgentId` (the card) and the free-text `request`, with an optional `intent` (one the card allows; defaults to its first), `maxTurns` (default 12) and `human` (`{ displayName }`, added as the owner acting for the initiator). The contract is the request plus the card's purpose, capabilities, allowed intents, forbidden topics and data rules, and it never changes. Returns the room as a shared `Session`, already `active`. A missing, draft or invalid card, a room with oneself, a disallowed intent or a contract that fails validation throws a `ConvexError` with `data.kind` `"InvalidArgument"`. |
+| `rooms.get` | query | One room by `sessionId` as a shared `Session` with its participants, or `null`. |
+| `gate.send` | action | The single path for a participant's message: `sessionId`, `senderParticipantId`, `recipient` (a participant or `"all"`) and `content` (`SendableContent`: text, a UI block or a UI response). It asks the moderator, then stores the message with its verdict and returns it as a shared `Message`. A blocked message is stored as `blocked` and the gate adds a `moderator_alert` addressed to the sender. If the moderator throws, the message is blocked. Errors are `ConvexError`s whose `data.kind` is `NotFound`, `RoomClosed`, `NotParticipant` or `InvalidArgument`. |
+| `gate.history` | reactive query | The latest 500 records for a room, in chronological order and filtered for `viewerParticipantId`. |
+| `gate.historyPage` | paginated query | The full room history in chronological order, with the same visibility rules. Pass Convex `paginationOpts` and use the returned cursor until `isDone`, even if a filtered page is empty. |
+
+Both agents and the human see allowed messages; only the sender and humans see a blocked message and its alert. An ID from another room throws `NotParticipant`. The viewer ID selects a perspective, not an authenticated identity.
+
+Only `convex/gate.ts` writes to `messages` (the seed is the one exception), and a test fails if another module does. Platform notices, such as `session_opened`, go through the same module without asking the moderator. The moderator sits behind the shared `Moderator` interface in `shared/moderation.ts`: `moderate({ content, sender, recipient, participants, contract, history })` (history contains up to the latest 500 room messages, in order) returns `{ verdict, events }`, and the gate stores one `moderationEvents` row per event. Until E3, `currentModerator()` returns `allowAllModerator`, which allows everything; E3 replaces it there and nowhere else.
+
+An allowed message addressed to a hosted agent schedules a reply after the message is stored. The agent gets only the history it could see as a participant. The reply goes back to the original sender through the same gate and gets its own verdict. E2 uses a deterministic acknowledgment backed by the fake LLM; E8 supplies real room agents.
+
+Every stored agent message consumes one turn. The final turn records `turn_limit_reached` in the same transaction. After that, extra agent sends fail with `TurnLimitReached` and no more agent replies are scheduled; humans can still send.
+
 ## MCP server (E5)
 
 External agents reach the directory through the MCP server at http://localhost:3000/api/mcp, with a per-agent API key from `pnpm mcp:key`. [docs/mcp.md](mcp.md) explains how to get a key and configure each client.
@@ -42,7 +62,7 @@ This runs Vitest offline, with no network and no credentials. `tests/setup.ts` r
 - the fake LLM, model selection from the environment, and the business sources,
 - `seed:ensure` against an in-memory Convex (convex-test): every seeded agent is a valid card.
 
-`pnpm smoke` is separate. It starts `pnpm dev` and drives the home page in Chromium.
+`pnpm smoke` starts `pnpm dev`, drives the home and directory pages in Chromium, and verifies that three independent Convex subscriptions see the same room messages in order. The room check runs only against a local Convex backend.
 
 ## Configuration
 
