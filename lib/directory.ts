@@ -57,40 +57,44 @@ export const COMUNAS = [
   "Vitacura",
 ] as const;
 
-const COMUNA_ALIASES: Record<string, (typeof COMUNAS)[number]> = {
-  "santiago centro": "Santiago",
-  "til til": "Tiltil",
-};
+export const MAX_QUERY_LENGTH = 300;
 
-const CATEGORY_SYNONYMS: Record<string, string[]> = {
-  salud: ["clinica", "centro de salud"],
-  cardiologia: ["cardiologo", "cardiologa", "corazon"],
-  medicina_general: [
-    "medico",
-    "medica",
-    "doctor",
-    "doctora",
-    "medico general",
-    "consulta medica",
-  ],
-  odontologia: ["dentista", "odontologo", "odontologa", "dental", "diente"],
-  hoteleria: ["hotel", "hostal", "alojamiento", "hospedaje"],
-  cafeteria: ["cafe", "cafecito"],
-  panaderia: ["pan", "panadero", "marraqueta"],
-  ferreteria: ["herramienta", "tornillo"],
-  veterinaria: ["veterinario", "vet", "mascota"],
-  peluqueria: [
-    "peluquero",
-    "peluquera",
-    "barberia",
-    "barbero",
-    "corte de pelo",
-  ],
-  abogados: ["abogado", "abogada", "juridico", "estudio juridico"],
-  gasfiteria: ["gasfiter", "plomero"],
-  gimnasio: ["gym", "entrenamiento"],
-  farmacia: ["remedio", "medicamento"],
-};
+const COMUNA_ALIASES = new Map<string, (typeof COMUNAS)[number]>([
+  ["santiago centro", "Santiago"],
+  ["til til", "Tiltil"],
+]);
+
+const CATEGORY_SYNONYMS = new Map<string, string[]>(
+  Object.entries({
+    salud: ["clinica", "centro de salud"],
+    cardiologia: ["cardiologo", "cardiologa", "corazon"],
+    medicina_general: [
+      "medico",
+      "medica",
+      "doctor",
+      "doctora",
+      "medico general",
+      "consulta medica",
+    ],
+    odontologia: ["dentista", "odontologo", "odontologa", "dental", "diente"],
+    hoteleria: ["hotel", "hostal", "alojamiento", "hospedaje"],
+    cafeteria: ["cafe", "cafecito"],
+    panaderia: ["pan", "panadero", "marraqueta"],
+    ferreteria: ["herramienta", "tornillo"],
+    veterinaria: ["veterinario", "vet", "mascota"],
+    peluqueria: [
+      "peluquero",
+      "peluquera",
+      "barberia",
+      "barbero",
+      "corte de pelo",
+    ],
+    abogados: ["abogado", "abogada", "juridico", "estudio juridico"],
+    gasfiteria: ["gasfiter", "plomero"],
+    gimnasio: ["gym", "entrenamiento"],
+    farmacia: ["remedio", "medicamento"],
+  }),
+);
 
 export type DirectoryField = "category" | "comuna";
 
@@ -123,28 +127,35 @@ const STOPWORDS = new Set([
   "el",
   "en",
   "favor",
+  "hoy",
   "hay",
   "hola",
   "la",
   "las",
   "lo",
   "los",
+  "manana",
   "me",
   "mi",
   "necesito",
+  "noche",
   "o",
   "para",
   "por",
+  "pronto",
   "que",
   "quiero",
+  "tarde",
   "un",
   "una",
   "unas",
   "unos",
+  "urgente",
   "y",
 ]);
 
-const PLACE_MARKER = /(?<![a-z0-9])(cerca de|comuna de|comuna|en)(?![a-z0-9])/g;
+const PLACE_MARKER =
+  /(?<![a-z0-9])(cerca de|cerca|comuna de|comuna|en)(?![a-z0-9])/g;
 
 type Span = { start: number; end: number };
 
@@ -161,7 +172,7 @@ export function canonicalComuna(input: string): string | null {
   const key = normalize(input);
   return (
     COMUNAS.find((comuna) => normalize(comuna) === key) ??
-    COMUNA_ALIASES[key] ??
+    COMUNA_ALIASES.get(key) ??
     null
   );
 }
@@ -228,25 +239,21 @@ function isAncestor(
 }
 
 function contentWords(text: string): string[] {
-  return text.split(/[\s|]+/).filter((w) => w && !STOPWORDS.has(w));
+  return text.split(/[\s|#]+/).filter((w) => w && !STOPWORDS.has(w));
 }
 
-function leftovers(text: string, spans: readonly Span[]) {
-  const masked = [...text]
-    .map((char, i) =>
-      spans.some((s) => i >= s.start && i < s.end) ? "|" : char,
-    )
-    .join("");
-  const marker = [...masked.matchAll(PLACE_MARKER)].at(-1);
-  if (!marker) return { need: contentWords(masked), place: [] };
-  const rest = masked.slice(marker.index + marker[0].length);
-  const cut = rest.indexOf("|");
-  return {
-    need: contentWords(
-      `${masked.slice(0, marker.index)} ${cut === -1 ? "" : rest.slice(cut)}`,
-    ),
-    place: contentWords(cut === -1 ? rest : rest.slice(0, cut)),
-  };
+function splitPlaces(masked: string) {
+  const markers = [...masked.matchAll(PLACE_MARKER)];
+  const places: string[] = [];
+  let need = masked.slice(0, markers[0]?.index ?? masked.length);
+  markers.forEach((marker, i) => {
+    const start = marker.index + marker[0].length;
+    const segment = masked.slice(start, markers[i + 1]?.index ?? masked.length);
+    const cut = segment.indexOf("|");
+    places.push(cut === -1 ? segment : segment.slice(0, cut));
+    if (cut !== -1) need += ` ${segment.slice(cut)}`;
+  });
+  return { need: contentWords(need), places };
 }
 
 export function parseDirectoryText(
@@ -259,7 +266,7 @@ export function parseDirectoryText(
     const span = firstMatch(normalized, [
       normalize(c.slug),
       normalize(c.label),
-      ...(CATEGORY_SYNONYMS[c.slug] ?? []),
+      ...(CATEGORY_SYNONYMS.get(c.slug) ?? []),
     ]);
     return span ? [{ slug: c.slug, span }] : [];
   });
@@ -273,35 +280,46 @@ export function parseDirectoryText(
       )
       .sort((a, b) => a.span.start - b.span.start)[0]?.slug ?? null;
 
-  const comunaHits = [
+  const comunaHit = [
     ...COMUNAS.map((comuna) => ({ comuna, phrase: normalize(comuna) })),
-    ...Object.entries(COMUNA_ALIASES).map(([phrase, comuna]) => ({
-      comuna,
-      phrase,
-    })),
+    ...[...COMUNA_ALIASES].map(([phrase, comuna]) => ({ comuna, phrase })),
   ]
     .flatMap((hit) => {
       const span = firstMatch(normalized, [hit.phrase]);
       return span ? [{ comuna: hit.comuna, span }] : [];
     })
-    .sort((a, b) => a.span.start - b.span.start || b.span.end - a.span.end);
-  const comuna = comunaHits[0]?.comuna ?? null;
+    .sort((a, b) => a.span.start - b.span.start || b.span.end - a.span.end)[0];
 
-  const { need, place } = leftovers(
-    normalized,
-    [...categoryHits, ...comunaHits].map((hit) => hit.span),
-  );
+  const inside = (i: number, span: Span) => i >= span.start && i < span.end;
+  const masked = [...normalized]
+    .map((char, i) =>
+      categoryHits.some((hit) => inside(i, hit.span))
+        ? "|"
+        : comunaHit && inside(i, comunaHit.span)
+          ? "#"
+          : char,
+    )
+    .join("");
+  const { need, places } = splitPlaces(masked);
+  const comunaPlace = places.find((place) => place.includes("#"));
+  const comuna =
+    comunaHit && !(comunaPlace && contentWords(comunaPlace).length > 0)
+      ? comunaHit.comuna
+      : null;
+
   const unresolved: DirectoryField[] = [];
   if (!category && need.length > 0) unresolved.push("category");
-  if (!comuna && place.length > 0) unresolved.push("comuna");
+  if (!comuna && (comunaHit || places.some((p) => contentWords(p).length > 0)))
+    unresolved.push("comuna");
   return { category, comuna, unresolved };
 }
 
 async function askLlm(
   text: string,
   categories: readonly Category[],
-  getLlm: () => LlmProvider,
+  getLlm: () => Promise<LlmProvider>,
 ) {
+  const llm = await getLlm();
   const schema = z.object({
     category: z
       .enum(categories.map((c) => c.slug) as [string, ...string[]])
@@ -309,7 +327,7 @@ async function askLlm(
     comuna: z.enum(COMUNAS).nullable(),
   });
   try {
-    return await getLlm().generateObject({
+    return await llm.generateObject({
       role: "agent",
       system:
         "Traduce una búsqueda del directorio de agentes a una categoría y una comuna. Responde null en lo que la búsqueda no diga o no esté en las listas.",
@@ -321,7 +339,10 @@ async function askLlm(
       schema,
     });
   } catch (error) {
-    console.warn("directory: LLM could not interpret the search", error);
+    console.warn(
+      "directory: LLM fallback failed:",
+      error instanceof Error ? error.name : typeof error,
+    );
     return null;
   }
 }
@@ -329,7 +350,7 @@ async function askLlm(
 export async function interpretDirectoryText(
   text: string,
   categories: readonly Category[],
-  getLlm: () => LlmProvider,
+  getLlm: () => Promise<LlmProvider>,
 ): Promise<TextInterpretation> {
   const parsed = parseDirectoryText(text, categories);
   const answer =

@@ -5,7 +5,7 @@ import DirectoryList from "@/components/DirectoryList";
 import { api } from "@/convex/_generated/api";
 
 export default function DirectoryPage() {
-  const cards = useQuery(api.directory.search, {});
+  const cards = useQuery(api.directory.search, {})?.agents;
   const categories = useQuery(api.directory.categories, {});
 
   return (

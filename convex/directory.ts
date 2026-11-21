@@ -1,41 +1,59 @@
+import { MINUTE, RateLimiter } from "@convex-dev/rate-limiter";
 import { ConvexError, v } from "convex/values";
 import {
   canonicalComuna,
   categoryWithDescendants,
   interpretDirectoryText,
+  MAX_QUERY_LENGTH,
   resolveCategory,
   type TextInterpretation,
 } from "../lib/directory";
-import { effectiveAllowedIntents } from "../shared/agent";
+import { AgentCard, effectiveAllowedIntents } from "../shared/agent";
 import type { Category } from "../shared/catalog";
 import type { AgentDetail, AgentSummary } from "../shared/mcp";
 import { createLlmProvider } from "../shared/providers/llm";
 import type { AgentStatus } from "../shared/scope";
-import { api } from "./_generated/api";
-import type { Doc } from "./_generated/dataModel";
+import { api, components } from "./_generated/api";
+import type { Doc, Id } from "./_generated/dataModel";
 import { action, type QueryCtx, query } from "./_generated/server";
 
-export type DirectoryCard = AgentDetail &
-  Pick<AgentSummary, "comuna" | "allowedIntents">;
+export type DirectoryCard = Omit<AgentDetail, "agentId"> &
+  Pick<AgentSummary, "comuna" | "allowedIntents"> & { agentId: Id<"agents"> };
+
+export type DirectorySearchResult = {
+  agents: DirectoryCard[];
+  truncated: boolean;
+};
 
 const LISTED_STATUSES: AgentStatus[] = ["active", "prospect"];
-const SCAN_LIMIT = 500;
+const CATEGORY_LIMIT = 200;
+export const SCAN_BUDGET = 1000;
 export const MAX_LIMIT = 20;
+
+const rateLimiter = new RateLimiter(components.rateLimiter, {
+  directoryTextLlm: {
+    kind: "token bucket",
+    rate: 30,
+    period: MINUTE,
+    capacity: 10,
+  },
+});
+
+function invalidArgument(message: string): never {
+  throw new ConvexError({ kind: "InvalidArgument", message });
+}
 
 function checkLimit(limit: number | undefined) {
   if (
     limit !== undefined &&
     (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT)
   ) {
-    throw new ConvexError({
-      kind: "InvalidArgument",
-      message: `limit must be an integer from 1 to ${MAX_LIMIT}`,
-    });
+    invalidArgument(`limit must be an integer from 1 to ${MAX_LIMIT}`);
   }
 }
 
 async function loadCategories(ctx: QueryCtx): Promise<Category[]> {
-  const rows = await ctx.db.query("categories").take(SCAN_LIMIT);
+  const rows = await ctx.db.query("categories").take(CATEGORY_LIMIT);
   return rows.map(({ slug, parent, label, attributeSchema }) => ({
     slug,
     parent,
@@ -52,13 +70,8 @@ function rank(a: Doc<"agents">, b: Doc<"agents">) {
   );
 }
 
-export async function toDirectoryCard(
-  ctx: QueryCtx,
-  agent: Doc<"agents">,
-): Promise<DirectoryCard> {
-  const entity = agent.entityId ? await ctx.db.get(agent.entityId) : null;
+function cardFields(agent: Doc<"agents">): AgentCard {
   return {
-    agentId: agent._id,
     slug: agent.slug,
     name: agent.name,
     description: agent.description,
@@ -72,9 +85,28 @@ export async function toDirectoryCard(
     publicKey: agent.publicKey,
     status: agent.status,
     verified: agent.verified,
+  };
+}
+
+function isListed(agent: Doc<"agents">) {
+  return (
+    LISTED_STATUSES.includes(agent.status) &&
+    AgentCard.safeParse(cardFields(agent)).success
+  );
+}
+
+export async function toDirectoryCard(
+  ctx: QueryCtx,
+  agent: Doc<"agents">,
+): Promise<DirectoryCard> {
+  const card = cardFields(agent);
+  const entity = agent.entityId ? await ctx.db.get(agent.entityId) : null;
+  return {
+    ...card,
+    agentId: agent._id,
     entityName: entity?.name,
-    comuna: agent.location?.comuna,
-    allowedIntents: effectiveAllowedIntents(agent),
+    comuna: card.location?.comuna,
+    allowedIntents: effectiveAllowedIntents(card),
   };
 }
 
@@ -89,45 +121,56 @@ export const search = query({
     comuna: v.optional(v.string()),
     limit: v.optional(v.number()),
   },
-  handler: async (ctx, args): Promise<DirectoryCard[]> => {
+  handler: async (ctx, args): Promise<DirectorySearchResult> => {
     checkLimit(args.limit);
+    const none = { agents: [], truncated: false };
     const categories = await loadCategories(ctx);
     let wanted: Set<string> | undefined;
     if (args.category !== undefined) {
       const category = resolveCategory(args.category, categories);
-      if (!category) return [];
+      if (!category) return none;
       wanted = categoryWithDescendants(category.slug, categories);
     }
     let comuna: string | undefined;
     if (args.comuna !== undefined) {
       const canonical = canonicalComuna(args.comuna);
-      if (!canonical) return [];
+      if (!canonical) return none;
       comuna = canonical;
     }
 
-    const rows = await Promise.all(
-      LISTED_STATUSES.map((status) =>
-        comuna
-          ? ctx.db
-              .query("agents")
-              .withIndex("by_status_and_location_comuna", (q) =>
-                q.eq("status", status).eq("location.comuna", comuna),
-              )
-              .take(SCAN_LIMIT)
-          : ctx.db
-              .query("agents")
-              .withIndex("by_status_and_primaryCategory", (q) =>
-                q.eq("status", status),
-              )
-              .take(SCAN_LIMIT),
-      ),
+    const matches: Doc<"agents">[] = [];
+    let scanned = 0;
+    let truncated = false;
+    for (const status of LISTED_STATUSES) {
+      if (truncated) break;
+      const rows = comuna
+        ? ctx.db
+            .query("agents")
+            .withIndex("by_status_and_location_comuna", (q) =>
+              q.eq("status", status).eq("location.comuna", comuna),
+            )
+        : ctx.db
+            .query("agents")
+            .withIndex("by_status_and_primaryCategory", (q) =>
+              q.eq("status", status),
+            );
+      for await (const agent of rows) {
+        if (scanned === SCAN_BUDGET) {
+          truncated = true;
+          break;
+        }
+        scanned += 1;
+        if (wanted && !agent.categories.some((c) => wanted.has(c))) continue;
+        if (isListed(agent)) matches.push(agent);
+      }
+    }
+    const agents = await Promise.all(
+      matches
+        .sort(rank)
+        .slice(0, args.limit)
+        .map((agent) => toDirectoryCard(ctx, agent)),
     );
-    const matches = rows
-      .flat()
-      .filter((agent) => !wanted || agent.categories.some((c) => wanted.has(c)))
-      .sort(rank)
-      .slice(0, args.limit);
-    return Promise.all(matches.map((agent) => toDirectoryCard(ctx, agent)));
+    return { agents, truncated };
   },
 });
 
@@ -138,10 +181,7 @@ export const get = query({
   },
   handler: async (ctx, { agentId, slug }): Promise<DirectoryCard | null> => {
     if ((agentId === undefined) === (slug === undefined)) {
-      throw new ConvexError({
-        kind: "InvalidArgument",
-        message: "pass exactly one of agentId or slug",
-      });
+      invalidArgument("pass exactly one of agentId or slug");
     }
     const agent = agentId
       ? await ctx.db.get(agentId)
@@ -149,7 +189,7 @@ export const get = query({
           .query("agents")
           .withIndex("by_slug", (q) => q.eq("slug", slug as string))
           .unique();
-    if (!agent || !LISTED_STATUSES.includes(agent.status)) return null;
+    if (!agent || !isListed(agent)) return null;
     return toDirectoryCard(ctx, agent);
   },
 });
@@ -159,29 +199,39 @@ export const searchText = action({
   handler: async (
     ctx,
     { query, limit },
-  ): Promise<{
-    interpretation: TextInterpretation;
-    agents: DirectoryCard[];
-  }> => {
+  ): Promise<
+    DirectorySearchResult & { interpretation: TextInterpretation }
+  > => {
     checkLimit(limit);
+    if (query.length > MAX_QUERY_LENGTH) {
+      invalidArgument(`query must be at most ${MAX_QUERY_LENGTH} characters`);
+    }
     const categories: Category[] = await ctx.runQuery(
       api.directory.categories,
       {},
     );
-    const interpretation = await interpretDirectoryText(query, categories, () =>
-      createLlmProvider(),
+    const interpretation = await interpretDirectoryText(
+      query,
+      categories,
+      async () => {
+        await rateLimiter.limit(ctx, "directoryTextLlm", { throws: true });
+        return createLlmProvider();
+      },
     );
     if (
       interpretation.unresolved.length > 0 ||
       (!interpretation.category && !interpretation.comuna)
     ) {
-      return { interpretation, agents: [] };
+      return { interpretation, agents: [], truncated: false };
     }
-    const agents: DirectoryCard[] = await ctx.runQuery(api.directory.search, {
-      category: interpretation.category ?? undefined,
-      comuna: interpretation.comuna ?? undefined,
-      limit,
-    });
-    return { interpretation, agents };
+    const result: DirectorySearchResult = await ctx.runQuery(
+      api.directory.search,
+      {
+        category: interpretation.category ?? undefined,
+        comuna: interpretation.comuna ?? undefined,
+        limit,
+      },
+    );
+    return { interpretation, ...result };
   },
 });

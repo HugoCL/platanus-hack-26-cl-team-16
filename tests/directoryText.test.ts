@@ -12,7 +12,7 @@ import { SEED_CATEGORIES } from "../shared/seedData";
 
 const parse = (text: string) => parseDirectoryText(text, SEED_CATEGORIES);
 
-const noLlm = (): LlmProvider => {
+const noLlm = async (): Promise<LlmProvider> => {
   throw new Error("the LLM must not be created");
 };
 
@@ -46,6 +46,41 @@ describe("free-text parser", () => {
       unresolved: ["category"],
     });
     expect(parse("xyzzy qwerty").unresolved).toEqual(["category"]);
+    expect(parse("abogado en Santiago de Compostela")).toEqual({
+      category: "abogados",
+      comuna: null,
+      unresolved: ["comuna"],
+    });
+  });
+
+  it("accepts a comuna followed by another place or a time", () => {
+    expect(parse("cardiólogo en Providencia en la tarde")).toEqual({
+      category: "cardiologia",
+      comuna: "Providencia",
+      unresolved: [],
+    });
+    expect(parse("dentista en Ñuñoa cerca del metro")).toEqual({
+      category: "odontologia",
+      comuna: "Ñuñoa",
+      unresolved: [],
+    });
+  });
+
+  it("ignores inherited object properties in its dictionaries", () => {
+    for (const word of ["constructor", "__proto__", "toString"]) {
+      expect(canonicalComuna(word)).toBeNull();
+      expect(
+        parseDirectoryText(word, [
+          ...SEED_CATEGORIES,
+          {
+            slug: word === "__proto__" ? "proto" : word.toLowerCase(),
+            parent: null,
+            label: "Rara",
+            attributeSchema: [],
+          },
+        ]),
+      ).toMatchObject({ comuna: null });
+    }
   });
 
   it("canonicalizes comunas", () => {
@@ -86,7 +121,7 @@ describe("LLM fallback", () => {
       interpretDirectoryText(
         "me duele el pecho en Providencia",
         SEED_CATEGORIES,
-        () => llm,
+        async () => llm,
       ),
     ).resolves.toEqual({
       category: "cardiologia",
@@ -104,7 +139,7 @@ describe("LLM fallback", () => {
       interpretDirectoryText(
         "cardiólogo en Narnia",
         SEED_CATEGORIES,
-        () => llm,
+        async () => llm,
       ),
     ).resolves.toEqual({
       category: "cardiologia",
@@ -120,7 +155,11 @@ describe("LLM fallback", () => {
       object: () => ({ category: "astrologia", comuna: "Narnia" }),
     });
     await expect(
-      interpretDirectoryText("lectura de tarot", SEED_CATEGORIES, () => llm),
+      interpretDirectoryText(
+        "lectura de tarot",
+        SEED_CATEGORIES,
+        async () => llm,
+      ),
     ).resolves.toEqual({
       category: null,
       comuna: null,

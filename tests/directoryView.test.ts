@@ -13,7 +13,7 @@ const modules = import.meta.glob("../convex/**/*.ts");
 it("5. the web view shows every seed card", async () => {
   const t = convexTest(schema, modules);
   await t.mutation(internal.seed.ensure, {});
-  const cards = await t.query(api.directory.search, {});
+  const { agents: cards } = await t.query(api.directory.search, {});
   const categories = await t.query(api.directory.categories, {});
 
   const html = renderToStaticMarkup(
