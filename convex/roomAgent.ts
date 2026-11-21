@@ -3,7 +3,7 @@ import {
   createFakeLlmProvider,
   type LlmProvider,
 } from "../shared/providers/llm";
-import { CONSUMER_AGENT_SLUG } from "../shared/seedData";
+import { CONSUMER_AGENT_SLUG } from "../shared/seed-data";
 import type { Participant, SessionContract } from "../shared/session";
 import type { Doc } from "./_generated/dataModel";
 import type { ActionCtx } from "./_generated/server";

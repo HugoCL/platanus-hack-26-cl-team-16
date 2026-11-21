@@ -197,6 +197,7 @@ export default defineSchema({
   )
     .index("by_sessionId", ["sessionId"])
     .index("by_agentId_and_sessionId", ["agentId", "sessionId"])
+    .index("by_tokenIdentifier_and_leftAt", ["tokenIdentifier", "leftAt"])
     .index("by_tokenIdentifier_and_sessionId", [
       "tokenIdentifier",
       "sessionId",
@@ -208,8 +209,10 @@ export default defineSchema({
     recipient: v.union(v.literal("all"), v.id("participants")),
     content: zodToConvex(MessageContent),
     moderation: zodToConvex(MessageModeration),
+    seq: v.optional(v.number()),
   })
     .index("by_sessionId", ["sessionId"])
+    .index("by_sessionId_and_seq", ["sessionId", "seq"])
     .index("by_sessionId_and_moderation_status", [
       "sessionId",
       "moderation.status",

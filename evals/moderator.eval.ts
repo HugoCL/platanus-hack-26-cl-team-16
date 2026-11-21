@@ -5,7 +5,7 @@ import {
   MODERATION_SET_VERSION,
   type ModerationCase,
   moderationInput,
-} from "../shared/fixtures/moderationSet";
+} from "../shared/fixtures/moderation-set";
 import { modelFor } from "../shared/models";
 import { judge } from "../shared/moderator/judge";
 import { createModerator } from "../shared/moderator/moderator";

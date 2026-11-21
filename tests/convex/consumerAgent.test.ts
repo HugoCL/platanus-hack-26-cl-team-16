@@ -17,7 +17,7 @@ import {
   createFakeLlmProvider,
   type LlmProvider,
 } from "../../shared/providers/llm";
-import { CLINIC_AGENT_SLUG } from "../../shared/seedData";
+import { CLINIC_AGENT_SLUG } from "../../shared/seed-data";
 import {
   askProvider,
   choose,

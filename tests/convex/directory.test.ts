@@ -14,7 +14,7 @@ import {
 } from "../../convex/directory";
 import schema from "../../convex/schema";
 import { AgentDetail, AgentSummary } from "../../shared/mcp";
-import { CLINIC_AGENT_SLUG } from "../../shared/seedData";
+import { CLINIC_AGENT_SLUG } from "../../shared/seed-data";
 
 const modules = import.meta.glob("../../convex/**/*.ts");
 
@@ -225,6 +225,26 @@ describe("directory search", () => {
     }
   });
 
+  it("lets an explicit category or comuna win over the text without the LLM", async () => {
+    for (const args of [
+      { query: "cardiólogo en Valparaíso", comuna: "Providencia" },
+      { query: "cardiólogo en Ñuñoa", comuna: "Providencia" },
+      { query: "algo rarísimo en Providencia", category: "cardiologia" },
+      { query: "", category: "cardiologia", comuna: "Providencia" },
+      { query: "cardiólogo en Providencia", category: "", comuna: "" },
+    ]) {
+      const result = await t.action(api.directory.searchText, args);
+      expect(result.interpretation.diagnostic).toBeUndefined();
+      expect(result.agents.map((c) => c.slug)).toEqual([CLINIC_AGENT_SLUG]);
+      if (args.comuna) expect(result.interpretation.comuna).toBeNull();
+    }
+    const unmatched = await t.action(api.directory.searchText, {
+      query: "cardiólogo",
+      comuna: "Comuna Inventada",
+    });
+    expect(unmatched.agents).toEqual([]);
+  });
+
   it("caps the free-text length and rate-limits only the LLM fallback", async () => {
     await expect(
       t.action(api.directory.searchText, { query: "a".repeat(301) }),
@@ -393,6 +413,9 @@ describe("directory search", () => {
       t.query(api.directory.get, { slug: "no-existe" }),
     ).resolves.toBeNull();
     await expect(t.query(api.directory.get, {})).rejects.toThrow(/exactly one/);
+    await expect(
+      t.query(api.directory.get, { agentId: "garbage" }),
+    ).resolves.toBeNull();
     await expect(
       t.query(api.directory.get, {
         slug: CLINIC_AGENT_SLUG,
