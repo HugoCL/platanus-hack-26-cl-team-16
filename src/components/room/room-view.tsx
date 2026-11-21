@@ -29,11 +29,15 @@ import { Tabs, TabsList, TabsPanel, TabsTab } from "@ui-sdk/react/tabs";
 import { Textarea } from "@ui-sdk/react/textarea";
 import {
   ArrowDownIcon,
+  ArrowLeftRightIcon,
+  BanIcon,
   BotIcon,
+  CheckIcon,
   PanelRightIcon,
   SendHorizontalIcon,
   ShieldAlertIcon,
   ShieldCheckIcon,
+  ShieldIcon,
   UserIcon,
 } from "lucide-react";
 import {
@@ -807,7 +811,13 @@ function SidePanel({
         <TabsTab value="participantes">Participantes</TabsTab>
       </TabsList>
       <TabsPanel value="contrato">
-        <ContractView contract={contract} />
+        <ContractView
+          contract={contract}
+          providerName={
+            participants.find((p) => p.kind === "agent" && p.side === "other")
+              ?.name ?? "El proveedor"
+          }
+        />
       </TabsPanel>
       <TabsPanel value="auditoria">
         <AuditView
@@ -841,92 +851,109 @@ function Section({
   );
 }
 
-const TERM_DOT = {
-  allowed: "bg-success",
-  forbidden: "bg-destructive",
-} as const;
+const andList = new Intl.ListFormat("es", { type: "conjunction" });
+const orList = new Intl.ListFormat("es", { type: "disjunction" });
+const lower = (label: string) =>
+  label === label.toUpperCase() ? label : label.toLowerCase();
 
-function Terms({
-  items,
-  marker,
+function ContractView({
+  contract,
+  providerName,
 }: {
-  items: { label: string; code?: string }[];
-  marker?: keyof typeof TERM_DOT;
+  contract: SessionContract;
+  providerName: string;
 }) {
-  return (
-    <ul className="m-0 flex list-none flex-col p-0">
-      {items.map((item) => (
-        <li
-          key={item.code ?? item.label}
-          className="flex flex-wrap items-baseline justify-between gap-x-3 py-1"
-        >
-          <span className="flex min-w-0 items-center gap-2">
-            {marker ? (
-              <span
-                aria-hidden="true"
-                className={`size-1.5 shrink-0 rounded-full ${TERM_DOT[marker]}`}
-              />
-            ) : null}
-            {item.label}
-          </span>
-          {item.code ? (
-            <code className="min-w-0 font-mono text-xs break-all text-subtle-foreground">
-              {item.code}
-            </code>
-          ) : null}
-        </li>
-      ))}
-    </ul>
+  const shares = contract.recipientShares.map((f) => lower(dataFieldLabel(f)));
+  const requests = contract.recipientRequests.map((f) =>
+    lower(dataFieldLabel(f)),
   );
-}
-
-function ContractView({ contract }: { contract: SessionContract }) {
-  const fields = (codes: string[]) =>
-    codes.map((code) => ({ label: dataFieldLabel(code), code }));
+  const lines = [
+    contract.allowedIntents.length > 0 && {
+      icon: CheckIcon,
+      tone: "text-success",
+      text: (
+        <>
+          Tu agente puede{" "}
+          <strong>
+            {andList.format(
+              contract.allowedIntents.map((i) => lower(intentLabel(i))),
+            )}
+          </strong>
+          .
+        </>
+      ),
+    },
+    (shares.length > 0 || requests.length > 0) && {
+      icon: ArrowLeftRightIcon,
+      tone: "text-subtle-foreground",
+      text: (
+        <>
+          {providerName}
+          {shares.length > 0 ? (
+            <>
+              {" "}
+              comparte <strong>{andList.format(shares)}</strong>
+            </>
+          ) : null}
+          {shares.length > 0 && requests.length > 0 ? ", y" : null}
+          {requests.length > 0 ? (
+            <>
+              {" "}
+              puede pedirte <strong>{andList.format(requests)}</strong>
+            </>
+          ) : null}
+          .
+        </>
+      ),
+    },
+    contract.forbiddenTopics.length > 0 && {
+      icon: BanIcon,
+      tone: "text-destructive",
+      text: (
+        <>
+          Nunca se habla de{" "}
+          <strong>{orList.format(contract.forbiddenTopics)}</strong>.
+        </>
+      ),
+    },
+    {
+      icon: ShieldIcon,
+      tone: "text-subtle-foreground",
+      text: (
+        <>
+          Si se bloquean <strong>{contract.maxViolations} mensajes</strong>, la
+          sala se cierra.
+        </>
+      ),
+    },
+  ].filter((line) => line !== false);
   return (
-    <div className="flex flex-col gap-4 text-sm">
-      <Section title="Intención">
-        <p className="m-0 flex items-baseline justify-between gap-3">
-          <span className="text-base font-semibold">
-            {intentLabel(contract.intent.name)}
-          </span>
-          <code className="font-mono text-xs text-subtle-foreground">
-            {contract.intent.name}
-          </code>
+    <div className="flex flex-col gap-5 text-sm">
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-subtle-foreground">Objetivo</span>
+        <p className="m-0 text-lg leading-tight font-semibold">
+          {intentLabel(contract.intent.name)}
         </p>
-        <p className="m-0 text-subtle-foreground">
+        <p className="m-0 break-words text-subtle-foreground">
           “{contract.intent.description}”
         </p>
-      </Section>
-      <Section title="Intenciones permitidas">
-        <Terms
-          marker="allowed"
-          items={contract.allowedIntents.map((code) => ({
-            label: intentLabel(code),
-            code,
-          }))}
-        />
-      </Section>
-      <Section title="Temas prohibidos">
-        <Terms
-          marker="forbidden"
-          items={contract.forbiddenTopics.map((label) => ({ label }))}
-        />
-      </Section>
-      <Section title="Qué comparte el proveedor">
-        <Terms items={fields(contract.recipientShares)} />
-      </Section>
-      <Section title="Qué pide el proveedor">
-        <Terms items={fields(contract.recipientRequests)} />
-      </Section>
-      <Section title="Máximo de bloqueos">
-        <p className="m-0">
-          {contract.maxViolations} mensajes bloqueados antes de cerrar la sala
-        </p>
-      </Section>
+      </div>
+      <ul className="m-0 flex list-none flex-col gap-3.5 p-0 leading-relaxed">
+        {lines.map(({ icon: Icon, tone, text }) => (
+          <li key={Icon.displayName} className="flex gap-3">
+            <Icon
+              aria-hidden="true"
+              className={`mt-[3px] size-4 shrink-0 ${tone}`}
+            />
+            <span className="min-w-0 break-words [&_strong]:font-medium">
+              {text}
+            </span>
+          </li>
+        ))}
+      </ul>
       <p className="m-0 text-xs text-subtle-foreground">
-        Calculado al abrir la sala cruzando la intención de tu agente con el
-        scope del proveedor.
+        Lo calculamos al abrir la sala, cruzando tu pedido con lo que ofrece{" "}
+        {providerName}.
       </p>
     </div>
   );
