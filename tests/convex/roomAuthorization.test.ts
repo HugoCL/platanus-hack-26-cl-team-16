@@ -1,6 +1,7 @@
 // @vitest-environment edge-runtime
 import { describe, expect, it } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import {
   errorKind,
   REQUEST,
@@ -82,6 +83,47 @@ describe("public room authorization", () => {
     for (const call of Object.values(member)) {
       expect(await errorKind(call())).toBe("NotParticipant");
     }
+  });
+
+  it("opens a room for a human only on behalf of an agent they own or a shared agent", async () => {
+    const { t, consumerId, open } = await seededRooms();
+    const shared = await open({ human: { displayName: "Juan" } });
+    const tokenIdentifier = await t.run(async (ctx) => {
+      const owner = await ctx.db
+        .query("participants")
+        .withIndex("by_sessionId", (q) =>
+          q.eq("sessionId", shared.sessionId as Id<"sessions">),
+        )
+        .filter((q) => q.eq(q.field("kind"), "human"))
+        .first();
+      if (owner?.kind !== "human") throw new Error("missing owner");
+      return owner.tokenIdentifier;
+    });
+    const setOwner = (ownerTokenIdentifier: string) =>
+      t.run((ctx) =>
+        ctx.db.patch("agents", consumerId, { ownerTokenIdentifier }),
+      );
+    const rows = () =>
+      t.run(async (ctx) => ({
+        sessions: (await ctx.db.query("sessions").collect()).length,
+        participants: (await ctx.db.query("participants").collect()).length,
+        messages: (await ctx.db.query("messages").collect()).length,
+      }));
+
+    await setOwner(tokenIdentifier);
+    expect(
+      (await open({ human: { displayName: "Juan" } })).participants,
+    ).toContainEqual(
+      expect.objectContaining({ role: "owner", onBehalfOfAgentId: consumerId }),
+    );
+
+    await setOwner("https://other.test|someone-else");
+    const before = await rows();
+    expect(await errorKind(open({ human: { displayName: "Juan" } }))).toBe(
+      "NotOwner",
+    );
+    expect(await rows()).toEqual(before);
+    expect((await open()).participants).toHaveLength(2);
   });
 
   it("does not attach a human to an internal opening without an authenticated user", async () => {
