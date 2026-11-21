@@ -272,8 +272,8 @@ describe("messagesAfter", () => {
   });
 
   it("rejects a cursor it did not issue", async () => {
-    const { readAfter } = await setup();
-    for (const cursor of [
+    const { readAfter, room } = await setup();
+    const shapes = [
       "",
       "s:",
       "s:1:2",
@@ -286,8 +286,28 @@ describe("messagesAfter", () => {
       "s:1e0",
       "s:01",
       "c:   :x",
+    ];
+    for (const cursor of [
+      ...shapes,
+      ...shapes.map((shape) => `${room.sessionId}:${shape}`),
+      "s:1",
     ]) {
       expect(await errorKind(readAfter(cursor))).toBe("InvalidArgument");
     }
+  });
+
+  it("rejects a cursor from another room", async () => {
+    const rooms = await setup();
+    const { t, readAfter, room } = rooms;
+    const other = await roomWithHuman(rooms);
+    expect(other.sessionId).not.toBe(room.sessionId);
+    const { cursor } = await t.run((ctx) =>
+      messagesAfter(ctx, other.sessionId, null, { limit: LIMIT }),
+    );
+    expect(cursor).toMatch(new RegExp(`^${other.sessionId}:`));
+    expect(await errorKind(readAfter(cursor))).toBe("InvalidArgument");
+    expect((await readAfter(null)).cursor).toMatch(
+      new RegExp(`^${room.sessionId}:`),
+    );
   });
 });

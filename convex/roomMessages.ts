@@ -46,25 +46,31 @@ function invalidCursor(): never {
   });
 }
 
-// Only the two shapes encodeCursor writes: `s:<seq>` with seq >= 1, and `c:<_creationTime>:<id>`.
-const SEQ_CURSOR = /^s:([1-9]\d*)$/;
-const CREATION_CURSOR = /^c:(\d+(?:\.\d+)?):([^:]+)$/;
+// Only the two shapes encodeCursor writes, both led by the room's id so a cursor from another
+// room is refused: `<sessionId>:s:<seq>` with seq >= 1, and `<sessionId>:c:<_creationTime>:<id>`.
+const SEQ_CURSOR = /^([^:]+):s:([1-9]\d*)$/;
+const CREATION_CURSOR = /^([^:]+):c:(\d+(?:\.\d+)?):([^:]+)$/;
 
-function decodeCursor(ctx: QueryCtx, cursor: string): Position {
+function decodeCursor(
+  ctx: QueryCtx,
+  sessionId: Id<"sessions">,
+  cursor: string,
+): Position {
   const seq = SEQ_CURSOR.exec(cursor);
-  if (seq && Number.isSafeInteger(Number(seq[1]))) {
-    return { seq: Number(seq[1]) };
+  if (seq?.[1] === sessionId && Number.isSafeInteger(Number(seq[2]))) {
+    return { seq: Number(seq[2]) };
   }
   const creation = CREATION_CURSOR.exec(cursor);
-  const messageId = creation && ctx.db.normalizeId("messages", creation[2]);
+  const messageId =
+    creation?.[1] === sessionId && ctx.db.normalizeId("messages", creation[3]);
   if (!creation || !messageId) invalidCursor();
-  return { creationTime: Number(creation[1]), messageId };
+  return { creationTime: Number(creation[2]), messageId };
 }
 
 function encodeCursor(doc: Doc<"messages">) {
   return doc.seq === undefined
-    ? `c:${doc._creationTime}:${doc._id}`
-    : `s:${doc.seq}`;
+    ? `${doc.sessionId}:c:${doc._creationTime}:${doc._id}`
+    : `${doc.sessionId}:s:${doc.seq}`;
 }
 
 // The room's messages after `cursor` (null reads from the start) in sequence order, as raw rows
@@ -82,7 +88,8 @@ export async function messagesAfter(
     byteBudget = HISTORY_BYTE_BUDGET,
   }: { limit: number; byteBudget?: number },
 ): Promise<{ messages: Doc<"messages">[]; cursor: string | null }> {
-  const position = cursor === null ? null : decodeCursor(ctx, cursor);
+  const position =
+    cursor === null ? null : decodeCursor(ctx, sessionId, cursor);
   const messages: Doc<"messages">[] = [];
   let bytes = 0;
   const page = () => {
