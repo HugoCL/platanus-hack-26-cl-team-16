@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
+import { judgeRateLimiter } from "../../convex/moderator";
 import { testRoomAgent } from "../../convex/roomAgent";
 import * as rules from "../../shared/moderator/rules";
 import {
@@ -79,6 +80,68 @@ it("does not deliver a blocked agent reply to the other agent", async () => {
     status: "blocked",
     verdict: { decision: "block" },
   });
+});
+
+it("persists a hosted reply blocked by timeout when retry quota is unavailable", async () => {
+  const room = await setup();
+  await room.t.run((ctx) =>
+    judgeRateLimiter.limit(ctx, "roomJudgeSender", {
+      key: `participant:${room.provider}`,
+      count: 9,
+      throws: true,
+    }),
+  );
+  const agent = vi.spyOn(testRoomAgent, "reply");
+  const moderate = vi.spyOn(room.llm, "generateObject");
+  const sent = await room.send();
+  moderate.mockClear();
+  moderate.mockImplementationOnce(() => new Promise(() => {}));
+
+  const jobs = () =>
+    room.t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
+  const [scheduled] = await jobs();
+  await room.finishReplies();
+
+  expect(agent).toHaveBeenCalledTimes(1);
+  expect(moderate).toHaveBeenCalledTimes(1);
+  expect(moderate.mock.calls[0][0].abortSignal?.aborted).toBe(true);
+  const [blocked, alert] = (await room.history(room.provider)).slice(2);
+  expect(blocked).toMatchObject({
+    status: "blocked",
+    senderParticipantId: room.provider,
+    recipient: room.consumer,
+    verdict: {
+      decision: "block",
+      rule: "purpose",
+      reason: "El moderador falló; el mensaje se bloqueó.",
+    },
+  });
+  expect(alert.content).toMatchObject({
+    kind: "ui",
+    spec: { type: "moderator_alert" },
+  });
+  const audit = await room.t.run((ctx) =>
+    ctx.db
+      .query("moderationEvents")
+      .withIndex("by_messageId", (q) =>
+        q.eq("messageId", blocked.messageId as Id<"messages">),
+      )
+      .collect(),
+  );
+  expect(audit.at(-1)).toMatchObject({
+    stage: "purpose",
+    action: "block",
+    reasons: [
+      {
+        code: "moderator_error",
+        detail: "No se pudo iniciar el reintento del juez.",
+      },
+    ],
+  });
+  expect((await room.history()).slice(1)).toEqual([sent]);
+  expect(await jobs()).toMatchObject([
+    { _id: scheduled._id, state: { kind: "success" } },
+  ]);
 });
 
 it("does not ask an agent to reply to a block or a message for a human or external agent", async () => {
