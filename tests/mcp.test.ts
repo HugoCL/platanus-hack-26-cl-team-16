@@ -391,7 +391,7 @@ describe("MCP room tools", () => {
   }
 
   async function hostedRoom() {
-    const session = await t.mutation(api.rooms.open, {
+    const session = await t.action(api.rooms.open, {
       initiatorAgentId: agents.consumer,
       providerAgentId: agents.clinic,
       request: REQUEST,
@@ -402,6 +402,15 @@ describe("MCP room tools", () => {
       provider: roleIn(session, "recipient"),
     };
   }
+
+  const withE3Moderator = () =>
+    vi.spyOn(allowAllModerator, "moderate").mockImplementation((input) =>
+      createModerator({
+        llm: createFakeLlmProvider({
+          object: () => ({ decision: "allow", rule: "purpose" }),
+        }),
+      }).moderate(input),
+    );
 
   const history = (sessionId: Id<"sessions">, viewer: Id<"participants">) =>
     t.query(api.gate.history, { sessionId, viewerParticipantId: viewer });
@@ -490,12 +499,8 @@ describe("MCP room tools", () => {
   });
 
   it("criterion 3: the gate blocks the reference attack from an external agent as it does from a hosted one", async () => {
-    const moderate = vi
-      .spyOn(allowAllModerator, "moderate")
-      .mockImplementation((input) =>
-        createModerator({ llm: createFakeLlmProvider() }).moderate(input),
-      );
     const { sessionId, me, provider } = await openRoom();
+    const moderate = withE3Moderator();
 
     const { message } = await use("send_message", {
       sessionId,
@@ -553,9 +558,41 @@ describe("MCP room tools", () => {
     });
   });
 
+  it("criterion 3: open_session refuses a request carrying the reference attack and opens no room", async () => {
+    withE3Moderator();
+    const stored = async () => {
+      const [sessions, messages] = await t.run(async (ctx) => [
+        await ctx.db.query("sessions").collect(),
+        await ctx.db.query("messages").collect(),
+      ]);
+      return { sessions: sessions.length, messages: messages.length };
+    };
+    const before = await stored();
+
+    expect(
+      await refusal("open_session", {
+        targetAgentId: agents.clinic,
+        intent: { ...intent, description: REFERENCE_ATTACK },
+      }),
+    ).toContain("RequestBlocked (injection)");
+
+    expect(await stored()).toEqual(before);
+    const fromHosted = await t
+      .action(api.rooms.open, {
+        initiatorAgentId: agents.consumer,
+        providerAgentId: agents.clinic,
+        request: REFERENCE_ATTACK,
+      })
+      .catch((error: { data?: unknown }) => error.data);
+    expect(fromHosted).toMatchObject({
+      kind: "RequestBlocked",
+      rule: "injection",
+    });
+  });
+
   it("criterion 5: a key cannot read, write or close a room its agent is not in", async () => {
-    const moderate = vi.spyOn(allowAllModerator, "moderate");
     const { sessionId, provider } = await hostedRoom();
+    const moderate = vi.spyOn(allowAllModerator, "moderate");
     const before = await history(sessionId, provider);
 
     for (const [name, args] of [

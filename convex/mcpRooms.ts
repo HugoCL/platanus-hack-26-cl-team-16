@@ -85,7 +85,7 @@ export const open = action({
       initiatorAgentId: Id<"agents">;
       providerAgentId: Id<"agents">;
     } = await ctx.runQuery(internal.mcpRooms.opener, { apiKey, targetAgentId });
-    return ctx.runMutation(api.rooms.open, { ...agents, request, intent });
+    return ctx.runAction(api.rooms.open, { ...agents, request, intent });
   },
 });
 

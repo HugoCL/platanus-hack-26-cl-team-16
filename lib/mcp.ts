@@ -91,7 +91,8 @@ function registerTool<N extends McpToolName>(
 
 function readableError(error: unknown): never {
   if (error instanceof ConvexError && typeof error.data?.message === "string") {
-    throw new Error(`${error.data.kind}: ${error.data.message}`);
+    const { kind, rule, message } = error.data;
+    throw new Error(`${kind}${rule ? ` (${rule})` : ""}: ${message}`);
   }
   throw error;
 }
