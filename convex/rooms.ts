@@ -58,14 +58,21 @@ export async function openRoom(
     args,
   );
   const [initiator] = participants;
-  const { verdict, events } = await moderate({
-    content: { kind: "text", text: contract.intent.description },
-    sender: initiator,
-    recipient: "all",
-    participants,
-    contract,
-    history: [],
-  });
+  const { verdict, events } = await moderate(
+    ctx,
+    {
+      content: { kind: "text", text: contract.intent.description },
+      sender: initiator,
+      recipient: "all",
+      participants,
+      contract,
+      history: [],
+    },
+    {
+      sender: `agent:${args.initiatorAgentId}`,
+      room: `open:${args.providerAgentId}`,
+    },
+  );
   if (verdict.decision === "block") {
     throw new ConvexError({
       kind: "RequestBlocked",

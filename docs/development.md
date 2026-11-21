@@ -49,6 +49,8 @@ An allowed message addressed to a hosted agent schedules a reply after the messa
 
 Every stored agent message consumes one turn. The final turn records `turn_limit_reached` in the same transaction. After that, extra agent sends fail with `TurnLimitReached` and no more agent replies are scheduled; humans can still send.
 
+The paid judge is rate limited per sender and per room (`convex/moderator.ts`): a token bucket of 10 per minute for each participant (or, in `openRoom`, each initiator agent) and one of 20 per minute for each room (or, in `openRoom`, each provider card). Only a message that passed the deterministic rules and is about to reach the judge takes a token. With either bucket empty, `gate.send` and `openRoom` throw a `ConvexError` whose `data.kind` is `RateLimited`, store nothing and don't call the LLM. Every blocked message also counts toward the contract's `maxViolations`: the one that reaches it terminates the room in the same transaction (`status: "terminated"`, `closedReason: "max_violations"`, and a `session_terminated` notice), and later sends fail with `RoomClosed`.
+
 ## Test
 
 ```sh

@@ -96,14 +96,21 @@ export async function sendThroughGate(
     recipient: args.recipient,
   });
 
-  const outcome = await moderate({
-    content,
-    sender: room.sender,
-    recipient: args.recipient,
-    participants: room.participants,
-    contract: room.contract,
-    history: room.history,
-  });
+  const outcome = await moderate(
+    ctx,
+    {
+      content,
+      sender: room.sender,
+      recipient: args.recipient,
+      participants: room.participants,
+      contract: room.contract,
+      history: room.history,
+    },
+    {
+      sender: `participant:${args.senderParticipantId}`,
+      room: `session:${args.sessionId}`,
+    },
+  );
 
   return ctx.runMutation(internal.gate.commit, {
     sessionId: args.sessionId,
@@ -199,6 +206,25 @@ export const commit = internalMutation({
           },
         },
       );
+    }
+    if (verdict.decision === "block") {
+      const stored = await ctx.db.get("sessions", args.sessionId);
+      const violationCount = (stored?.violationCount ?? 0) + 1;
+      const terminated = violationCount >= session.contract.maxViolations;
+      await ctx.db.patch("sessions", args.sessionId, {
+        violationCount,
+        ...(terminated
+          ? { status: "terminated" as const, closedReason: "max_violations" }
+          : {}),
+      });
+      if (terminated) {
+        await publishNotice(
+          ctx,
+          args.sessionId,
+          "session_terminated",
+          `La sala se cerró tras ${violationCount} mensajes bloqueados.`,
+        );
+      }
     }
     if (agentTurn) {
       await ctx.db.patch("sessions", args.sessionId, { turnCount });
