@@ -177,7 +177,7 @@ export function DirectoryMap({
   return (
     <section
       aria-label="Mapa de resultados"
-      className={`relative min-h-[520px] overflow-hidden bg-[var(--sm-map-land)] ${className}`}
+      className={`relative min-h-[520px] overflow-hidden lg:min-h-0 bg-[var(--sm-map-land)] ${className}`}
     >
       {/* biome-ignore lint/a11y/noStaticElementInteractions: drag-to-pan is a pointer extra; the pins and zoom buttons are the keyboard path */}
       <div

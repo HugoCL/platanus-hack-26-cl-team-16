@@ -231,7 +231,7 @@ export function DirectorySearch() {
     .join(" · ");
 
   return (
-    <div className="flex min-h-dvh flex-col bg-background lg:h-dvh">
+    <div className="flex min-h-dvh flex-col bg-background lg:h-dvh lg:min-h-0 lg:overflow-hidden">
       <SiteHeader current="directory" />
 
       <section
