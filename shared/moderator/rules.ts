@@ -15,7 +15,10 @@ export type RuleFinding = {
 
 const RUT_FORMATTED =
   /(?<![\d.])(\d{1,2}(?:\.\d{3}){2}|\d{7,8})-([\dk])(?![\dk])/gi;
-const RUT_AFTER_KEYWORD = /\bru[tn]\b[\s:#]*(\d{7,8})([\dk])(?![\dk])/gi;
+// A value labeled RUT or RUN is always read as a RUT, even after a price or
+// phone prefix.
+const RUT_AFTER_KEYWORD =
+  /\bru[tn]\b[\s:#]*(?:\$|\+\s*56)?[\s-]*(\d{7,8})([\dk])(?![\dk])/gi;
 // A RUT with no dots, hyphen or label: 7 or 8 digits and the check digit,
 // standing alone, so not part of a longer number. Before looking for one, two
 // kinds of whole tokens are set aside: a price, "$" and digits with or without
