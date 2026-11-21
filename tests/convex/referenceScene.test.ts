@@ -1,9 +1,9 @@
 // @vitest-environment edge-runtime
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { internal } from "../../convex/_generated/api";
+import { api } from "../../convex/_generated/api";
 import { referenceLlm } from "../../convex/referenceLlm";
 import { createFakeLlmProvider } from "../../shared/providers/llm";
-import { errorKind, REQUEST, seededRooms } from "./roomFixture";
+import { errorKind, REQUEST, ROOM_OWNER, seededRooms } from "./roomFixture";
 import { NOW } from "./rooms";
 
 vi.mock("../../convex/referenceLlm", () => ({ referenceLlm: vi.fn() }));
@@ -21,7 +21,7 @@ it("does not open a room without a configured reference model", async () => {
 
   expect(
     await errorKind(
-      t.action(internal.referenceScene.start, {
+      t.withIdentity(ROOM_OWNER).action(api.referenceScene.start, {
         request: REQUEST,
         displayName: "Juan",
       }),
@@ -34,9 +34,23 @@ it("returns no room when the directory finds no provider", async () => {
   vi.mocked(referenceLlm).mockReturnValue(createFakeLlmProvider());
 
   expect(
-    await t.action(internal.referenceScene.start, {
+    await t.withIdentity(ROOM_OWNER).action(api.referenceScene.start, {
       request: "Necesito un gimnasio en Pirque",
       displayName: "Juan",
     }),
   ).toBeNull();
+});
+
+it("checks authentication before acquiring a model or opening a room", async () => {
+  const { t } = await seededRooms();
+
+  expect(
+    await errorKind(
+      t.action(api.referenceScene.start, {
+        request: REQUEST,
+        displayName: "Juan",
+      }),
+    ),
+  ).toBe("Unauthorized");
+  expect(referenceLlm).not.toHaveBeenCalled();
 });

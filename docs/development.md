@@ -76,7 +76,7 @@ The consumer (`lib/agents/consumer.ts`) starts from the human's request as writt
 
 ### Reference rooms
 
-`internal.referenceScene.start` accepts a request and the human's display name. The seed consumer searches the directory and chooses a provider. The action opens an E2 room with the neutral intent description, then sends the actual opening through the gate. The qualified hosted provider uses the same room participant and gate regardless of which consumer opened the room; an external consumer can send its own opening and receive replies without running the seed consumer.
+`api.referenceScene.start` accepts a request and display name from a signed-in user. The seed consumer searches the directory and chooses a provider. The action opens an E2 room with the neutral intent description, then sends the actual opening through the gate. The hosted provider uses the same room and gate regardless of which consumer opened the room; a trusted external consumer can send its own opening and receive replies without running the seed consumer.
 
 The reference agents use a model with structured output (`LLM_PROVIDER=openrouter` on the Convex deployment). In unconfigured local rooms E2 still uses its acknowledgment double. Tests inject a scripted fake through the model factory. The room moderator is configured independently; PLTNS-39 owns connecting the real moderator.
 

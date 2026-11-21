@@ -6,11 +6,13 @@ import { CONSUMER_AGENT_SLUG } from "../shared/seedData";
 import type { Session } from "../shared/session";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { internalAction } from "./_generated/server";
+import { action } from "./_generated/server";
 import { sendThroughGate } from "./gate";
 import { referenceLlm } from "./referenceLlm";
+import { requireRoomIdentity } from "./roomState";
+import { openRoom } from "./rooms";
 
-export const start = internalAction({
+export const start = action({
   args: { request: v.string(), displayName: v.string() },
   handler: async (
     ctx,
@@ -19,6 +21,7 @@ export const start = internalAction({
     room: Session;
     opening: Message;
   } | null> => {
+    await requireRoomIdentity(ctx);
     const text = request.trim();
     if (!text || text.length > MAX_TEXT_LENGTH) {
       throw new ConvexError({
@@ -45,7 +48,7 @@ export const start = internalAction({
         (await ctx.runAction(api.directory.searchText, { query })).agents,
     });
     if (!choice) return null;
-    const room = await ctx.runAction(api.rooms.open, {
+    const room = await openRoom(ctx, {
       initiatorAgentId: consumer.agentId as Id<"agents">,
       providerAgentId: choice.agentId as Id<"agents">,
       request: choice.intent.description,
