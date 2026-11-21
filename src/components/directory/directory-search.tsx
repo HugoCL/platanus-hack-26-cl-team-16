@@ -102,19 +102,21 @@ export function DirectorySearch() {
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [fixture, setFixture] = useFixtureState();
-  const filterKey = `${category}|${comuna}`;
+  const origin = geo.state === "on" ? geo.origin : null;
+  const near = sort === "distance" ? origin : null;
+  const filterKey = `${category}|${comuna}|${near ? `${near.lat},${near.lng}` : ""}`;
   const [more, setMore] = useState({ key: filterKey, offsets: FIRST_PAGE });
   const offsets = more.key === filterKey ? more.offsets : FIRST_PAGE;
   const { result: liveResult, loadingMore } = usePagedSearch(
     category,
     comuna,
+    near,
     offsets,
   );
   const result =
     fixture === "demo" ? liveResult : fixtureResult(fixture, liveResult);
   const categories = useQuery(api.directory.categories, {});
 
-  const origin = geo.state === "on" ? geo.origin : null;
   const radiusFilter = origin && withinRadius ? radiusKm : null;
 
   const distances = useMemo(() => {
@@ -766,6 +768,7 @@ function TextSearch({
 function usePagedSearch(
   category: string | null,
   comuna: string | null,
+  near: LatLng | null,
   offsets: number[],
 ) {
   const requests = useMemo(
@@ -778,13 +781,14 @@ function usePagedSearch(
             args: {
               ...(category ? { category } : {}),
               ...(comuna ? { comuna } : {}),
+              ...(near ? { near: { lat: near.lat, lng: near.lng } } : {}),
               limit: PAGE_SIZE,
               offset,
             },
           },
         ]),
       ),
-    [category, comuna, offsets],
+    [category, comuna, near, offsets],
   );
   const results = useQueries(requests);
   const loaded: DirectorySearchResult[] = [];

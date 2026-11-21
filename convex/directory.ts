@@ -10,6 +10,7 @@ import {
 } from "../lib/directory";
 import { AgentCard, effectiveAllowedIntents } from "../shared/agent";
 import type { Category } from "../shared/catalog";
+import { distanceKm } from "../shared/geo";
 import type { AgentDetail, AgentSummary } from "../shared/mcp";
 import { createLlmProvider } from "../shared/providers/llm";
 import type { AgentStatus } from "../shared/scope";
@@ -114,6 +115,13 @@ function rank(a: ListedCard, b: ListedCard) {
   );
 }
 
+/** Nearest first; cards without a location go last; ties keep the relevance order. */
+function byDistanceFrom(near: { lat: number; lng: number }) {
+  const km = (c: ListedCard) =>
+    c.card.location ? distanceKm(near, c.card.location) : Infinity;
+  return (a: ListedCard, b: ListedCard) => km(a) - km(b) || rank(a, b);
+}
+
 function cardFields(agent: Doc<"agents">): AgentCard {
   return {
     slug: agent.slug,
@@ -163,6 +171,7 @@ export const search = query({
     comuna: v.optional(v.string()),
     limit: v.optional(v.number()),
     offset: v.optional(v.number()),
+    near: v.optional(v.object({ lat: v.number(), lng: v.number() })),
   },
   handler: async (ctx, args): Promise<DirectorySearchResult> => {
     checkLimit(args.limit);
@@ -220,7 +229,9 @@ export const search = query({
 
     const agents: DirectoryCard[] = [];
     let responseBytes = 0;
-    for (const match of matches.sort(rank).slice(offset, offset + limit)) {
+    for (const match of matches
+      .sort(args.near ? byDistanceFrom(args.near) : rank)
+      .slice(offset, offset + limit)) {
       const card = await toDirectoryCard(ctx, match);
       responseBytes += byteSize(card);
       if (responseBytes > RESPONSE_BYTE_BUDGET) {
