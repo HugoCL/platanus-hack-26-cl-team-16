@@ -3,7 +3,13 @@
 import { Button } from "@ui-sdk/react/button";
 import { Minus, Plus } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  type PointerEvent as ReactPointerEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { DirectoryCard } from "@/convex/directory";
 import type { Category } from "@/shared/catalog";
 import type { LatLng } from "@/shared/geo";
@@ -16,6 +22,9 @@ const PADDING = 56;
 const MAX_ZOOM = 8;
 
 type Size = { width: number; height: number };
+type Point = { x: number; y: number };
+
+const MIDDLE_BUTTON = 1;
 
 function useSize<T extends HTMLElement>() {
   const ref = useRef<T>(null);
@@ -37,7 +46,7 @@ function useSize<T extends HTMLElement>() {
  * A schematic map: pins sit at their real relative positions (equirectangular, km-scaled), on a
  * plain grid. No tiles, no streets, so nothing on it pretends to be geography it doesn't know.
  */
-function useProjection(points: LatLng[], size: Size, zoom: number) {
+function useProjection(points: LatLng[], size: Size, zoom: number, pan: Point) {
   return useMemo(() => {
     if (points.length === 0 || size.width === 0) return null;
     const lats = points.map((p) => p.lat);
@@ -61,11 +70,11 @@ function useProjection(points: LatLng[], size: Size, zoom: number) {
     return {
       pxPerKm,
       project: (p: LatLng) => ({
-        x: size.width / 2 + (p.lng - lng0) * kmPerDegLng * pxPerKm,
-        y: size.height / 2 - (p.lat - lat0) * KM_PER_DEG_LAT * pxPerKm,
+        x: size.width / 2 + pan.x + (p.lng - lng0) * kmPerDegLng * pxPerKm,
+        y: size.height / 2 + pan.y - (p.lat - lat0) * KM_PER_DEG_LAT * pxPerKm,
       }),
     };
-  }, [points, size, zoom]);
+  }, [points, size, zoom, pan]);
 }
 
 export function DirectoryMap({
@@ -110,7 +119,43 @@ export function DirectoryMap({
     return list;
   }, [located, origin, radiusKm]);
 
-  const projection = useProjection(points, size, zoom);
+  const [pan, setPan] = useState<Point>({ x: 0, y: 0 });
+  const drag = useRef<{ id: number; x: number; y: number } | null>(null);
+  // A new result set re-fits the map, so drop the old pan with it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset on points change only
+  useEffect(() => setPan({ x: 0, y: 0 }), [points]);
+  const projection = useProjection(points, size, zoom, pan);
+
+  // Zoom around the view's center: the pan scales with the zoom.
+  function zoomBy(factor: number) {
+    const next = Math.min(Math.max(zoom * factor, 1), MAX_ZOOM);
+    const ratio = next / zoom;
+    setZoom(next);
+    setPan((p) =>
+      next === 1 ? { x: 0, y: 0 } : { x: p.x * ratio, y: p.y * ratio },
+    );
+  }
+
+  // Pan with the middle button anywhere, or the main button on the background (pins stay clickable).
+  function onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    const middle = event.button === MIDDLE_BUTTON;
+    if (!middle && (event.button !== 0 || event.target !== event.currentTarget))
+      return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    drag.current = { id: event.pointerId, x: event.clientX, y: event.clientY };
+  }
+  function onPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const start = drag.current;
+    if (!start || start.id !== event.pointerId) return;
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    drag.current = { ...start, x: event.clientX, y: event.clientY };
+    setPan((p) => ({ x: p.x + dx, y: p.y + dy }));
+  }
+  function onPointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+    if (drag.current?.id === event.pointerId) drag.current = null;
+  }
 
   const labels = useMemo(() => {
     const groups = new Map<string, LatLng[]>();
@@ -134,9 +179,22 @@ export function DirectoryMap({
       aria-label="Mapa de resultados"
       className={`relative min-h-[520px] overflow-hidden bg-[var(--sm-map-land)] ${className}`}
     >
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: drag-to-pan is a pointer extra; the pins and zoom buttons are the keyboard path */}
       <div
         ref={ref}
-        className="absolute inset-0 [background-image:linear-gradient(var(--sm-map-grid)_1px,transparent_1px),linear-gradient(90deg,var(--sm-map-grid)_1px,transparent_1px)] [background-size:48px_48px]"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        // Stops the browser's middle-click autoscroll (and paste on Linux) over the map.
+        onMouseDown={(event) => {
+          if (event.button === MIDDLE_BUTTON) event.preventDefault();
+        }}
+        onAuxClick={(event) => event.preventDefault()}
+        style={{
+          backgroundPosition: `${pan.x}px ${pan.y}px`,
+        }}
+        className="absolute inset-0 cursor-grab touch-none select-none active:cursor-grabbing [background-image:linear-gradient(var(--sm-map-grid)_1px,transparent_1px),linear-gradient(90deg,var(--sm-map-grid)_1px,transparent_1px)] [background-size:48px_48px]"
       >
         {projection ? (
           <>
@@ -238,7 +296,7 @@ export function DirectoryMap({
           data-variant="ghost"
           aria-label="Acercar"
           disabled={zoom >= MAX_ZOOM}
-          onClick={() => setZoom((z) => Math.min(z * 1.5, MAX_ZOOM))}
+          onClick={() => zoomBy(1.5)}
           className="!size-10 !rounded-none !p-0"
         >
           <Plus aria-hidden size={16} />
@@ -247,7 +305,7 @@ export function DirectoryMap({
           data-variant="ghost"
           aria-label="Alejar"
           disabled={zoom <= 1}
-          onClick={() => setZoom((z) => Math.max(z / 1.5, 1))}
+          onClick={() => zoomBy(1 / 1.5)}
           className="!size-10 !rounded-none border-t border-border !p-0"
         >
           <Minus aria-hidden size={16} />
