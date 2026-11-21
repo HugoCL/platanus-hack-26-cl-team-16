@@ -10,6 +10,8 @@ pnpm install && pnpm dev
 
 `pnpm dev` starts a local Convex backend, loads the seed data into every empty table (`seed:ensure`), and serves the app at http://localhost:3000. The seed data lives in `shared/seed-data.ts`: 15 fictitious agent cards across 13 categories, the Providencia clinic with 2 doctors and 4 open slots, a hotel with nightly availability, shops with priced products, and one example room.
 
+The directory, the MCP server and the tests work like this. Rooms do not: the default `fake` LLM has no judge, so the moderator blocks every request that reaches it (`RequestBlocked`, "El moderador falló") and the reference scene answers `NotConfigured`. To open rooms locally, set `LLM_PROVIDER=openrouter` and `OPENROUTER_API_KEY` on the local deployment as described in [Try Claude through OpenRouter locally](#try-claude-through-openrouter-locally).
+
 If a schema change is rejected because your local data no longer matches it, stop `pnpm dev`, delete `.convex/local`, and start again. That gives you a fresh local database that is reseeded from `shared/seed-data.ts`.
 
 Rooms seeded before E2 have a contract without the provider's `purpose`. The schema still accepts them, and `pnpm migrate` (with `pnpm dev` running) copies the purpose from the recipient's card (`backfillSessionPurpose`). Run it once on every deployment that kept its data: local, the team's cloud dev and reused previews. `pnpm seed:reset` also works on a local deployment.
