@@ -196,7 +196,7 @@ export function SelectedCard({
 
 export function MapLegend({ origin }: { origin: LatLng | null }) {
   return (
-    <div className="absolute bottom-4 left-4 flex gap-3.5 rounded-2xl bg-card px-3 py-2 text-xs text-subtle-foreground shadow-card">
+    <div className="absolute top-3 left-3 flex gap-3.5 lg:top-auto lg:bottom-4 lg:left-4 rounded-2xl bg-card px-3 py-2 text-xs text-subtle-foreground shadow-card">
       <span className="inline-flex items-center gap-1.5">
         <span className="size-2.5 rounded-full bg-foreground" />
         Activo

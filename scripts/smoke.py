@@ -118,6 +118,37 @@ def directory(page):
     return cards.count()
 
 
+def mobile_directory(page):
+    from playwright.sync_api import expect
+
+    page.add_init_script("""
+      const queryPermission = navigator.permissions.query.bind(navigator.permissions);
+      navigator.permissions.query = (permission) => permission.name === "geolocation"
+        ? Promise.resolve({ state: "prompt" })
+        : queryPermission(permission);
+      for (const method of ["getItem", "setItem"]) {
+        const original = Storage.prototype[method];
+        Storage.prototype[method] = function (key, ...args) {
+          if (key === "directory:location-invite-dismissed") {
+            throw new DOMException("Storage blocked", "SecurityError");
+          }
+          return original.call(this, key, ...args);
+        };
+      }
+    """)
+    directory(page)
+    dismiss = page.get_by_role("button", name="Ahora no", exact=True)
+    expect(dismiss).to_be_visible()
+    page.screenshot(path=str(ARTIFACTS / "directory-mobile-search.png"))
+    dismiss.click()
+    expect(dismiss).to_be_hidden()
+    page.get_by_role("searchbox", name="¿Qué necesitas?").fill(
+        "cardiólogo en Providencia"
+    )
+    page.get_by_role("button", name="Buscar", exact=True).click()
+    expect(page.get_by_role("button", name="Quitar Providencia", exact=True)).to_be_visible()
+
+
 def check():
     from playwright.sync_api import sync_playwright
 
@@ -139,6 +170,9 @@ def check():
                     page.screenshot(path=str(ARTIFACTS / "smoke.png"), full_page=True)
                 except Exception as err:
                     print(f"smoke: could not save the screenshot: {err}")
+            mobile = browser.new_page(viewport={"width": 390, "height": 844})
+            mobile.on("pageerror", lambda err: page_errors.append(str(err)))
+            mobile_directory(mobile)
         finally:
             browser.close()
     if page_errors:
@@ -154,6 +188,7 @@ def check():
         f"PASS: {URL} rendered the landing, /directory listed {listed} cards,"
         " screenshot of /directory at artifacts/smoke.png"
     )
+    print("PASS: mobile search submits by click and location invite works with blocked storage")
     return 0
 
 

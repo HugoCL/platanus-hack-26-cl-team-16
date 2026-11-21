@@ -32,7 +32,14 @@ import {
   X,
 } from "lucide-react";
 import dynamic from "next/dynamic";
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type FormEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { api } from "@/convex/_generated/api";
 import type { DirectoryCard, DirectorySearchResult } from "@/convex/directory";
 import type { LatLng } from "@/shared/geo";
@@ -51,12 +58,19 @@ const MAX_INTENT_FILTERS = 6;
 const DEFAULT_RADIUS_KM = 5;
 const PAGE_SIZE = 20;
 const FIRST_PAGE = [0];
+const INVITE_DISMISSED_KEY = "directory:location-invite-dismissed";
+
+function isLocationInviteDismissed() {
+  try {
+    return Boolean(localStorage.getItem(INVITE_DISMISSED_KEY));
+  } catch {
+    return false;
+  }
+}
 
 const GoogleDirectoryMap = dynamic(() => import("./google-directory-map"), {
   ssr: false,
-  loading: () => (
-    <div className="min-h-[520px] flex-1 bg-[var(--sm-map-land)] lg:min-h-0" />
-  ),
+  loading: () => <div className="min-h-0 flex-1 bg-[var(--sm-map-land)]" />,
 });
 const MapView = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
   ? GoogleDirectoryMap
@@ -185,7 +199,8 @@ export function DirectorySearch() {
       ?.query({ name: "geolocation" })
       .then((status) => {
         if (status.state === "granted") startLocating(false);
-        else if (status.state === "prompt") setOfferLocation(true);
+        else if (status.state === "prompt" && !isLocationInviteDismissed())
+          setOfferLocation(true);
       })
       .catch(() => {});
   }, []);
@@ -298,29 +313,45 @@ export function DirectorySearch() {
     .join(" · ");
 
   return (
-    <div className="flex min-h-dvh flex-col bg-background lg:h-dvh lg:min-h-0 lg:overflow-hidden">
+    <div
+      className={`flex min-h-dvh flex-col bg-background lg:h-dvh lg:min-h-0 lg:overflow-hidden ${view === "map" ? "max-lg:h-dvh max-lg:min-h-0 max-lg:overflow-hidden" : ""}`}
+    >
       <SiteHeader current="directory" />
 
       <section
         aria-label="Búsqueda"
-        className="flex flex-col gap-3.5 border-b border-border px-4 py-5 sm:px-6"
+        className={`flex flex-col gap-3.5 border-b border-border px-4 sm:px-6 ${view === "map" ? "py-3 lg:py-5 [&>:not(:first-child)]:max-lg:hidden" : "py-5"}`}
       >
         <TextSearch
           onInterpreted={({ category, comuna }) => {
             setCategory(category);
             setComuna(comuna);
           }}
+          trailing={
+            view === "map" ? null : (
+              <Button
+                data-size="icon"
+                className="relative !size-12 flex-none sm:!hidden"
+                aria-expanded={filtersOpen}
+                aria-controls="directory-filters"
+                onClick={() => setFiltersOpen((open) => !open)}
+              >
+                <SlidersHorizontal aria-hidden size={18} />
+                <span className="sr-only">
+                  Filtros{active.length > 0 ? ` · ${active.length}` : ""}
+                </span>
+                {active.length > 0 ? (
+                  <span
+                    aria-hidden
+                    className="absolute -top-1 -right-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-medium text-primary-foreground tabular-nums"
+                  >
+                    {active.length}
+                  </span>
+                ) : null}
+              </Button>
+            )
+          }
         />
-
-        <Button
-          className="inline-flex items-center gap-1.5 self-start sm:!hidden"
-          aria-expanded={filtersOpen}
-          aria-controls="directory-filters"
-          onClick={() => setFiltersOpen((open) => !open)}
-        >
-          <SlidersHorizontal aria-hidden size={15} />
-          Filtros{active.length > 0 ? ` · ${active.length}` : ""}
-        </Button>
 
         <div
           id="directory-filters"
@@ -471,12 +502,15 @@ export function DirectorySearch() {
         </div>
 
         {offerLocation && geo.state === "off" ? (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 self-start rounded-2xl bg-muted py-2 pr-2 pl-3.5 text-[13px]">
-            <LocateFixed aria-hidden size={15} />
-            <span>
-              Comparte tu ubicación y te mostramos primero lo que está cerca.
+          <div className="flex items-center gap-x-3 self-start rounded-2xl bg-muted py-1.5 pr-1.5 pl-3.5 text-[13px] max-sm:self-stretch">
+            <LocateFixed aria-hidden size={15} className="flex-none" />
+            <span className="min-w-0 flex-1">
+              <span className="sm:hidden">¿Ver lo cercano?</span>
+              <span className="max-sm:hidden">
+                Comparte tu ubicación y te mostramos primero lo que está cerca.
+              </span>
             </span>
-            <div className="flex gap-1">
+            <div className="flex flex-none gap-1">
               <Button
                 data-variant="solid"
                 data-size="sm"
@@ -487,9 +521,19 @@ export function DirectorySearch() {
               <Button
                 data-variant="ghost"
                 data-size="sm"
-                onClick={() => setOfferLocation(false)}
+                aria-label="Ahora no"
+                onClick={() => {
+                  setOfferLocation(false);
+                  try {
+                    localStorage.setItem(INVITE_DISMISSED_KEY, "1");
+                  } catch {
+                    // The invite is dismissed for this visit without storage.
+                  }
+                }}
+                className="max-sm:!w-8 max-sm:!px-0"
               >
-                Ahora no
+                <X aria-hidden size={14} className="sm:hidden" />
+                <span className="max-sm:hidden">Ahora no</span>
               </Button>
             </div>
           </div>
@@ -709,8 +753,10 @@ type Interpretation = { category: string | null; comuna: string | null };
 
 function TextSearch({
   onInterpreted,
+  trailing,
 }: {
   onInterpreted: (value: Interpretation) => void;
+  trailing?: ReactNode;
 }) {
   const searchText = useAction(api.directory.searchText);
   const [text, setText] = useState("");
@@ -765,27 +811,46 @@ function TextSearch({
           <Search
             aria-hidden
             size={18}
-            className="pointer-events-none absolute left-4 text-muted-foreground"
+            className="pointer-events-none absolute left-4 hidden text-muted-foreground sm:block"
           />
           <Input
             id="dir-q"
             type="search"
+            enterKeyHint="search"
+            aria-busy={busy}
             value={text}
             maxLength={MAX_QUERY_LENGTH}
             onChange={(event) => setText(event.target.value)}
             placeholder="¿Qué necesitas? ej. hora con cardiólogo en Providencia"
-            className="!h-12 w-full !border-ring !pl-11 !text-[15px]"
+            className="!h-12 w-full !border-ring !text-[15px] max-sm:!pr-11 sm:!pl-11"
           />
+          <Button
+            type="submit"
+            data-variant="ghost"
+            data-size="icon"
+            aria-label="Buscar"
+            aria-busy={busy}
+            disabled={busy}
+            className="absolute right-1 !size-10 !p-0 sm:!hidden"
+          >
+            {busy ? (
+              <LoaderCircle aria-hidden size={18} className="animate-spin" />
+            ) : (
+              <Search aria-hidden size={18} />
+            )}
+          </Button>
         </div>
         <Button
           type="submit"
           data-variant="solid"
           data-size="xl"
+          className="max-sm:!hidden"
           aria-busy={busy}
           disabled={busy}
         >
           {busy ? "Buscando…" : "Buscar"}
         </Button>
+        {trailing}
       </form>
       {note ? (
         <p
