@@ -181,6 +181,36 @@ describe("generic provider agent", () => {
     ]);
   });
 
+  it("only its own booking's confirmation counts as sent", async () => {
+    const room = await openRoom();
+    const picker = await askForSlots(room);
+    await room.post(room.recipient, room.owner, {
+      kind: "ui",
+      spec: {
+        type: "confirmation",
+        id: "permiso",
+        title: "Permiso",
+        summary: "Otra cosa.",
+        details: [],
+        confirmLabel: "Sí",
+        cancelLabel: "No",
+      },
+    });
+    const chosen = pickerOf(picker).slots[0].id;
+
+    const actions = await askProvider(
+      t,
+      room,
+      await choose(room, picker, chosen),
+      noLlm,
+    );
+
+    expect(actions).toMatchObject([
+      { kind: "send", content: { spec: { id: `reserva-${chosen}` } } },
+      { kind: "close" },
+    ]);
+  });
+
   it("never books a slot it did not offer in that picker", async () => {
     const room = await openRoom();
     const picker = await askForSlots(room);
