@@ -337,6 +337,23 @@ describe("directory search", () => {
     expect(result.truncated).toBe(true);
   });
 
+  it("pages past the first results with an offset", async () => {
+    await insertCopies("hotel-providencia-suites", 10, (i) => ({
+      slug: `hotel-extra-${i}`,
+      name: `Hotel extra ${i}`,
+      verified: false,
+    }));
+    const first = await t.query(api.directory.search, {});
+    const rest = await t.query(api.directory.search, { offset: MAX_LIMIT });
+    expect(rest.truncated).toBe(false);
+    expect(rest.agents.length).toBeGreaterThan(0);
+    const slugs = [...first.agents, ...rest.agents].map((a) => a.slug);
+    expect(new Set(slugs).size).toBe(slugs.length);
+    await expect(t.query(api.directory.search, { offset: -1 })).rejects.toThrow(
+      /offset/,
+    );
+  });
+
   it("resolves exact category slugs through the index, beyond the taxonomy page", async () => {
     await t.run(async (ctx) => {
       for (let i = 0; i < CATEGORY_LIMIT + 10; i++) {

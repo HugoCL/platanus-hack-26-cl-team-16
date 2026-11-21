@@ -123,6 +123,6 @@ export function categoryTree(categories: readonly Category[]) {
   ]);
 }
 
-export function pluralAgents(count: number) {
-  return `${count} ${count === 1 ? "agente" : "agentes"}`;
+export function pluralAgents(count: number, more = false) {
+  return `${count}${more ? "+" : ""} ${count === 1 && !more ? "agente" : "agentes"}`;
 }

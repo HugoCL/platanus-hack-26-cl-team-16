@@ -18,7 +18,7 @@ import { categoryIcon } from "./directory-format";
 
 const KM_PER_DEG_LAT = 110.574;
 const MIN_SPAN_KM = 2;
-const PADDING = 56;
+const PADDING = { x: 104, top: 64, bottom: 96 };
 const MAX_ZOOM = 8;
 
 type Size = { width: number; height: number };
@@ -64,14 +64,16 @@ function useProjection(points: LatLng[], size: Size, zoom: number, pan: Point) {
     );
     const pxPerKm =
       Math.min(
-        Math.max(size.width - PADDING * 2, 80) / spanX,
-        Math.max(size.height - PADDING * 2, 80) / spanY,
+        Math.max(size.width - PADDING.x * 2, 80) / spanX,
+        Math.max(size.height - PADDING.top - PADDING.bottom, 80) / spanY,
       ) * zoom;
+    const centerY =
+      PADDING.top + (size.height - PADDING.top - PADDING.bottom) / 2;
     return {
       pxPerKm,
       project: (p: LatLng) => ({
         x: size.width / 2 + pan.x + (p.lng - lng0) * kmPerDegLng * pxPerKm,
-        y: size.height / 2 + pan.y - (p.lat - lat0) * KM_PER_DEG_LAT * pxPerKm,
+        y: centerY + pan.y - (p.lat - lat0) * KM_PER_DEG_LAT * pxPerKm,
       }),
     };
   }, [points, size, zoom, pan]);
@@ -171,8 +173,27 @@ export function DirectoryMap({
     }));
   }, [located]);
 
-  const selected = located.find((c) => c.agentId === selectedId);
+  const pins = useMemo(() => {
+    const groups = new Map<string, typeof located>();
+    for (const card of located) {
+      const key = `${card.location.lat},${card.location.lng}`;
+      groups.set(key, [...(groups.get(key) ?? []), card]);
+    }
+    return [...groups.values()];
+  }, [located]);
+
+  const selectedPin = pins.find((pin) =>
+    pin.some((c) => c.agentId === selectedId),
+  );
+  const selected = selectedPin?.find((c) => c.agentId === selectedId);
   const selectedAt = selected && projection?.project(selected.location);
+
+  function select(agentId: string) {
+    onSelect(agentId);
+    document
+      .getElementById(`agent-${agentId}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
 
   return (
     <section
@@ -219,26 +240,25 @@ export function DirectoryMap({
               />
             ) : null}
 
-            {located.map((card) => {
+            {pins.map((pin) => {
+              const card = pin.find((c) => c.agentId === selectedId) ?? pin[0];
               const at = projection.project(card.location);
               const Icon = categoryIcon(card.categories, categories);
               const isSelected = card.agentId === selectedId;
-              const prospect = isProspect(card);
+              const prospect = pin.every(isProspect);
+              const next =
+                pin[(pin.indexOf(card) + (isSelected ? 1 : 0)) % pin.length];
               return (
                 <button
-                  key={card.agentId}
+                  key={pin[0].agentId}
                   type="button"
-                  aria-label={`${card.name}${prospect ? " (sin reclamar)" : ""}`}
+                  aria-label={
+                    pin.length > 1
+                      ? `${pin.length} agentes en la misma dirección: ${pin.map((c) => c.name).join(", ")}`
+                      : `${card.name}${prospect ? " (sin reclamar)" : ""}`
+                  }
                   aria-pressed={isSelected}
-                  onClick={() => {
-                    onSelect(card.agentId);
-                    document
-                      .getElementById(`agent-${card.agentId}`)
-                      ?.scrollIntoView({
-                        behavior: "smooth",
-                        block: "nearest",
-                      });
-                  }}
+                  onClick={() => select(next.agentId)}
                   className={`absolute grid -translate-x-1/2 -translate-y-full place-items-center rounded-[50%_50%_50%_0] transition-transform [rotate:-45deg] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
                     isSelected
                       ? "z-20 size-11 bg-primary text-primary-foreground shadow-[0_0_0_4px_color-mix(in_oklch,var(--ui-primary)_20%,transparent)]"
@@ -253,6 +273,14 @@ export function DirectoryMap({
                     size={isSelected ? 20 : 16}
                     className="rotate-45"
                   />
+                  {pin.length > 1 ? (
+                    <span
+                      aria-hidden
+                      className="absolute -top-1.5 -right-1.5 grid h-5 min-w-5 rotate-45 place-items-center rounded-full bg-foreground px-1 text-[11px] font-medium text-background tabular-nums"
+                    >
+                      {pin.length}
+                    </span>
+                  ) : null}
                 </button>
               );
             })}
@@ -275,6 +303,25 @@ export function DirectoryMap({
                 <span className="line-clamp-2 text-[13px] leading-normal text-subtle-foreground">
                   {selected.purpose}
                 </span>
+                {selectedPin && selectedPin.length > 1 ? (
+                  <div className="flex flex-col gap-1 border-t border-border pt-2">
+                    <span className="text-xs text-subtle-foreground">
+                      También en esta dirección
+                    </span>
+                    {selectedPin
+                      .filter((c) => c !== selected)
+                      .map((c) => (
+                        <button
+                          key={c.agentId}
+                          type="button"
+                          onClick={() => select(c.agentId)}
+                          className="cursor-pointer truncate border-0 bg-transparent p-0 text-left text-[13px] font-medium text-foreground underline-offset-3 hover:underline"
+                        >
+                          {c.name}
+                        </button>
+                      ))}
+                  </div>
+                ) : null}
                 <Link
                   href={`/directory/${selected.slug}`}
                   className="inline-flex h-8 items-center self-start rounded-full border border-input px-3 text-[13px] font-medium text-foreground no-underline hover:bg-muted"
@@ -286,7 +333,9 @@ export function DirectoryMap({
           </>
         ) : (
           <p className="absolute inset-0 m-0 grid place-items-center text-subtle-foreground">
-            Ningún resultado tiene ubicación.
+            {cards.length === 0
+              ? "Sin resultados."
+              : "Ningún resultado tiene ubicación."}
           </p>
         )}
       </div>

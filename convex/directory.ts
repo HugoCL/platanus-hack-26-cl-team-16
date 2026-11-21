@@ -160,10 +160,15 @@ export const search = query({
     category: v.optional(v.string()),
     comuna: v.optional(v.string()),
     limit: v.optional(v.number()),
+    offset: v.optional(v.number()),
   },
   handler: async (ctx, args): Promise<DirectorySearchResult> => {
     checkLimit(args.limit);
     const limit = args.limit ?? MAX_LIMIT;
+    const offset = args.offset ?? 0;
+    if (!Number.isInteger(offset) || offset < 0) {
+      invalidArgument("offset must be a non-negative integer");
+    }
     let truncated = false;
 
     let wanted: Set<string> | undefined;
@@ -209,11 +214,11 @@ export const search = query({
         if (listed) matches.push(listed);
       }
     }
-    truncated ||= scanStopped || matches.length > limit;
+    truncated ||= scanStopped || matches.length > offset + limit;
 
     const agents: DirectoryCard[] = [];
     let responseBytes = 0;
-    for (const match of matches.sort(rank).slice(0, limit)) {
+    for (const match of matches.sort(rank).slice(offset, offset + limit)) {
       const card = await toDirectoryCard(ctx, match);
       responseBytes += byteSize(card);
       if (responseBytes > RESPONSE_BYTE_BUDGET) {

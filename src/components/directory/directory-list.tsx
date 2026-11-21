@@ -27,6 +27,9 @@ export default function DirectoryList({
   onSelect,
   onConverse,
 }: DirectoryListProps) {
+  const nameCounts = new Map<string, number>();
+  for (const card of cards)
+    nameCounts.set(card.name, (nameCounts.get(card.name) ?? 0) + 1);
   return (
     <ul
       className="m-0 flex list-none flex-col gap-3 p-0"
@@ -38,6 +41,7 @@ export default function DirectoryList({
           card={card}
           categories={categories}
           distance={distances?.get(card.agentId)}
+          sharesName={(nameCounts.get(card.name) ?? 0) > 1}
           selected={card.agentId === selectedId}
           onSelect={onSelect}
           onConverse={onConverse}
@@ -51,6 +55,7 @@ function AgentResult({
   card,
   categories,
   distance,
+  sharesName,
   selected,
   onSelect,
   onConverse,
@@ -58,6 +63,7 @@ function AgentResult({
   card: DirectoryCard;
   categories: Category[];
   distance?: number;
+  sharesName: boolean;
   selected: boolean;
   onSelect?: (agentId: string) => void;
   onConverse?: (card: DirectoryCard) => void;
@@ -67,6 +73,7 @@ function AgentResult({
   const intents = card.allowedIntents;
   const href = `/directory/${card.slug}`;
   const meta = [
+    sharesName ? (card.location?.address ?? card.entityName) : undefined,
     card.comuna,
     distance === undefined ? undefined : formatKm(distance),
     KIND_LABELS[card.kind],
@@ -97,6 +104,7 @@ function AgentResult({
               type="button"
               data-select
               aria-pressed={selected}
+              title={card.name}
               onClick={() => onSelect?.(card.agentId)}
               className="line-clamp-2 min-w-0 cursor-pointer border-0 bg-transparent p-0 text-left font-[inherit] text-inherit outline-none before:absolute before:inset-0 before:rounded-3xl"
             >
@@ -129,7 +137,8 @@ function AgentResult({
           {intents.slice(0, VISIBLE_INTENTS).map((intent) => (
             <li
               key={intent}
-              className="inline-flex h-6 items-center rounded-full border border-input px-2.5 text-xs"
+              title={intentLabel(intent)}
+              className="h-6 max-w-full truncate rounded-full border border-input px-2.5 text-xs leading-[22px]"
             >
               {intentLabel(intent)}
             </li>
