@@ -127,11 +127,10 @@ export default function GoogleDirectoryMap({
             >
               <SelectedCard
                 key={selected.agentId}
-                className="origin-bottom"
                 pin={selectedPin}
                 selected={selected}
                 onSelect={select}
-                className="pointer-events-auto"
+                className="origin-bottom pointer-events-auto"
               />
             </AdvancedMarker>
           ) : null}
