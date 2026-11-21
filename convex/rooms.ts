@@ -125,3 +125,39 @@ export const get = query({
   handler: (ctx, { sessionId }): Promise<Session | null> =>
     loadSession(ctx, sessionId),
 });
+
+export const close = mutation({
+  args: {
+    sessionId: v.id("sessions"),
+    participantId: v.id("participants"),
+  },
+  handler: async (ctx, { sessionId, participantId }) => {
+    const session = await ctx.db.get(sessionId);
+    if (!session) {
+      throw new ConvexError({
+        kind: "NotFound",
+        message: "the room does not exist",
+      });
+    }
+    const participant = await ctx.db.get(participantId);
+    if (
+      participant?.sessionId !== sessionId ||
+      participant.leftAt !== undefined
+    ) {
+      throw new ConvexError({
+        kind: "NotParticipant",
+        message: "only a participant can close the room",
+      });
+    }
+    if (session.status === "active") {
+      await ctx.db.patch("sessions", sessionId, { status: "closed" });
+      await publishNotice(ctx, sessionId, "session_closed", "Sala cerrada.");
+    } else if (session.status !== "closed") {
+      throw new ConvexError({
+        kind: "RoomClosed",
+        message: "the room is not open",
+      });
+    }
+    return { sessionId, status: "closed" as const };
+  },
+});
