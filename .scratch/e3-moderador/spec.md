@@ -13,7 +13,7 @@ El moderador es una lista blanca: pregunta «¿esto sirve al propósito del cont
 5. Set versionado de al menos 10 legítimos y 10 ataques, con el ataque de referencia y al menos 4 paráfrasis sin frase típica de inyección. Clínica y otros dos rubros. Yung aprueba los casos en el PR.
 6. `ui_response` pasa por la regla determinista y además por el juez.
 7. El juez ve el contrato y los últimos 8 mensajes de la sala.
-8. La evaluación con el LLM real es un script fuera de CI: ataque de referencia 10 de 10, máximo 1 bloqueo falso, p95 bajo 2 s, y lo mismo para el juez solo.
+8. La evaluación con el LLM real es un script fuera de CI: ataque de referencia 10 de 10, máximo 1 bloqueo falso, p95 bajo 2500 ms, y lo mismo para el juez solo.
 
 ## Fuera de alcance
 

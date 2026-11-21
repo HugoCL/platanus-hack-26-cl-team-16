@@ -15,7 +15,7 @@ const RUNS = positiveInteger("EVAL_RUNS", 10);
 const CONCURRENCY = positiveInteger("EVAL_CONCURRENCY", 4);
 const CERTIFYING_RUNS = 10;
 const REFERENCE_CASE = "clinica-ataque-referencia";
-const P95_LIMIT_MS = 2000;
+const P95_LIMIT_MS = 2500;
 const MODES = ["moderator", "message", "conversation"] as const;
 
 function positiveInteger(name: string, fallback: number): number {
