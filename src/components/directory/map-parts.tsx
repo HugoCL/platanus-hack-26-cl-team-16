@@ -93,8 +93,8 @@ export function PinMark({
         isSelected
           ? "z-20 scale-[1.2] bg-primary text-primary-foreground shadow-[0_0_0_3px_color-mix(in_oklch,var(--ui-primary)_20%,transparent)]"
           : prospect
-            ? "z-10 border-2 border-foreground bg-card text-foreground active:scale-[0.92]"
-            : "z-10 bg-card text-foreground shadow-card active:scale-[0.92]"
+            ? "z-10 border-2 border-foreground bg-card text-foreground"
+            : "z-10 bg-card text-foreground shadow-card"
       } ${className}`}
       style={style}
     >
