@@ -25,6 +25,31 @@ The directory lives in `convex/directory.ts` and the page at http://localhost:30
 
 Each card is an `AgentDetail` (the full `AgentCard` with purpose and scope) plus `comuna` and `allowedIntents`, so it also validates as an `AgentSummary`. Draft cards are never listed.
 
+## Bookings (E8)
+
+`convex/bookings.ts` holds the booking state of providers with the `booking` capability. It is internal: the provider agent books from inside a room.
+
+| Function | Kind | What it does |
+| --- | --- | --- |
+| `freeSlots(ctx, agentId, now)` | helper | The provider's slots that start after `now` and have `booked < capacity`, in start order (at most 200 rows scanned), so a taken or past slot is never offered. Queries take `now` as an argument because they cannot read the clock. |
+| `bookings.book` | internal mutation | Books one slot for a room where the agent is the provider. A room holds one booking: when it has one, `book` returns it, whatever slot was asked and even after the room closed. Otherwise the room must be open (`active`) with a contract that allows booking, and the slot must belong to a bookable offering of the provider. It creates a confirmed `booking` transaction and raises `booked` in the same mutation, never past `capacity`. A booking names its slot in `slotId`. A full slot, one that starts at or before `now`, or one whose offering the provider turned off returns `{ status: "unavailable" }`. The result type is `Booking` in `lib/agents/booking.ts`. |
+
+## Reference agents (E8)
+
+The agents' cores live in `lib/agents/` and are pure. A turn goes in (`AgentTurn`: the room contract, its participants, the history the agent can see and the message it answers) and actions come out (`AgentAction`: messages to send through the room's moderation, or closing the room). They reach the model only through `LlmProvider`, so the tests run them on the fake LLM.
+
+The provider (`lib/agents/provider.ts`) is generic. Its configuration is its card, its active offerings and their free slots, plus the `systemPrompt` of its `hostedAgentConfigs` row when it has one, all loaded by the internal query `providerAgent.context` (with `now`, so past slots are left out). That query reads nothing from other rooms, so the provider has nobody else's data to give away even when a message gets past the moderator (criterion 4).
+
+It acts only on a delivered message addressed to it (or to `all`). For a text, the model picks one action:
+
+- `offer_slots` (only when the room's contract has the `booking` capability): the provider sends the room's human owner a `slot_picker` with the first two free slots of the offerings the model picked. The model chooses offerings by key and never writes slots itself. With no human in the room, it says so in text.
+- `reply`: the model's answer goes back to the sender.
+- `decline`: a fixed refusal goes back to the sender.
+
+A `slot_selected` answer, from the human its picker was sent to, books that slot through `bookings.book` without asking the model. The provider then sends that human a `confirmation` card and closes the room, so the scenario ends the same way whatever consumer is in the room. A room holds one booking: a choice of another slot gets no answer, and the booked slot is confirmed again only while its confirmation (`reserva-<slot id>`) has not reached the human, so a turn cut short after booking can be retried. Two simultaneous choices of the same slot can still both confirm it: the booking stays one, and only the card repeats. If another room took the slot meanwhile, the human gets a new picker with the same offering's other slots.
+
+The consumer (`lib/agents/consumer.ts`) starts from the human's request as written. `chooseProvider` searches with `directory.searchText`, using the request as written or, when it is longer than the search's 300 characters, a short query the model writes from it. It gives the model the first five cards that allow some intent, as `<card>:<intent>` pairs. The model picks one pair, or none, and writes the opening message. The request never enters the room's contract, which skips moderation: the contract's intent description names only the intent and the provider, and the provider learns the request from the moderated opening. In the room, `consumerTurn` answers only delivered messages its provider sent to it or to everyone: the model replies, waits, or closes, and always sees the consumer's opening, however long the room gets. The provider closes the room when it confirms the booking.
+
 ## Test
 
 ```sh
@@ -39,7 +64,8 @@ This runs Vitest offline, with no network and no credentials. `tests/setup.ts` r
 - the directory: text parsing (`lib/directory.ts`), the list view, and `directory.*` against an in-memory Convex,
 - the moderator: the versioned moderation set (`shared/fixtures/moderation-set.ts`), the deterministic rules and the full moderator with the fake LLM,
 - the room demo UI's formatting helpers (`src/components/room/room-format.ts`),
-- `seed:ensure` against an in-memory Convex (convex-test): every seeded agent is a valid card.
+- `seed:ensure` against an in-memory Convex (convex-test): every seeded agent is a valid card,
+- bookings and the reference agents against the same in-memory Convex, with the fake LLM.
 
 `pnpm smoke` is separate. It starts `pnpm dev`, drives the home page in Chromium, and checks that `/directory` lists the seed cards.
 
