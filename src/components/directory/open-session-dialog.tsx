@@ -112,14 +112,14 @@ export function OpenSessionDialog({
                   <DialogTitle className="m-0 text-xl font-semibold tracking-tight">
                     ¿Para qué quieres conversar?
                   </DialogTitle>
-                  <DialogDescription className="m-0 text-[13px] text-subtle-foreground">
+                  <DialogDescription className="m-0 text-caption text-subtle-foreground">
                     {selfName} habla con {card.name}.
                   </DialogDescription>
                 </div>
 
                 {card.allowedIntents.length > 0 ? (
                   <div className="flex flex-col gap-2">
-                    <span id="open-intent" className="text-[13px] font-medium">
+                    <span id="open-intent" className="text-caption font-medium">
                       Intención
                     </span>
                     <RadioGroup
@@ -155,7 +155,7 @@ export function OpenSessionDialog({
                 <div className="flex flex-col gap-1.5">
                   <label
                     htmlFor="open-description"
-                    className="text-[13px] font-medium"
+                    className="text-caption font-medium"
                   >
                     Descripción corta
                   </label>
@@ -193,12 +193,12 @@ export function OpenSessionDialog({
                   <DialogTitle className="m-0 text-xl font-semibold tracking-tight">
                     Revisa el contrato
                   </DialogTitle>
-                  <DialogDescription className="m-0 text-[13px] text-subtle-foreground">
+                  <DialogDescription className="m-0 text-caption text-subtle-foreground">
                     Esto rige la sala. El moderador revisa cada mensaje contra
                     este contrato.
                   </DialogDescription>
                 </div>
-                <dl className="m-0 flex flex-col gap-3.5 text-[13px]">
+                <dl className="m-0 flex flex-col gap-3.5 text-caption">
                   <div className="flex flex-col gap-1">
                     <dt className="text-subtle-foreground">Intención</dt>
                     <dd className="m-0 break-words">
@@ -351,7 +351,7 @@ function ChipRow({
           items.map((item) => (
             <span
               key={item}
-              className={`inline-flex h-6.5 items-center rounded-full px-2.5 ${className}`}
+              className={`inline-flex h-6.5 items-center rounded-lg px-2.5 ${className}`}
             >
               {item}
             </span>

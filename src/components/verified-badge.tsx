@@ -17,9 +17,9 @@ export function VerifiedBadge({
         aria-label={LABEL}
         data-size="sm"
         data-variant="ghost"
-        className={`!h-6 !w-6 shrink-0 !p-0 text-subtle-foreground ${className}`}
+        className={`!h-6 !w-6 shrink-0 !p-0 text-brand-ink ${className}`}
       >
-        <BadgeCheckIcon size={size} />
+        <BadgeCheckIcon size={size} fill="var(--brand-yellow)" />
       </TooltipTrigger>
       <TooltipContent>{LABEL}</TooltipContent>
     </Tooltip>

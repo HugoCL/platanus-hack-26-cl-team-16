@@ -343,7 +343,7 @@ export function DirectorySearch() {
                 {active.length > 0 ? (
                   <span
                     aria-hidden
-                    className="absolute -top-1 -right-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-medium text-primary-foreground tabular-nums"
+                    className="absolute -top-1 -right-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-micro font-medium text-primary-foreground tabular-nums"
                   >
                     {active.length}
                   </span>
@@ -367,7 +367,7 @@ export function DirectorySearch() {
               >
                 <SelectLabel className="sr-only">Categoría</SelectLabel>
                 <SelectTrigger
-                  className={`!h-9 !text-[13px] ${category ? "!border-foreground" : ""}`}
+                  className={`!h-9 !text-caption ${category ? "!border-foreground" : ""}`}
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -394,7 +394,7 @@ export function DirectorySearch() {
             >
               <SelectLabel className="sr-only">Comuna</SelectLabel>
               <SelectTrigger
-                className={`!h-9 !text-[13px] ${comuna ? "!border-foreground" : ""}`}
+                className={`!h-9 !text-caption ${comuna ? "!border-foreground" : ""}`}
               >
                 <SelectValue />
               </SelectTrigger>
@@ -411,17 +411,17 @@ export function DirectorySearch() {
             <Toggle
               pressed={geo.state === "on" || geo.state === "locating"}
               onPressedChange={locate}
-              className="inline-flex !h-9 items-center gap-1.5 !rounded-full !px-3 text-[13px] data-pressed:!border-primary data-pressed:!bg-primary data-pressed:!text-primary-foreground"
+              className="inline-flex !h-9 items-center gap-1.5 !rounded-lg !px-3 text-caption data-pressed:!border-primary data-pressed:!bg-primary data-pressed:!text-primary-foreground"
             >
               <LocateFixed aria-hidden size={15} />
               {geo.state === "locating" ? "Ubicando…" : "Cerca de mí"}
             </Toggle>
 
             {origin ? (
-              <div className="inline-flex h-9 items-center gap-2.5 rounded-full bg-muted px-3.5">
+              <div className="inline-flex h-9 items-center gap-2.5 rounded-lg bg-muted px-3.5">
                 <span
                   id="radius-label"
-                  className="text-[13px] text-subtle-foreground"
+                  className="text-caption text-subtle-foreground"
                 >
                   Radio
                 </span>
@@ -442,14 +442,14 @@ export function DirectorySearch() {
                     </SliderTrack>
                   </SliderControl>
                 </Slider>
-                <span className="min-w-12 text-[13px] tabular-nums">
+                <span className="min-w-12 text-caption tabular-nums">
                   {withinRadius ? `${radiusKm} km` : "Sin límite"}
                 </span>
               </div>
             ) : null}
 
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 sm:ml-auto">
-              <label className="inline-flex min-h-9 items-center gap-2 text-[13px] text-subtle-foreground">
+              <label className="inline-flex min-h-9 items-center gap-2 text-caption text-subtle-foreground">
                 <Switch
                   checked={verifiedOnly}
                   onCheckedChange={setVerifiedOnly}
@@ -458,7 +458,7 @@ export function DirectorySearch() {
                 </Switch>
                 Solo verificados
               </label>
-              <label className="inline-flex min-h-9 items-center gap-2 text-[13px] text-subtle-foreground">
+              <label className="inline-flex min-h-9 items-center gap-2 text-caption text-subtle-foreground">
                 <Switch
                   checked={includeProspects}
                   onCheckedChange={setIncludeProspects}
@@ -488,7 +488,7 @@ export function DirectorySearch() {
                           : list.filter((i) => i !== intent),
                       )
                     }
-                    className="inline-flex !h-8 items-center gap-1.5 !rounded-full !px-3 text-[13px] text-subtle-foreground data-pressed:text-foreground"
+                    className="inline-flex !h-8 items-center gap-1.5 !rounded-lg !px-3 text-caption text-subtle-foreground data-pressed:text-foreground"
                   >
                     {pressed ? (
                       <Check aria-hidden size={13} strokeWidth={2} />
@@ -502,7 +502,7 @@ export function DirectorySearch() {
         </div>
 
         {offerLocation && geo.state === "off" ? (
-          <div className="flex items-center gap-x-3 self-start rounded-2xl bg-muted py-1.5 pr-1.5 pl-3.5 text-[13px] max-sm:self-stretch">
+          <div className="flex items-center gap-x-3 self-start rounded-2xl bg-muted py-1.5 pr-1.5 pl-3.5 text-caption max-sm:self-stretch">
             <LocateFixed aria-hidden size={15} className="flex-none" />
             <span className="min-w-0 flex-1">
               <span className="sm:hidden">¿Ver lo cercano?</span>
@@ -540,20 +540,20 @@ export function DirectorySearch() {
         ) : null}
 
         {geo.state === "error" ? (
-          <p role="alert" className="m-0 text-[13px] text-destructive-text">
+          <p role="alert" className="m-0 text-caption text-destructive-text">
             {geo.message}
           </p>
         ) : null}
 
         {active.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-1.5 text-[13px]">
+          <div className="flex flex-wrap items-center gap-1.5 text-caption">
             <span className="mr-0.5 text-xs text-subtle-foreground">
               Activos
             </span>
             {active.map((filter) => (
               <span
                 key={filter.key}
-                className="inline-flex h-7 items-center gap-0.5 rounded-full bg-muted pr-1 pl-2.5"
+                className="inline-flex h-7 items-center gap-0.5 rounded-lg bg-muted pr-1 pl-2.5"
               >
                 {filter.label}
                 <Button
@@ -585,13 +585,13 @@ export function DirectorySearch() {
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3.5">
             <p
               aria-live="polite"
-              className="m-0 text-[13px] text-subtle-foreground"
+              className="m-0 text-caption text-subtle-foreground"
             >
               {result === undefined ? (
                 "Buscando…"
               ) : (
                 <>
-                  <span className="font-medium text-foreground tabular-nums">
+                  <span className="font-mono text-xs font-bold tracking-wider text-foreground uppercase tabular-nums">
                     {pluralAgents(cards.length, result.truncated)}
                   </span>
                   {summary ? ` · ${summary}` : null}
@@ -605,7 +605,7 @@ export function DirectorySearch() {
               }}
             >
               <SelectLabel className="sr-only">Orden</SelectLabel>
-              <SelectTrigger className="!h-8 !text-[13px]">
+              <SelectTrigger className="!h-8 !text-caption">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -635,14 +635,14 @@ export function DirectorySearch() {
                     <div className="flex items-start gap-3">
                       <span className="size-10 flex-none rounded-2xl bg-muted" />
                       <div className="flex flex-1 flex-col gap-2 pt-1">
-                        <span className="h-4 w-3/5 rounded-full bg-muted" />
-                        <span className="h-3 w-2/5 rounded-full bg-muted" />
+                        <span className="h-4 w-3/5 rounded-sm bg-muted" />
+                        <span className="h-3 w-2/5 rounded-sm bg-muted" />
                       </div>
                     </div>
-                    <span className="h-3 w-full rounded-full bg-muted" />
+                    <span className="h-3 w-full rounded-sm bg-muted" />
                     <div className="flex gap-2">
-                      <span className="h-9 flex-1 rounded-full bg-muted" />
-                      <span className="h-9 flex-1 rounded-full bg-muted" />
+                      <span className="h-9 flex-1 rounded-2xl bg-muted" />
+                      <span className="h-9 flex-1 rounded-2xl bg-muted" />
                     </div>
                   </div>
                 ))}
@@ -822,7 +822,7 @@ function TextSearch({
             maxLength={MAX_QUERY_LENGTH}
             onChange={(event) => setText(event.target.value)}
             placeholder="¿Qué necesitas? ej. hora con cardiólogo en Providencia"
-            className="!h-12 w-full !border-ring !text-[15px] max-sm:!pr-11 sm:!pl-11"
+            className="!h-12 w-full !border-foreground !text-lead max-sm:!pr-11 sm:!pl-11"
           />
           <Button
             type="submit"
@@ -842,7 +842,7 @@ function TextSearch({
         </div>
         <Button
           type="submit"
-          data-variant="solid"
+          data-variant="brand"
           data-size="xl"
           className="max-sm:!hidden"
           aria-busy={busy}
@@ -855,7 +855,7 @@ function TextSearch({
       {note ? (
         <p
           aria-live="polite"
-          className="m-0 text-[13px] text-subtle-foreground"
+          className="m-0 text-caption text-subtle-foreground"
         >
           {note}
         </p>
