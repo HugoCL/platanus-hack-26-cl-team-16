@@ -130,7 +130,7 @@ export function PinButton({
       aria-label={label}
       aria-pressed={isSelected}
       onClick={() => onSelect(next.agentId)}
-      className={`cursor-pointer rounded-full border-0 bg-transparent p-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${className}`}
+      className={`${isSelected ? "z-20" : "z-10"} cursor-pointer rounded-full border-0 bg-transparent p-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${className}`}
       style={style}
     >
       <PinMark pin={pin} selectedId={selectedId} categories={categories} />
