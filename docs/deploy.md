@@ -81,7 +81,7 @@ What changes the bill:
 - **Bandwidth above 5 GB.** Render bills the extra, or suspends the Free services when the workspace has no payment method.
 - **A new entry in `render.yaml`.** Render creates it on the next sync. Review changes to that file as a cost decision.
 - **Convex above the Free limits.** Nothing is billed: new writes start to fail.
-- **Real LLM or business providers.** `LLM_PROVIDER=gateway` and the other variables in `docs/development.md` spend those providers' credits. The defaults are offline and free.
+- **Real LLM or business providers.** `LLM_PROVIDER=openrouter` and the other variables in `docs/development.md` spend those providers' credits. The defaults are offline and free.
 
 ## One-time setup (human only)
 
@@ -94,7 +94,7 @@ Clerk keyless mode works only under `next dev`. A deployed build runs `next star
 1. In a terminal, `npx convex login`, then `npx convex dev --configure=new` to create the cloud project. Stop it once it runs. This is step 1 of "Switch to real accounts" in `AGENTS.md`.
 2. In the [Convex Dashboard](https://dashboard.convex.dev), create the project's production deployment if it has none. On that deployment's Deployment Settings page, General tab, click "Generate Production Deploy Key" and enable the `deployment:deploy` permission. The key starts with `prod:`. It becomes `CONVEX_DEPLOY_KEY` on Render.
 3. On the project's Settings page (not a deployment's), section Preview Deploy Keys, click "Generate Preview Deploy Key". The key starts with `preview:team-slug:project-slug|`. It becomes `CONVEX_PREVIEW_DEPLOY_KEY` on Render. A `dev:`, `prod:` or `project:` key fails the preview build: the Dev deployment's Deployment Settings page generates the first of those.
-4. Only when the app should use real providers: set the variables from `docs/development.md` (for example `LLM_PROVIDER` and `AI_GATEWAY_API_KEY`) on the production deployment (Settings, Environment Variables), and as default environment variables for preview deployments (Project Settings).
+4. Only when the app should use real providers: set the variables from `docs/development.md` (for example `LLM_PROVIDER=openrouter` and `OPENROUTER_API_KEY`) on the production deployment (Settings, Environment Variables), and as default environment variables for preview deployments (Project Settings).
 
 ### Clerk
 
