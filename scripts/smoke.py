@@ -169,8 +169,9 @@ def check():
         print("FAIL: uncaught page errors", *page_errors, sep="\n  ")
         return 1
     subprocess.run(
-        ["node", "--env-file-if-exists=.env", "--env-file-if-exists=.env.local",
-         str(ROOT / "scripts" / "smoke-rooms.mjs")],
+        ["pnpm", "test", "tests/convex/gate.test.ts",
+         "tests/convex/roomAuthorization.test.ts", "tests/convex/roomAgent.test.ts",
+         "tests/convex/rooms.test.ts"],
         cwd=ROOT, check=True, timeout=30,
     )
     print(

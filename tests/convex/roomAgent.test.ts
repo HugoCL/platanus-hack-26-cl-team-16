@@ -2,9 +2,14 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import { allowAllModerator } from "../../convex/moderator";
 import { testRoomAgent } from "../../convex/roomAgent";
-import { errorKind, roomWithHuman, seededRooms } from "./roomFixture";
+import * as rules from "../../shared/moderator/rules";
+import {
+  errorKind,
+  ROOM_OWNER,
+  roomWithHuman,
+  seededRooms,
+} from "./roomFixture";
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => {
@@ -23,21 +28,24 @@ async function setup() {
     human,
     sessionId,
     send: (recipient: Id<"participants"> | "all" = provider) =>
-      t.action(api.gate.send, {
+      t.action(internal.gate.sendAsParticipant, {
         sessionId,
         senderParticipantId: consumer,
         recipient,
         content: { kind: "text", text: "¿Tienes horas?" },
       }),
     history: (viewerParticipantId = consumer) =>
-      t.query(api.gate.history, { sessionId, viewerParticipantId }),
+      t.query(internal.gate.historyForParticipant, {
+        sessionId,
+        viewerParticipantId,
+      }),
     finishReplies: () => t.finishAllScheduledFunctions(vi.runAllTimers),
   };
 }
 
 it("publishes a hosted agent's answer to the sender with its own verdict", async () => {
   const room = await setup();
-  const moderate = vi.spyOn(allowAllModerator, "moderate");
+  const moderate = vi.spyOn(rules, "checkRules");
   const sent = await room.send();
   expect(sent.status).toBe("allowed");
   await room.finishReplies();
@@ -59,15 +67,8 @@ it("publishes a hosted agent's answer to the sender with its own verdict", async
 
 it("does not deliver a blocked agent reply to the other agent", async () => {
   const room = await setup();
-  const moderate = vi.spyOn(allowAllModerator, "moderate");
-  moderate.mockResolvedValueOnce({
-    verdict: { decision: "allow", reason: "Within the room's purpose." },
-    events: [],
-  });
-  moderate.mockResolvedValueOnce({
-    verdict: { decision: "block", rule: "purpose", reason: "Off-topic." },
-    events: [],
-  });
+  room.judge.mockReturnValueOnce({ decision: "allow", rule: "purpose" });
+  room.judge.mockReturnValueOnce({ decision: "block", rule: "purpose" });
 
   const sent = await room.send();
   await room.finishReplies();
@@ -83,10 +84,7 @@ it("does not deliver a blocked agent reply to the other agent", async () => {
 it("does not ask an agent to reply to a block or a message for a human or external agent", async () => {
   const room = await setup();
   const agent = vi.spyOn(testRoomAgent, "reply");
-  vi.spyOn(allowAllModerator, "moderate").mockResolvedValueOnce({
-    verdict: { decision: "block", rule: "purpose", reason: "Off-topic." },
-    events: [],
-  });
+  room.judge.mockReturnValueOnce({ decision: "block", rule: "purpose" });
   await room.send();
   await room.send(room.human);
   await room.t.run((ctx) =>
@@ -100,19 +98,19 @@ it("does not ask an agent to reply to a block or a message for a human or extern
 it("does not expose previous blocked messages to the hosted recipient", async () => {
   const room = await setup();
   const agent = vi.spyOn(testRoomAgent, "reply");
-  vi.spyOn(allowAllModerator, "moderate").mockResolvedValueOnce({
-    verdict: { decision: "block", rule: "purpose", reason: "Off-topic." },
-    events: [],
-  });
-  await room.send();
+  room.judge.mockReturnValueOnce({ decision: "block", rule: "purpose" });
+  expect((await room.send()).status).toBe("blocked");
+  await room.finishReplies();
+  expect(agent).not.toHaveBeenCalled();
   const allowed = await room.send();
   await room.finishReplies();
+  expect(agent.mock.calls[0][0].message).toEqual(allowed);
   expect(agent.mock.calls[0][0].history.slice(1)).toEqual([allowed]);
 });
 
 it("sends what an agent asks, to whom it asks, each through the gate", async () => {
   const room = await setup();
-  const moderate = vi.spyOn(allowAllModerator, "moderate");
+  const moderate = vi.spyOn(rules, "checkRules");
   const agent = vi.spyOn(testRoomAgent, "reply").mockResolvedValueOnce([
     {
       kind: "send",
@@ -176,7 +174,11 @@ it("closes the room when an agent asks, like rooms.close, and drops what follows
     { kind: "system", code: "session_closed" },
   ]);
   expect(
-    (await room.t.query(api.rooms.get, { sessionId: room.sessionId }))?.status,
+    (
+      await room.t
+        .withIdentity(ROOM_OWNER)
+        .query(api.rooms.get, { sessionId: room.sessionId })
+    )?.status,
   ).toBe("closed");
   expect(await errorKind(room.send())).toBe("RoomClosed");
 });
@@ -186,7 +188,7 @@ it("gives every agent a turn for a human's message to everyone, and none for an 
   const agent = vi.spyOn(testRoomAgent, "reply");
   const toEveryone = { kind: "text" as const, text: "Hola a todos." };
 
-  await room.t.action(api.gate.send, {
+  await room.t.action(internal.gate.sendAsParticipant, {
     sessionId: room.sessionId,
     senderParticipantId: room.human,
     recipient: "all",
@@ -231,7 +233,11 @@ it("drops a whole reply that addresses someone outside the room", async () => {
 
   expect((await room.history(room.human)).slice(1)).toEqual([sent]);
   expect(
-    (await room.t.query(api.rooms.get, { sessionId: room.sessionId }))?.status,
+    (
+      await room.t
+        .withIdentity(ROOM_OWNER)
+        .query(api.rooms.get, { sessionId: room.sessionId })
+    )?.status,
   ).toBe("active");
 });
 
@@ -245,21 +251,18 @@ it("stops a reply at the first send the moderator blocks", async () => {
     },
     { kind: "close" },
   ]);
-  const moderate = vi.spyOn(allowAllModerator, "moderate");
-  moderate.mockResolvedValueOnce({
-    verdict: { decision: "allow", reason: "Within the room's purpose." },
-    events: [],
-  });
-  moderate.mockResolvedValueOnce({
-    verdict: { decision: "block", rule: "sensitive_data", reason: "Datos." },
-    events: [],
-  });
+  room.judge.mockReturnValueOnce({ decision: "allow", rule: "purpose" });
+  room.judge.mockReturnValueOnce({ decision: "block", rule: "purpose" });
 
   await room.send();
   await room.finishReplies();
 
   expect(
-    (await room.t.query(api.rooms.get, { sessionId: room.sessionId }))?.status,
+    (
+      await room.t
+        .withIdentity(ROOM_OWNER)
+        .query(api.rooms.get, { sessionId: room.sessionId })
+    )?.status,
   ).toBe("active");
   expect((await room.history(room.human)).at(-1)).toMatchObject({
     content: { kind: "ui", spec: { type: "moderator_alert" } },
@@ -339,15 +342,8 @@ it("records a blocked confirmation even when one with the same id was allowed", 
     },
     { kind: "close" },
   ]);
-  const moderate = vi.spyOn(allowAllModerator, "moderate");
-  moderate.mockResolvedValueOnce({
-    verdict: { decision: "allow", reason: "Within the room's purpose." },
-    events: [],
-  });
-  moderate.mockResolvedValueOnce({
-    verdict: { decision: "block", rule: "sensitive_data", reason: "Datos." },
-    events: [],
-  });
+  room.judge.mockReturnValueOnce({ decision: "allow", rule: "purpose" });
+  room.judge.mockReturnValueOnce({ decision: "block", rule: "purpose" });
   await room.send();
   await room.finishReplies();
 
@@ -362,7 +358,11 @@ it("records a blocked confirmation even when one with the same id was allowed", 
     content: { kind: "ui", spec: { type: "moderator_alert" } },
   });
   expect(
-    (await room.t.query(api.rooms.get, { sessionId: room.sessionId }))?.status,
+    (
+      await room.t
+        .withIdentity(ROOM_OWNER)
+        .query(api.rooms.get, { sessionId: room.sessionId })
+    )?.status,
   ).toBe("active");
 });
 

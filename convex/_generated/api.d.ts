@@ -8,12 +8,17 @@
  * @module
  */
 
+import type * as bookings from "../bookings.js";
 import type * as directory from "../directory.js";
 import type * as gate from "../gate.js";
 import type * as jobs from "../jobs.js";
 import type * as migrations from "../migrations.js";
 import type * as moderator from "../moderator.js";
 import type * as myFunctions from "../myFunctions.js";
+import type * as providerAgent from "../providerAgent.js";
+import type * as referenceAgents from "../referenceAgents.js";
+import type * as referenceLlm from "../referenceLlm.js";
+import type * as referenceScene from "../referenceScene.js";
 import type * as roomAgent from "../roomAgent.js";
 import type * as roomState from "../roomState.js";
 import type * as rooms from "../rooms.js";
@@ -27,12 +32,17 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  bookings: typeof bookings;
   directory: typeof directory;
   gate: typeof gate;
   jobs: typeof jobs;
   migrations: typeof migrations;
   moderator: typeof moderator;
   myFunctions: typeof myFunctions;
+  providerAgent: typeof providerAgent;
+  referenceAgents: typeof referenceAgents;
+  referenceLlm: typeof referenceLlm;
+  referenceScene: typeof referenceScene;
   roomAgent: typeof roomAgent;
   roomState: typeof roomState;
   rooms: typeof rooms;

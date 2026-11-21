@@ -3,9 +3,12 @@ import {
   createFakeLlmProvider,
   type LlmProvider,
 } from "../shared/providers/llm";
+import { CONSUMER_AGENT_SLUG } from "../shared/seedData";
 import type { Participant, SessionContract } from "../shared/session";
 import type { Doc } from "./_generated/dataModel";
 import type { ActionCtx } from "./_generated/server";
+import { referenceConsumer, referenceProvider } from "./referenceAgents";
+import { referenceLlm } from "./referenceLlm";
 
 const ACK = "Recibido.";
 
@@ -51,14 +54,20 @@ export const testRoomAgent: RoomAgent = {
 
 export const fakeRoomLlm = createFakeLlmProvider({ text: () => ACK });
 
-// The agent that answers for a hosted card in a room, with the model it uses. Every card gets the
-// test agent until E8 plugs in the reference agents here.
 export function roomAgentFor(
-  _agent: Doc<"agents">,
-  _ctx: ActionCtx,
+  agent: Doc<"agents">,
+  ctx: ActionCtx,
 ): {
   agent: RoomAgent;
   llm: LlmProvider;
 } {
-  return { agent: testRoomAgent, llm: fakeRoomLlm };
+  const llm = referenceLlm();
+  if (!llm) return { agent: testRoomAgent, llm: fakeRoomLlm };
+  return {
+    agent:
+      agent.slug === CONSUMER_AGENT_SLUG
+        ? referenceConsumer
+        : referenceProvider(ctx, agent._id),
+    llm,
+  };
 }
