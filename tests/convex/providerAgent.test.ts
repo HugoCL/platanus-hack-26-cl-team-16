@@ -84,16 +84,21 @@ const availability = (id: string) =>
   t.run((ctx) => ctx.db.get("availability", id as Id<"availability">));
 
 describe("generic provider agent", () => {
-  it.each([
-    { offerings: [] },
-    { offerings: ["o1"] },
-    { offerings: ["unknown"] },
-  ])(
-    "does not substitute cardiology for unavailable medicina general (model picks $offerings)",
-    async ({ offerings }) => {
+  it.each(
+    [
+      "Quiero una hora con medicina general esta semana",
+      "Quiero una hora de medicina general en una clínica",
+    ].flatMap((description) =>
+      [[], ["o1"], ["unknown"]].map((offerings) => ({
+        description,
+        offerings,
+      })),
+    ),
+  )(
+    "does not substitute cardiology for '$description' (model picks $offerings)",
+    async ({ description, offerings }) => {
       const room = await openRoom();
-      room.contract.intent.description =
-        "Quiero una hora con medicina general esta semana";
+      room.contract.intent.description = description;
       const ask = await room.post(
         room.owner,
         "all",
