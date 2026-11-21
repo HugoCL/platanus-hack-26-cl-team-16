@@ -624,11 +624,11 @@ function TextSearch({
 
   return (
     <div className="flex flex-col gap-2">
-      <form onSubmit={submit} className="flex max-w-240 flex-wrap gap-2">
+      <form onSubmit={submit} className="flex max-w-240 gap-2">
         <label htmlFor="dir-q" className="sr-only">
           ¿Qué necesitas?
         </label>
-        <div className="relative flex min-w-0 flex-[1_1_320px] items-center">
+        <div className="relative flex min-w-0 flex-1 items-center">
           <Search
             aria-hidden
             size={18}
