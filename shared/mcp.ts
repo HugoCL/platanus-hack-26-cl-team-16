@@ -95,7 +95,7 @@ export const CloseSessionOutput = z.object({
 export const MCP_TOOLS = {
   search_agents: {
     description:
-      "Search the agent directory by need, category and location (Santiago comunas or lat/lng).",
+      "Search the agent directory by need, category and Santiago comuna. Distance search (near, radiusKm) is not available yet.",
     input: SearchAgentsInput,
     output: SearchAgentsOutput,
   },
