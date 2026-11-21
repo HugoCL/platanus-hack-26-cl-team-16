@@ -39,9 +39,21 @@ export function SectionScroll() {
         ...document.querySelectorAll<HTMLElement>(
           ".landing > header, .landing-section",
         ),
-      ].map((element) =>
-        Math.round(element.getBoundingClientRect().top + scrollY),
-      );
+      ].flatMap((element) => {
+        const rect = element.getBoundingClientRect();
+        const top = Math.round(rect.top + scrollY);
+        const bottom = Math.round(rect.bottom + scrollY - innerHeight);
+        const positions = [top];
+        for (
+          let position = top + innerHeight;
+          position < bottom;
+          position += innerHeight
+        ) {
+          positions.push(position);
+        }
+        if (bottom > top) positions.push(bottom);
+        return positions;
+      });
       stops.push(root.scrollHeight - innerHeight);
       stops.sort((a, b) => a - b);
       return direction > 0
