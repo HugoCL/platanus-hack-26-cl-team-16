@@ -1,3 +1,4 @@
+import { paginationOptsValidator } from "convex/server";
 import { ConvexError, v } from "convex/values";
 import { zodToConvex } from "convex-helpers/server/zod4";
 import {
@@ -26,6 +27,7 @@ import {
 } from "./_generated/server";
 import { currentModerator } from "./moderator";
 import { loadSession, toMessage } from "./roomState";
+import { visibleTo } from "./visibility";
 
 const HISTORY_LIMIT = 500;
 
@@ -206,16 +208,60 @@ export const commit = internalMutation({
   },
 });
 
+const historyArgs = {
+  sessionId: v.id("sessions"),
+  viewerParticipantId: v.id("participants"),
+};
+
 export const history = query({
-  args: { sessionId: v.id("sessions") },
-  handler: async (ctx, { sessionId }): Promise<Message[]> => {
+  args: historyArgs,
+  handler: async (
+    ctx,
+    { sessionId, viewerParticipantId },
+  ): Promise<Message[]> => {
+    const viewer = await roomViewer(ctx, sessionId, viewerParticipantId);
     const messages = await ctx.db
       .query("messages")
       .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+      .order("desc")
       .take(HISTORY_LIMIT);
-    return messages.map(toMessage);
+    return messages
+      .reverse()
+      .map(toMessage)
+      .filter((message) => visibleTo(message, viewer));
   },
 });
+
+export const historyPage = query({
+  args: { ...historyArgs, paginationOpts: paginationOptsValidator },
+  handler: async (ctx, { sessionId, viewerParticipantId, paginationOpts }) => {
+    const viewer = await roomViewer(ctx, sessionId, viewerParticipantId);
+    const result = await ctx.db
+      .query("messages")
+      .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+      .paginate(paginationOpts);
+    return {
+      ...result,
+      page: result.page
+        .map(toMessage)
+        .filter((message) => visibleTo(message, viewer)),
+    };
+  },
+});
+
+async function roomViewer(
+  ctx: QueryCtx,
+  sessionId: Id<"sessions">,
+  viewerParticipantId: Id<"participants">,
+) {
+  const room = await loadSession(ctx, sessionId);
+  if (!room) gateError("NotFound", "the room does not exist");
+  const viewer = room.participants.find(
+    (p) => p.participantId === viewerParticipantId,
+  );
+  if (!viewer) gateError("NotParticipant", "the viewer is not in this room");
+  return viewer;
+}
 
 export async function publishNotice(
   ctx: MutationCtx,

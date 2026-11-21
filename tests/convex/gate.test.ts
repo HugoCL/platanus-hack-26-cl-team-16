@@ -1,6 +1,7 @@
 // @vitest-environment edge-runtime
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { FunctionReturnType } from "convex/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -32,8 +33,11 @@ const send = (
     content: content as never,
   });
 
-const history = () =>
-  rooms.t.query(api.gate.history, { sessionId: room.sessionId });
+const history = (viewerParticipantId = room.consumer) =>
+  rooms.t.query(api.gate.history, {
+    sessionId: room.sessionId,
+    viewerParticipantId,
+  });
 
 function convexSources(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -46,6 +50,21 @@ function convexSources(dir: string): string[] {
 }
 
 describe("E2 success criteria", () => {
+  it("2. both agents and the human see each allowed message in the same order", async () => {
+    const viewers = [room.consumer, room.provider, room.human];
+    const [openingNotice] = await history();
+    expect(openingNotice.content).toMatchObject({ code: "session_opened" });
+    const expected = [openingNotice];
+
+    for (const [i, sender] of viewers.entries()) {
+      const recipient = viewers[(i + 1) % viewers.length];
+      expected.push(await send(sender, recipient, text(`Message ${i + 1}`)));
+      expect(await Promise.all(viewers.map(history))).toEqual(
+        viewers.map(() => expected),
+      );
+    }
+  });
+
   it("3. the history returns every message in order, each with its verdict", async () => {
     const sent = [
       await send(room.consumer, room.provider, text("Busco hora esta semana")),
@@ -71,6 +90,46 @@ describe("E2 success criteria", () => {
     }
     const times = messages.map((m) => m.sentAt);
     expect(times).toEqual([...times].sort((a, b) => a - b));
+  });
+
+  it("keeps the latest send visible in a long room and pages through older messages", async () => {
+    await rooms.t.run(async (ctx) => {
+      for (let n = 0; n < 500; n++) {
+        await ctx.db.insert("messages", {
+          sessionId: room.sessionId,
+          senderParticipantId: room.human,
+          recipient: "all",
+          content: text(`Earlier message ${n}`),
+          moderation: {
+            status: "allowed",
+            verdict: { decision: "allow", reason: "Test fixture." },
+            reasons: [],
+          },
+        });
+      }
+    });
+    const newest = await send(room.human, "all", text("Latest"));
+    const latest = await history();
+    expect(latest).toHaveLength(500);
+    expect(latest.at(-1)).toEqual(newest);
+
+    const all: Message[] = [];
+    let cursor: string | null = null;
+    while (true) {
+      const result: FunctionReturnType<typeof api.gate.historyPage> =
+        await rooms.t.query(api.gate.historyPage, {
+          sessionId: room.sessionId,
+          viewerParticipantId: room.consumer,
+          paginationOpts: { numItems: 200, cursor },
+        });
+      all.push(...result.page);
+      if (result.isDone) break;
+      expect(result.continueCursor).not.toBe(cursor);
+      cursor = result.continueCursor;
+    }
+    expect(all).toHaveLength(502);
+    expect(all[0].content).toMatchObject({ code: "session_opened" });
+    expect(all.slice(-500)).toEqual(latest);
   });
 
   it("6. only the gate module writes messages, and only the gate calls its commit", () => {
@@ -153,6 +212,9 @@ describe("the moderation gate", () => {
         },
       },
     });
+    expect((await history(room.consumer)).slice(1)).toEqual([blocked, alert]);
+    expect((await history(room.human)).slice(1)).toEqual([blocked, alert]);
+    expect(await history(room.provider)).toHaveLength(1);
     const events = await rooms.t.run((ctx) =>
       ctx.db
         .query("moderationEvents")
@@ -180,6 +242,11 @@ describe("the moderation gate", () => {
     expect(
       await errorKind(send(other.consumer, room.provider, text("Hola"))),
     ).toBe("NotParticipant");
+  });
+
+  it("rejects a history reader from another room", async () => {
+    const other = await roomWithHuman(rooms);
+    expect(await errorKind(history(other.consumer))).toBe("NotParticipant");
   });
 
   it("rejects a recipient from another room", async () => {

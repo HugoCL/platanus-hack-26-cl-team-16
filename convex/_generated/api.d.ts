@@ -17,6 +17,7 @@ import type * as myFunctions from "../myFunctions.js";
 import type * as roomState from "../roomState.js";
 import type * as rooms from "../rooms.js";
 import type * as seed from "../seed.js";
+import type * as visibility from "../visibility.js";
 
 import type {
   ApiFromModules,
@@ -34,6 +35,7 @@ declare const fullApi: ApiFromModules<{
   roomState: typeof roomState;
   rooms: typeof rooms;
   seed: typeof seed;
+  visibility: typeof visibility;
 }>;
 
 /**
