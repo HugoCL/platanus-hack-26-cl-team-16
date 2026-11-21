@@ -8,7 +8,7 @@ import { createModerator } from "../../shared/moderator/moderator";
 import { createFakeLlmProvider } from "../../shared/providers/llm";
 import { CLINIC_AGENT_SLUG, SEED_AGENTS } from "../../shared/seedData";
 import { Session } from "../../shared/session";
-import { errorKind, REQUEST, seededRooms } from "./roomFixture";
+import { errorKind, REQUEST, ROOM_OWNER, seededRooms } from "./roomFixture";
 
 const clinicCard = SEED_AGENTS.find((a) => a.card.slug === CLINIC_AGENT_SLUG)
   ?.card as (typeof SEED_AGENTS)[number]["card"];
@@ -59,7 +59,7 @@ describe("E2 success criteria", () => {
 describe("opening a room", () => {
   it("reads back as a valid shared Session with both agents and the human", async () => {
     const opened = await open({ human: { displayName: "Juan" } });
-    const room = await rooms.t.query(api.rooms.get, {
+    const room = await rooms.t.withIdentity(ROOM_OWNER).query(api.rooms.get, {
       sessionId: opened.sessionId as Id<"sessions">,
     });
 

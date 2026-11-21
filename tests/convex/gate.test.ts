@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { FunctionReturnType } from "convex/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "../../convex/_generated/api";
+import { internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { allowAllModerator } from "../../convex/moderator";
 import { Message } from "../../shared/messages";
@@ -26,7 +26,7 @@ const send = (
   recipient: Id<"participants"> | "all",
   content: unknown,
 ) =>
-  rooms.t.action(api.gate.send, {
+  rooms.t.action(internal.gate.sendAsParticipant, {
     sessionId: room.sessionId,
     senderParticipantId: sender,
     recipient,
@@ -34,7 +34,7 @@ const send = (
   });
 
 const history = (viewerParticipantId = room.consumer) =>
-  rooms.t.query(api.gate.history, {
+  rooms.t.query(internal.gate.historyForParticipant, {
     sessionId: room.sessionId,
     viewerParticipantId,
   });
@@ -115,12 +115,13 @@ describe("E2 success criteria", () => {
     const all: Message[] = [];
     let cursor: string | null = null;
     while (true) {
-      const result: FunctionReturnType<typeof api.gate.historyPage> =
-        await rooms.t.query(api.gate.historyPage, {
-          sessionId: room.sessionId,
-          viewerParticipantId: room.consumer,
-          paginationOpts: { numItems: 200, cursor },
-        });
+      const result: FunctionReturnType<
+        typeof internal.gate.historyPageForParticipant
+      > = await rooms.t.query(internal.gate.historyPageForParticipant, {
+        sessionId: room.sessionId,
+        viewerParticipantId: room.consumer,
+        paginationOpts: { numItems: 200, cursor },
+      });
       all.push(...result.page);
       if (result.isDone) break;
       expect(result.continueCursor).not.toBe(cursor);
@@ -303,12 +304,13 @@ describe("long rooms", () => {
     const all: Message[] = [];
     let cursor: string | null = null;
     while (true) {
-      const result: FunctionReturnType<typeof api.gate.historyPage> =
-        await rooms.t.query(api.gate.historyPage, {
-          sessionId: room.sessionId,
-          viewerParticipantId: room.human,
-          paginationOpts: { numItems: 200, cursor },
-        });
+      const result: FunctionReturnType<
+        typeof internal.gate.historyPageForParticipant
+      > = await rooms.t.query(internal.gate.historyPageForParticipant, {
+        sessionId: room.sessionId,
+        viewerParticipantId: room.human,
+        paginationOpts: { numItems: 200, cursor },
+      });
       all.push(...result.page);
       if (result.isDone) break;
       cursor = result.continueCursor;
