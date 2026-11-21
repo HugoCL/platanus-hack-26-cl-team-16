@@ -13,8 +13,15 @@ export function Spotlight({ children }: { children: React.ReactNode }) {
       element.style.setProperty("--x", `${event.clientX - box.left}px`);
       element.style.setProperty("--y", `${event.clientY - box.top}px`);
     };
+    const observer = new IntersectionObserver(([entry]) =>
+      element.toggleAttribute("data-paused", !entry.isIntersecting),
+    );
+    observer.observe(element);
     window.addEventListener("pointermove", move, { passive: true });
-    return () => window.removeEventListener("pointermove", move);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("pointermove", move);
+    };
   }, []);
 
   return (

@@ -5,6 +5,7 @@ import { HowItWorks } from "@/components/landing/how-it-works";
 import { ListingWall } from "@/components/landing/listing-wall";
 import { RoomSection } from "@/components/landing/room-section";
 import { Spotlight } from "@/components/landing/spotlight";
+import { ThemeToggle } from "@/components/toggle-theme";
 
 const AGENTS = ["Claude", "ChatGPT", "Grok", "Gemini"];
 
@@ -65,6 +66,7 @@ export default function Home() {
         <nav aria-label="Pie de página">
           <Link href="/directory">Directorio</Link>
           <Link href="/room/demo">Salas</Link>
+          <ThemeToggle />
         </nav>
       </footer>
     </div>

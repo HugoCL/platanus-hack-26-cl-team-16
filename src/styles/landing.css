@@ -130,6 +130,10 @@
   }
 }
 
+.landing-spotlight[data-paused] .landing-track {
+  animation-play-state: paused;
+}
+
 .landing-glow {
   position: absolute;
   inset: 0;
@@ -747,6 +751,7 @@
 
   & nav {
     display: flex;
+    align-items: center;
     gap: 1.25rem;
   }
 
