@@ -33,8 +33,7 @@ import type { UiSpec } from "@/shared/genui";
 import { MAX_TEXT_LENGTH } from "@/shared/messages";
 import type { SessionContract, SessionStatus } from "@/shared/session";
 import { VerifiedBadge } from "../verified-badge";
-import { DataToggle } from "./data-toggle";
-import { MODERATOR_MODEL } from "./demo-session";
+import { MODERATOR_MODEL, type RoomFixture } from "./demo-session";
 import { MessageItem } from "./message-item";
 import { ReasonList } from "./moderation";
 import {
@@ -51,7 +50,6 @@ import {
   violationTone,
 } from "./room-format";
 import { useDemoRoom } from "./use-demo-room";
-import { ROOM_DATASETS, type RoomDataset } from "./worst-case-session";
 
 const STATUS_DOT: Record<SessionStatus, string> = {
   requested: "bg-muted-foreground",
@@ -73,14 +71,13 @@ const ROLE_LABELS: Record<Viewer["role"], string> = {
 };
 
 export function DemoRoom({
-  dataset = "demo",
-  showDataToggle = false,
+  fixture,
+  instant = false,
 }: {
-  dataset?: RoomDataset;
-  showDataToggle?: boolean;
+  fixture: RoomFixture;
+  instant?: boolean;
 }) {
-  const fixture = ROOM_DATASETS[dataset].fixture;
-  const room = useDemoRoom(fixture.script, dataset !== "demo");
+  const room = useDemoRoom(fixture.script, instant);
   const [role, setRole] = useState<Viewer["role"]>("owner");
   const [panelOpen, setPanelOpen] = useState(true);
   const [control, setControl] = useState(false);
@@ -201,7 +198,6 @@ export function DemoRoom({
           </aside>
         ) : null}
       </div>
-      {showDataToggle ? <DataToggle current={dataset} /> : null}
       <Dialog
         open={auditFor !== null}
         onOpenChange={(open) => {

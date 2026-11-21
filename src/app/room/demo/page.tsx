@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
+import { DataToggle } from "@/components/room/data-toggle";
 import { DemoRoom } from "@/components/room/room-view";
-import { isRoomDataset } from "@/components/room/worst-case-session";
+import {
+  isRoomDataset,
+  ROOM_DATASETS,
+} from "@/components/room/worst-case-session";
 
 export const metadata: Metadata = {
   title: "Sala moderada · demo",
@@ -14,10 +18,14 @@ export default async function RoomDemoPage({
   searchParams: Promise<{ data?: string | string[] }>;
 }) {
   const { data } = await searchParams;
+  const dataset = DEV && isRoomDataset(data) ? data : "demo";
   return (
-    <DemoRoom
-      dataset={DEV && isRoomDataset(data) ? data : "demo"}
-      showDataToggle={DEV}
-    />
+    <>
+      <DemoRoom
+        fixture={ROOM_DATASETS[dataset].fixture}
+        instant={dataset !== "demo"}
+      />
+      {DEV ? <DataToggle current={dataset} /> : null}
+    </>
   );
 }
