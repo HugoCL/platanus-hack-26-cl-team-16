@@ -218,6 +218,7 @@ export function RoomView({
             <SessionHeader
               self={self}
               other={other}
+              panelOpen={panelOpen}
               onTogglePanel={() => {
                 if (window.matchMedia("(min-width: 64rem)").matches)
                   setPanelOpen((o) => !o);
@@ -478,10 +479,12 @@ function SessionList({
 function SessionHeader({
   self,
   other,
+  panelOpen,
   onTogglePanel,
 }: {
   self?: RoomParticipant;
   other?: RoomParticipant;
+  panelOpen: boolean;
   onTogglePanel: () => void;
 }) {
   return (
@@ -496,7 +499,7 @@ function SessionHeader({
             <span className="truncate" title={other?.name}>
               {other?.name}
             </span>
-            <VerifiedBadge />
+            {other?.verified && <VerifiedBadge />}
           </h1>
           <p className="m-0 flex items-center gap-1.5 text-xs text-subtle-foreground">
             <ShieldCheckIcon size={13} className="shrink-0" />
@@ -509,6 +512,18 @@ function SessionHeader({
           data-size="sm"
           data-variant="ghost"
           aria-label="Contrato y auditoría"
+          aria-expanded={panelOpen}
+          className="hidden lg:inline-flex"
+          onClick={onTogglePanel}
+        >
+          <PanelRightIcon size={16} />
+        </Button>
+        <Button
+          data-size="sm"
+          data-variant="ghost"
+          aria-label="Contrato y auditoría"
+          aria-haspopup="dialog"
+          className="lg:hidden"
           onClick={onTogglePanel}
         >
           <PanelRightIcon size={16} />

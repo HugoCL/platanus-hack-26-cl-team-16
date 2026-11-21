@@ -75,8 +75,7 @@ function Bubble({
   const isUi = content.kind === "ui";
   const visible = canSeeContent(status, message.senderParticipantId, viewer);
   const reason = primaryReason(message.reasons);
-  const canAct =
-    !readOnly && (viewer.role === "owner" || viewer.role === "operator");
+  const canModerate = viewer.role === "owner" || viewer.role === "operator";
   const slow = useSlowReview(status === "pending");
 
   const frame =
@@ -191,7 +190,7 @@ function Bubble({
           {reason?.detail ? (
             <span className="text-subtle-foreground">{reason.detail}</span>
           ) : null}
-          {canAct && onReview ? (
+          {canModerate && onReview ? (
             <>
               <Button
                 data-size="sm"

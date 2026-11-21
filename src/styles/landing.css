@@ -1,9 +1,9 @@
 /*
  * Landing: a hero over a wall of phone-book listings, then sections that alternate between the
  * page background and a second surface (the "page" of the book). The wall follows the Vercel
- * 404 (a dense field of tiny names lit around the pointer), the hero follows Sentry's (two-tone
- * headline, a glow rising from the bottom) with the glow and the call to action in phone-book
- * yellow. It follows the theme: light is warm paper with ink, dark is ink with light text.
+ * 404 (a dense, still field of tiny listings with a few lit up), the hero follows Sentry's
+ * (two-tone headline, a glow rising from the bottom right) with the glow, the call to action and
+ * the lit listings in --brand-yellow. It follows the theme: light is warm paper with ink, dark is ink with light text.
  * Text on yellow is always ink.
  */
 .landing {
@@ -13,14 +13,32 @@
   --landing-panel: light-dark(oklch(1 0 0), oklch(0.17 0.005 49));
   --landing-bubble: light-dark(oklch(0.94 0.006 90), oklch(0.25 0.006 49));
   --landing-fg: light-dark(oklch(0.13 0.004 49), oklch(0.985 0.001 106));
-  --landing-muted: light-dark(oklch(0.13 0.004 49 / 0.45), oklch(0.7 0.01 70));
+  --landing-muted: light-dark(oklch(0.13 0.004 49 / 0.58), oklch(0.7 0.01 70));
   --landing-subtle: light-dark(
     oklch(0.13 0.004 49 / 0.72),
     oklch(0.8 0.008 56)
   );
   --landing-line: light-dark(oklch(0.13 0.004 49 / 0.14), oklch(1 0 0 / 0.1));
-  --landing-wall-text: light-dark(oklch(0.25 0.012 70), oklch(0.78 0.012 90));
-  --landing-wall-heading: light-dark(oklch(0.13 0.004 49), var(--sm-yellow));
+  --landing-wall-text: light-dark(
+    oklch(0.13 0.004 49 / 0.17),
+    oklch(1 0 0 / 0.11)
+  );
+  --landing-wall-bright: light-dark(
+    oklch(0.13 0.004 49 / 0.45),
+    oklch(1 0 0 / 0.32)
+  );
+  --landing-wall-rule: light-dark(
+    oklch(0.13 0.004 49 / 0.08),
+    oklch(1 0 0 / 0.06)
+  );
+  --landing-wall-mark-bg: light-dark(
+    color-mix(in oklch, var(--brand-yellow) 70%, transparent),
+    color-mix(in oklch, var(--brand-yellow) 16%, transparent)
+  );
+  --landing-wall-mark-fg: light-dark(
+    oklch(0.13 0.004 49 / 0.75),
+    color-mix(in oklch, var(--brand-yellow) 85%, transparent)
+  );
   --landing-pad: clamp(1.25rem, 6vw, 6rem);
   --landing-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   display: flex;
@@ -34,7 +52,8 @@
  * Scroll moves one section at a time: the header (with the hero under it), the demo, how it
  * works, and the closing call to action, which snaps to the end with the footer. Sections fill
  * the viewport and center their content. Only on screens tall and wide enough for a section to
- * fit; on phones the page scrolls freely.
+ * fit; on phones the page scrolls freely. On desktop, section-scroll.tsx takes over the wheel and
+ * arrow keys so a light scroll does not jump and the move between sections is slower.
  */
 @media (min-width: 48rem) and (min-height: 40rem) {
   html:has(.landing) {
@@ -62,6 +81,10 @@
   }
 }
 
+.landing > header {
+  padding-inline: var(--landing-pad);
+}
+
 .landing-main {
   position: relative;
   isolation: isolate;
@@ -70,99 +93,80 @@
   grid-template-rows: 1fr auto;
   gap: 3rem;
   min-height: calc(100svh - 61px);
-  padding: clamp(3rem, 9vh, 6rem) var(--landing-pad) 2rem;
-}
-
-.landing-spotlight {
-  --x: 72%;
-  --y: 38%;
-  position: absolute;
-  inset: 0;
-  z-index: -2;
-  overflow: hidden;
-  color: var(--landing-wall-text);
-  mask-image:
-    radial-gradient(
-      circle 15rem at var(--x) var(--y),
-      rgb(0 0 0 / 0.75),
-      rgb(0 0 0 / 0.07) 100%
-    ),
-    linear-gradient(to bottom, transparent, black 8%, black 88%, transparent);
-  mask-composite: intersect;
+  padding: clamp(3rem, 9vh, 6rem) var(--landing-pad) 3.5rem;
 }
 
 /*
- * The wall is drawn into one image per column (listing-wall.tsx). Each track shows that image
- * twice and slides by one copy (-50%), so the loop is seamless; even columns run up, odd ones
- * down. Only transform animates, so the compositor moves it without layout or repaint.
+ * The wall is one canvas (listing-wall.tsx) under the hero. It fades in once drawn and fades out
+ * at the top and bottom edges, so the header and the trust row sit on clean background.
  */
-@keyframes landing-scroll {
-  from {
-    transform: translateY(0);
-  }
-  to {
-    transform: translateY(-50%);
-  }
-}
-
 .landing-wall {
-  display: flex;
-  gap: 1.25rem;
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
   height: 100%;
-  padding-inline: 1rem;
-  font: 500 0.5625rem / 1.45 var(--ui-font-mono);
   opacity: 0;
   transition: opacity 600ms var(--landing-ease-out);
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    black 10%,
+    black 78%,
+    transparent
+  );
 
   &[data-ready] {
     opacity: 1;
   }
 }
 
-.landing-column {
-  flex: 0 0 auto;
-}
-
-.landing-track {
-  animation: landing-scroll 140s linear infinite;
-  will-change: transform;
-
-  &[data-direction="down"] {
-    animation-direction: reverse;
-  }
-
-  & img {
-    display: block;
-  }
-}
-
-.landing-spotlight[data-paused] .landing-track {
-  animation-play-state: paused;
-}
-
+/*
+ * Sentry's light, in phone-book yellow: a glow rising from the bottom right, and a scrim of the
+ * page background behind the copy so the wall never competes with the headline.
+ */
 .landing-glow {
+  --landing-light:
+    radial-gradient(
+      75% 85% at 96% 122%,
+      color-mix(in oklch, var(--brand-yellow) 95%, transparent),
+      color-mix(in oklch, var(--brand-yellow) 50%, transparent) 38%,
+      color-mix(in oklch, var(--brand-yellow) 12%, transparent) 64%,
+      transparent 82%
+    ),
+    radial-gradient(
+      90% 28% at 60% 112%,
+      color-mix(in oklch, var(--brand-yellow) 35%, transparent),
+      transparent 72%
+    );
+  --landing-scrim: radial-gradient(
+    70% 72% at 24% 50%,
+    var(--landing-bg) 48%,
+    color-mix(in oklch, var(--landing-bg) 72%, transparent) 72%,
+    transparent 100%
+  );
   position: absolute;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background:
-    radial-gradient(
-      85% 60% at 10% 115%,
-      color-mix(in oklch, var(--sm-yellow) 96%, transparent),
-      color-mix(in oklch, var(--sm-yellow) 45%, transparent) 38%,
-      transparent 72%
-    ),
-    linear-gradient(
-      to top,
-      color-mix(in oklch, var(--sm-yellow) 55%, transparent),
-      color-mix(in oklch, var(--sm-yellow) 18%, transparent) 18%,
-      transparent 45%
-    ),
-    radial-gradient(
-      60% 55% at 22% 45%,
-      color-mix(in oklch, var(--landing-bg) 92%, transparent),
-      transparent 80%
+  background: var(--landing-light), var(--landing-scrim);
+
+  /* On a phone the copy fills the width and runs to the bottom: the light moves up the right
+     edge, behind the wall, and the whole wall dims to a texture under the text. */
+  @media (max-width: 40rem) {
+    --landing-light: radial-gradient(
+      18rem 26rem at 115% 38%,
+      color-mix(in oklch, var(--brand-yellow) 70%, transparent),
+      color-mix(in oklch, var(--brand-yellow) 18%, transparent) 55%,
+      transparent 100%
     );
+    --landing-scrim: linear-gradient(
+      to bottom,
+      color-mix(in oklch, var(--landing-bg) 45%, transparent),
+      color-mix(in oklch, var(--landing-bg) 88%, transparent) 30%
+    );
+    background: var(--landing-scrim), var(--landing-light);
+  }
 }
 
 .landing-hero {
@@ -176,7 +180,7 @@
   & h1 {
     margin: 0;
     color: var(--landing-fg);
-    font: 500 clamp(2.75rem, 6.4vw, 5.5rem) / 0.98 var(--ui-font-sans);
+    font: 400 clamp(2.75rem, 6.4vw, 5.5rem) / 0.98 var(--ui-font-sans);
     letter-spacing: -0.055em;
     text-wrap: balance;
   }
@@ -190,10 +194,39 @@
     max-width: 30rem;
     margin: 0;
     color: var(--landing-subtle);
-    font-size: 1rem;
+    font-size: 1.0625rem;
     line-height: 1.55;
     text-wrap: pretty;
   }
+}
+
+.landing-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  list-style: none;
+
+  & li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45em;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--landing-line);
+    border-radius: 0.375rem;
+    background: color-mix(in oklch, var(--landing-bg) 80%, transparent);
+    color: var(--landing-subtle);
+    font: 500 0.75rem / 1.2 var(--ui-font-sans);
+  }
+}
+
+.landing-badge-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--brand-yellow);
+  box-shadow: 0 0 0 1px light-dark(var(--landing-ink), transparent);
 }
 
 .landing-actions {
@@ -204,6 +237,8 @@
   margin-top: 0.75rem;
 }
 
+/* The call to action: a yellow button with its arrow in an attached segment. On light, an ink
+   edge keeps the yellow readable as a control against the cream. */
 .landing-cta {
   display: inline-flex;
   gap: 2px;
@@ -218,24 +253,28 @@
     display: flex;
     align-items: center;
     padding-inline: 1.25rem;
-    border-radius: 0.5rem;
-    background: linear-gradient(
-      to bottom,
-      oklch(0.94 0.15 100),
-      var(--sm-yellow)
-    );
+    border-radius: 0.5rem 0.125rem 0.125rem 0.5rem;
+    background: var(--brand-yellow);
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 0.45),
+      inset 0 0 0 1px light-dark(var(--landing-ink), transparent);
     transition:
       filter 150ms ease,
       transform 160ms var(--landing-ease-out);
   }
 
   & span + span {
-    padding-inline: 1rem;
+    padding-inline: 0.95rem;
+    border-radius: 0.125rem 0.5rem 0.5rem 0.125rem;
   }
 
   @media (hover: hover) and (pointer: fine) {
     &:hover span {
       filter: brightness(1.06);
+    }
+
+    &:hover span + span {
+      transform: translateX(2px);
     }
   }
 
@@ -244,7 +283,7 @@
   }
 
   &:focus-visible {
-    outline: 2px solid var(--sm-yellow);
+    outline: 2px solid light-dark(var(--landing-ink), var(--brand-yellow));
     outline-offset: 3px;
   }
 }
@@ -264,40 +303,40 @@
 
   @media (hover: hover) and (pointer: fine) {
     &:hover {
-      text-decoration-color: var(--sm-yellow);
+      text-decoration-color: currentColor;
     }
   }
 
   &:focus-visible {
-    outline: 2px solid var(--sm-yellow);
+    outline: 2px solid light-dark(var(--landing-ink), var(--brand-yellow));
     outline-offset: 3px;
     border-radius: 2px;
   }
 }
 
+/* Trust row, quiet like Sentry's logos: the agent names in muted type, no color. */
 .landing-agents {
   display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.75rem 2rem;
 
   & p {
     margin: 0;
-    color: oklch(0.13 0.004 49 / 0.75);
-    font: 600 0.625rem / 1 var(--ui-font-mono);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    color: var(--landing-subtle);
+    font-size: 0.8125rem;
   }
 
   & ul {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem 2rem;
+    gap: 0.5rem 1.75rem;
     margin: 0;
     padding: 0;
     list-style: none;
-    color: var(--landing-ink);
-    font-size: clamp(1rem, 2vw, 1.25rem);
-    font-weight: 700;
+    color: var(--landing-subtle);
+    font-size: clamp(1rem, 1.6vw, 1.125rem);
+    font-weight: 600;
     letter-spacing: -0.03em;
   }
 }
@@ -407,7 +446,7 @@
   & p[data-featured] {
     margin-inline: -0.25rem;
     padding-inline: 0.25rem;
-    background: var(--sm-yellow);
+    background: var(--brand-yellow);
     color: var(--landing-ink);
     font-weight: 700;
   }
@@ -473,7 +512,7 @@
     content: "";
     width: 0.5rem;
     height: 0.5rem;
-    background: var(--sm-yellow);
+    background: var(--brand-yellow);
   }
 }
 
@@ -541,7 +580,7 @@
   }
 
   & small {
-    color: light-dark(oklch(0.45 0.1 85), var(--sm-yellow));
+    color: light-dark(oklch(0.45 0.1 85), var(--brand-yellow));
     font: 600 0.6875rem / 1.3 var(--ui-font-mono);
   }
 
@@ -549,7 +588,7 @@
     gap: 0.25rem;
     padding: 0.75rem 0.9rem;
     border-radius: 0.75rem;
-    background: var(--sm-yellow);
+    background: var(--brand-yellow);
     color: var(--landing-ink);
   }
 
@@ -605,7 +644,7 @@
   }
 
   & i[data-on] {
-    background: var(--sm-yellow);
+    background: var(--brand-yellow);
   }
 }
 
@@ -621,8 +660,8 @@
   }
 
   & span[data-chosen] {
-    border-color: var(--sm-yellow);
-    background: var(--sm-yellow);
+    border-color: var(--brand-yellow);
+    background: var(--brand-yellow);
     color: var(--landing-ink);
   }
 }
@@ -666,7 +705,7 @@
   justify-content: space-between;
   gap: 1rem 2rem;
   padding: 1.5rem var(--landing-pad);
-  background: var(--sm-yellow);
+  background: var(--brand-yellow);
   color: var(--landing-ink);
   font: 500 0.75rem / 1.4 var(--ui-font-mono);
 
@@ -722,16 +761,9 @@
   }
 }
 
-@media (max-width: 40rem) {
-  .landing-spotlight {
-    --x: 90%;
-    --y: 10%;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .landing-track {
-    animation: none;
+  .landing-cta:hover span + span {
+    transform: none;
   }
 
   .landing-replay li {

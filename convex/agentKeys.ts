@@ -5,6 +5,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import {
   internalAction,
   internalMutation,
+  type MutationCtx,
   mutation,
   type QueryCtx,
 } from "./_generated/server";
@@ -13,7 +14,7 @@ import {
 // `issue` shows a key in clear once; only its SHA-256 hash and a short visible prefix are stored.
 // The caller's identity always comes from the key, through `agentForApiKey`: no public function
 // takes an agentId as the caller. Keys are only for external agents: the platform speaks for hosted
-// ones. A key works while it is not revoked and its agent is still active and external.
+// ones. A key works while it is not revoked and its agent is active or draft and external.
 
 const KEY_PREFIX = "dak_";
 const VISIBLE_PREFIX_LENGTH = 12;
@@ -62,7 +63,7 @@ export async function requireLiveCredential(
     key && key.revokedAt === undefined ? await ctx.db.get(key.agentId) : null;
   if (
     agent?._id !== agentId ||
-    agent.status !== "active" ||
+    (agent.status !== "active" && agent.status !== "draft") ||
     agent.kind !== "external"
   ) {
     throw new ConvexError({
@@ -84,7 +85,9 @@ export async function credentialForApiKey(
     .unique();
   if (!key || key.revokedAt !== undefined) return null;
   const agent = await ctx.db.get(key.agentId);
-  return agent?.status === "active" && agent.kind === "external"
+  return agent &&
+    (agent.status === "active" || agent.status === "draft") &&
+    agent.kind === "external"
     ? { key, agent }
     : null;
 }
@@ -150,9 +153,7 @@ export const issue = internalAction({
     ctx,
     { slug, label },
   ): Promise<{ apiKey: string; prefix: string; agentId: Id<"agents"> }> => {
-    const apiKey =
-      KEY_PREFIX + toHex(crypto.getRandomValues(new Uint8Array(32)));
-    const prefix = apiKey.slice(0, VISIBLE_PREFIX_LENGTH);
+    const { apiKey, prefix } = generateApiKey();
     const agentId: Id<"agents"> = await ctx.runMutation(
       internal.agentKeys.store,
       { slug, keyHash: await sha256Hex(apiKey), prefix, label },
@@ -168,24 +169,45 @@ export const store = internalMutation({
     prefix: v.string(),
     label: v.optional(v.string()),
   },
-  handler: async (ctx, { slug, ...key }): Promise<Id<"agents">> => {
-    const agent = await ctx.db
-      .query("agents")
-      .withIndex("by_slug", (q) => q.eq("slug", slug))
-      .unique();
-    if (!agent) {
-      throw new ConvexError({
-        kind: "NotFound",
-        message: `no agent with slug ${slug}`,
-      });
-    }
-    if (agent.status !== "active" || agent.kind !== "external") {
-      throw new ConvexError({
-        kind: "InvalidArgument",
-        message: `agent ${slug} is ${agent.status} and ${agent.kind}: keys are only for active external agents`,
-      });
-    }
-    await ctx.db.insert("agentApiKeys", { agentId: agent._id, ...key });
-    return agent._id;
-  },
+  handler: storeApiKey,
 });
+
+export async function storeApiKey(
+  ctx: Pick<MutationCtx, "db">,
+  {
+    slug,
+    ...key
+  }: {
+    slug: string;
+    keyHash: string;
+    prefix: string;
+    label?: string;
+  },
+): Promise<Id<"agents">> {
+  const agent = await ctx.db
+    .query("agents")
+    .withIndex("by_slug", (q) => q.eq("slug", slug))
+    .unique();
+  if (!agent) {
+    throw new ConvexError({
+      kind: "NotFound",
+      message: `no agent with slug ${slug}`,
+    });
+  }
+  if (
+    (agent.status !== "active" && agent.status !== "draft") ||
+    agent.kind !== "external"
+  ) {
+    throw new ConvexError({
+      kind: "InvalidArgument",
+      message: `agent ${slug} is ${agent.status} and ${agent.kind}: keys are only for active external agents`,
+    });
+  }
+  await ctx.db.insert("agentApiKeys", { agentId: agent._id, ...key });
+  return agent._id;
+}
+
+export function generateApiKey() {
+  const apiKey = KEY_PREFIX + toHex(crypto.getRandomValues(new Uint8Array(32)));
+  return { apiKey, prefix: apiKey.slice(0, VISIBLE_PREFIX_LENGTH) };
+}
