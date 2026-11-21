@@ -1,6 +1,6 @@
 // @vitest-environment edge-runtime
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { api } from "../../convex/_generated/api";
+import { internal } from "../../convex/_generated/api";
 import { allowAllModerator } from "../../convex/moderator";
 import { testRoomAgent } from "../../convex/roomAgent";
 import { roomWithHuman, seededRooms } from "./roomFixture";
@@ -21,14 +21,17 @@ async function setup() {
     provider,
     human,
     send: (recipient = provider) =>
-      t.action(api.gate.send, {
+      t.action(internal.gate.sendAsParticipant, {
         sessionId,
         senderParticipantId: consumer,
         recipient,
         content: { kind: "text", text: "¿Tienes horas?" },
       }),
     history: (viewerParticipantId = consumer) =>
-      t.query(api.gate.history, { sessionId, viewerParticipantId }),
+      t.query(internal.gate.historyForParticipant, {
+        sessionId,
+        viewerParticipantId,
+      }),
     finishReplies: () => t.finishAllScheduledFunctions(vi.runAllTimers),
   };
 }

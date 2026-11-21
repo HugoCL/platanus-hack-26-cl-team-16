@@ -1,17 +1,22 @@
 // @vitest-environment edge-runtime
 import { expect, it, vi } from "vitest";
-import { api } from "../../convex/_generated/api";
+import { api, internal } from "../../convex/_generated/api";
 import { allowAllModerator } from "../../convex/moderator";
-import { errorKind, roomWithHuman, seededRooms } from "./roomFixture";
+import {
+  errorKind,
+  ROOM_OWNER,
+  roomWithHuman,
+  seededRooms,
+} from "./roomFixture";
 
 async function setup() {
   const fixture = await seededRooms();
   const { t } = fixture;
   const { sessionId, consumer, provider, human } = await roomWithHuman(fixture);
   const close = (participantId = human) =>
-    t.mutation(api.rooms.close, { sessionId, participantId });
+    t.mutation(internal.rooms.closeAsParticipant, { sessionId, participantId });
   const send = () =>
-    t.action(api.gate.send, {
+    t.action(internal.gate.sendAsParticipant, {
       sessionId,
       senderParticipantId: consumer,
       recipient: provider,
@@ -33,7 +38,9 @@ it("4. closes the room once and rejects a new message without storing it", async
   const closed = await close();
   expect(closed).toEqual({ sessionId, status: "closed" });
   expect(await close()).toEqual(closed);
-  expect(await t.query(api.rooms.get, { sessionId })).toMatchObject({
+  expect(
+    await t.withIdentity(ROOM_OWNER).query(api.rooms.get, { sessionId }),
+  ).toMatchObject({
     status: "closed",
   });
   await expect(send()).rejects.toThrow(/the room is closed/);
@@ -47,7 +54,9 @@ it("does not let a participant from another room close this one", async () => {
   const { t, close, fixture, sessionId } = await setup();
   const other = await roomWithHuman(fixture);
   expect(await errorKind(close(other.human))).toBe("NotParticipant");
-  expect(await t.query(api.rooms.get, { sessionId })).toMatchObject({
+  expect(
+    await t.withIdentity(ROOM_OWNER).query(api.rooms.get, { sessionId }),
+  ).toMatchObject({
     status: "active",
   });
 });
