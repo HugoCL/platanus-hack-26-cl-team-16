@@ -276,3 +276,44 @@ describe("the moderation gate", () => {
     expect(await history()).toHaveLength(1);
   });
 });
+
+describe("long rooms", () => {
+  it("keeps sending and listing when the stored messages pass the read limit", async () => {
+    rooms = await seededRooms({ transactionLimits: true });
+    room = await roomWithHuman(rooms);
+    const large = "x".repeat(120_000);
+    for (let batch = 0; batch < 3; batch++) {
+      await rooms.t.run(async (ctx) => {
+        for (let i = 0; i < 50; i++) {
+          await ctx.db.insert("messages", {
+            sessionId: room.sessionId,
+            senderParticipantId: room.consumer,
+            recipient: "all",
+            content: { kind: "text", text: large },
+            moderation: { status: "allowed", reasons: [] },
+          });
+        }
+      });
+    }
+
+    const sent = await send(room.human, room.provider, text("¿Sigue ahí?"));
+
+    expect((await history()).at(-1)).toEqual(sent);
+
+    const all: Message[] = [];
+    let cursor: string | null = null;
+    while (true) {
+      const result: FunctionReturnType<typeof api.gate.historyPage> =
+        await rooms.t.query(api.gate.historyPage, {
+          sessionId: room.sessionId,
+          viewerParticipantId: room.human,
+          paginationOpts: { numItems: 200, cursor },
+        });
+      all.push(...result.page);
+      if (result.isDone) break;
+      cursor = result.continueCursor;
+    }
+    expect(all).toHaveLength(152);
+    expect(all.at(-1)).toEqual(sent);
+  });
+});
