@@ -2,8 +2,8 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import { allowAllModerator } from "../../convex/moderator";
 import { testRoomAgent } from "../../convex/roomAgent";
+import * as rules from "../../shared/moderator/rules";
 import { DEFAULT_MAX_TURNS, Session } from "../../shared/session";
 import {
   errorKind,
@@ -97,7 +97,7 @@ it.each([
 
 it("only admits one agent send when two compete for the last turn", async () => {
   const { consumer, provider, send, history, room } = await setup(1);
-  const moderate = vi.spyOn(allowAllModerator, "moderate");
+  const moderate = vi.spyOn(rules, "checkRules");
   const results = await Promise.allSettled([
     send(consumer, "all"),
     send(provider, "all"),

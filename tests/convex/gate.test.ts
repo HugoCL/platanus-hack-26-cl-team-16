@@ -416,6 +416,32 @@ describe("the moderation gate", () => {
     ).toBe("InvalidArgument");
   });
 
+  it("rejects a recipient who has left the room without storing the message", async () => {
+    await rooms.t.run((ctx) =>
+      ctx.db.patch("participants", room.provider, { leftAt: 1 }),
+    );
+    expect(
+      await errorKind(send(room.consumer, room.provider, text("Hola"))),
+    ).toBe("InvalidArgument");
+    expect(await history()).toHaveLength(1);
+  });
+
+  it("rejects a history reader who has left the room", async () => {
+    await rooms.t.run((ctx) =>
+      ctx.db.patch("participants", room.provider, { leftAt: 1 }),
+    );
+    expect(await errorKind(history(room.provider))).toBe("NotParticipant");
+    expect(
+      await errorKind(
+        rooms.t.query(internal.gate.historyPageForParticipant, {
+          sessionId: room.sessionId,
+          viewerParticipantId: room.provider,
+          paginationOpts: { numItems: 10, cursor: null },
+        }),
+      ),
+    ).toBe("NotParticipant");
+  });
+
   it.each([
     ["a system notice", { kind: "system", code: "session_closed", text: "x" }],
     [
@@ -509,7 +535,7 @@ describe("UI responses", () => {
 
   it("accepts a reply to a picker sent to the sender and shows it to the moderator", async () => {
     const sent = await send(room.provider, room.human, picker);
-    const moderate = vi.spyOn(allowAllModerator, "moderate");
+    const moderate = vi.spyOn(rules, "checkRules");
     const reply = await send(room.human, room.provider, choose(sent.messageId));
     expect(reply.status).toBe("allowed");
     expect(moderate.mock.calls[0][0].history.map((m) => m.messageId)).toContain(
@@ -530,7 +556,7 @@ describe("UI responses", () => {
         });
       }
     });
-    const moderate = vi.spyOn(allowAllModerator, "moderate");
+    const moderate = vi.spyOn(rules, "checkRules");
     await send(room.human, room.provider, choose(sent.messageId));
     expect(moderate.mock.calls[0][0].history.map((m) => m.messageId)).toContain(
       sent.messageId,
@@ -545,7 +571,7 @@ describe("UI responses", () => {
 
   it("rejects a reply to a picker from another room", async () => {
     const other = await roomWithHuman(rooms);
-    const sent = await rooms.t.action(api.gate.send, {
+    const sent = await rooms.t.action(internal.gate.sendAsParticipant, {
       sessionId: other.sessionId,
       senderParticipantId: other.provider,
       recipient: other.human,
@@ -571,9 +597,10 @@ describe("UI responses", () => {
   });
 
   it("rejects a reply to a blocked picker", async () => {
-    vi.spyOn(allowAllModerator, "moderate").mockResolvedValueOnce({
-      verdict: { decision: "block", rule: "injection", reason: "x" },
-      events: [],
+    rooms.judge.mockReturnValueOnce({
+      decision: "block",
+      rule: "scope",
+      reason: "x",
     });
     const sent = await send(room.provider, room.human, picker);
     expect(sent.status).toBe("blocked");

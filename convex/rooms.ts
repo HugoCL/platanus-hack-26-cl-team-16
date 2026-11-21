@@ -191,6 +191,15 @@ async function planRoom(ctx: QueryCtx, args: ObjectType<typeof openArgs>) {
   if (!initiator || !listedCard(initiator)) {
     invalidArgument("the initiator agent does not exist or is not listed");
   }
+  if (args.human && initiator.ownerTokenIdentifier !== undefined) {
+    const { tokenIdentifier } = await requireRoomIdentity(ctx);
+    if (initiator.ownerTokenIdentifier !== tokenIdentifier) {
+      throw new ConvexError({
+        kind: "NotOwner",
+        message: "you can only open a room on behalf of an agent you own",
+      });
+    }
+  }
   const provider = await ctx.db.get(args.providerAgentId);
   const listed = provider && listedCard(provider);
   if (!listed) {

@@ -504,13 +504,14 @@ async function roomViewer(
   sessionId: Id<"sessions">,
   viewerParticipantId: Id<"participants">,
 ) {
-  const room = await loadSession(ctx, sessionId);
-  if (!room) gateError("NotFound", "the room does not exist");
-  const viewer = room.participants.find(
-    (p) => p.participantId === viewerParticipantId,
-  );
-  if (!viewer) gateError("NotParticipant", "the viewer is not in this room");
-  return viewer;
+  if (!(await ctx.db.get(sessionId))) {
+    gateError("NotFound", "the room does not exist");
+  }
+  const viewer = await ctx.db.get(viewerParticipantId);
+  if (viewer?.sessionId !== sessionId || viewer.leftAt !== undefined) {
+    gateError("NotParticipant", "the viewer is not in this room");
+  }
+  return toParticipant(viewer);
 }
 
 export async function publishNotice(
@@ -573,11 +574,14 @@ async function checkSend(
   ) {
     gateError("TurnLimitReached", "the room has reached its agent turn limit");
   }
-  if (
-    args.recipient !== "all" &&
-    !session.participants.some((p) => p.participantId === args.recipient)
-  ) {
-    gateError("InvalidArgument", "the recipient is not in this room");
+  if (args.recipient !== "all") {
+    const recipientRow = await ctx.db.get(args.recipient);
+    if (
+      recipientRow?.sessionId !== args.sessionId ||
+      recipientRow.leftAt !== undefined
+    ) {
+      gateError("InvalidArgument", "the recipient is not in this room");
+    }
   }
   return {
     session: { ...session, contract: session.contract },
