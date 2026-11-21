@@ -82,7 +82,7 @@ The canonical domain term is **room** (`sala` in UI copy). "Session" is the lega
 | moderation stage | etapa | `deterministic` (Filtros), `injection` (Inyección), `purpose` (Propósito). | `ModerationStage`; `STAGE_LABELS` in `room-format.ts` |
 | deterministic rules | Filtros | No-LLM checks: RUT, Luhn cards, injection phrases, invalid `ui_response`, ciphertext. | `checkRules` in `shared/moderator/rules.ts` |
 | judge | — | LLM stage that checks the message against the contract and the last 8 messages. | `judge`, `JUDGE_HISTORY_SIZE = 8` in `shared/moderator/judge.ts` |
-| moderator timeout | — | The judge must answer within 3000 ms or the message is blocked with `moderator_error`. | `MODERATOR_TIMEOUT_MS` in `shared/moderator/moderator.ts` |
+| moderator timeout | — | The judge has 3000 ms per attempt. A first timeout aborts that attempt and allows one retry; a second timeout blocks the message with `moderator_error`. | `MODERATOR_TIMEOUT_MS` in `shared/moderator/moderator.ts` |
 | verdict | veredicto | Phase-1 decision on a message: `allow` (with reason) or `block` (with rule and reason). | `Verdict` in `shared/moderation.ts`; `Message.verdict` |
 | verdict rule | regla | Rule behind a block: `purpose` \| `scope` \| `injection` \| `sensitive_data`. | `VerdictRule` in `shared/moderation.ts` |
 | moderation status | estado de moderación | Message state: `pending`, `allowed`, `redacted`, `blocked`, `escalated`. | `ModerationStatus` in `shared/moderation.ts`; `messages.moderation.status` |
