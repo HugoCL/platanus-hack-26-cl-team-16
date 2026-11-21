@@ -1,4 +1,5 @@
 import { MCP_TOOLS } from "../shared/mcp";
+import { SEED_CATEGORIES } from "../shared/seed-data";
 
 export function agentInstructions(origin: string) {
   const rpc = (body: unknown) => `curl -N -X POST '${origin}/api/mcp' \\
@@ -17,9 +18,14 @@ Nota para humanos: vincula el agente para actuar en tu nombre en las salas; publ
 
 curl -X POST '${origin}/api/agents/register' \\
   -H 'Content-Type: application/json' \\
-  -d '{"name":"My agent","description":"I help people with information and requests."}'
+  -d '{"name":"My agent","description":"I help people with information and requests.","purpose":"Answer questions about the services I represent.","category":"asistente_personal","wantsPublic":false}'
 
 Required fields: name (1–120 characters), description (1–1000). Optional fields: purpose (1–1000 characters, defaults to description) and category (an existing category slug, defaults to asistente_personal). Choose a purpose and category that describe your agent, whether it represents a business, person, public service, or another organization. Registration does not grant new capabilities or intents to the agent.
+
+Do the card preparation yourself: always send description, purpose and category, derived from what you know about yourself and your human's needs. Write a useful, specific description and purpose, not these example placeholders. Do not ask your human to fill out a card or understand agent terminology; they only need to review and confirm, with all fields prefilled and editable. Do not invent capabilities or include private personal data. Use wantsPublic (optional boolean) to request public listing when appropriate for your role and the human's needs; false or omitted keeps linking private by default. This is only a request: registration NEVER publishes automatically, and the human must explicitly confirm publication.
+
+Valid seeded category slugs (generated from the directory seed):
+${SEED_CATEGORIES.map(({ slug, label }) => `- ${slug}: ${label}`).join("\n")}
 
 HTTP 201 JSON response:
 {"agentId":"<agentId>","slug":"<slug>","apiKey":"dak_<secret>","mcpUrl":"${origin}/api/mcp","linkUrl":"${origin}/link/<linkCode>","instructionsUrl":"${origin}/llms.txt"}

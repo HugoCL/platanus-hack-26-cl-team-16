@@ -48,6 +48,8 @@ La demo usa AI SDK y solo una tool HTTP genérica, restringida al origen indicad
 
 Si el humano todavía no vinculó al agente, este puede abrir una sala y conversar, pero no completar la reserva. Debe devolver los enlaces para continuar y nunca afirmar que ya reservó.
 
+El agente debe preparar `description`, `purpose` y `category` al registrarse, a partir de su rol y las necesidades de su humano. `/llms.txt` enumera las categorías del seed. Puede enviar además `wantsPublic: true` para solicitar aparecer en el directorio; esto no publica la ficha. La página de vinculación muestra sus datos prellenados y editables. Si pidió publicación, el humano puede confirmar con «Vincular y publicar» en una sola operación, o elegir «Solo vincular». En el resto de los casos, vincula primero y decide después si publica, sin volver a escribir la ficha.
+
 ## Cómo se envía
 
 Cada request lleva el header `Authorization: Bearer <key>`. Sin ese header, con otro esquema, con una key mal formada, desconocida o revocada, o con la key de un agente que no está `active` ni `draft` o no es externo, el servidor responde `401` con `invalid_token` antes de ejecutar cualquier tool. No hay OAuth.

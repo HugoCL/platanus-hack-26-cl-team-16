@@ -28,6 +28,7 @@ const registrationArgs = {
   description: v.string(),
   purpose: v.optional(v.string()),
   category: v.optional(v.string()),
+  wantsPublic: v.optional(v.boolean()),
   clientIp: v.optional(v.string()),
 };
 const registered = v.object({
@@ -47,6 +48,11 @@ const summary = v.object({
     v.literal("prospect"),
   ),
 });
+const publicationFields = {
+  purpose: v.string(),
+  category: v.string(),
+  description: v.optional(v.string()),
+};
 
 function fail(kind: string, message: string): never {
   throw new ConvexError({ kind, message });
@@ -160,6 +166,7 @@ export const create = internalMutation({
     const agentId = await ctx.db.insert("agents", {
       ...card,
       selfRegistered: true,
+      wantsPublic: args.wantsPublic,
       primaryCategory: card.categories[0],
       searchText: searchText(card),
     });
@@ -194,6 +201,9 @@ export const linkInfo = query({
       ...summary.fields,
       alreadyLinked: v.boolean(),
       linkedToCurrentUser: v.boolean(),
+      purpose: v.string(),
+      category: v.string(),
+      wantsPublic: v.optional(v.boolean()),
     }),
   ),
   handler: async (ctx, { code }) => {
@@ -209,14 +219,17 @@ export const linkInfo = query({
       ...toSummary(agent),
       alreadyLinked: agent.ownerTokenIdentifier !== undefined,
       linkedToCurrentUser,
+      purpose: agent.purpose,
+      category: agent.primaryCategory,
+      wantsPublic: agent.wantsPublic,
     };
   },
 });
 
 export const link = mutation({
-  args: { code: v.string() },
+  args: { code: v.string(), publish: v.optional(v.object(publicationFields)) },
   returns: v.null(),
-  handler: async (ctx, { code }) => {
+  handler: async (ctx, { code, publish }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) fail("Unauthorized", "sign in to link an agent");
     const row = await codeRow(ctx, code);
@@ -234,6 +247,7 @@ export const link = mutation({
       ownerTokenIdentifier: identity.tokenIdentifier,
     });
     await ctx.db.patch(row._id, { usedAt: Date.now() });
+    if (publish) await publishCard(ctx, { agentId: agent._id, ...publish });
     return null;
   },
 });
@@ -255,41 +269,46 @@ async function owned(ctx: MutationCtx, agentId: Id<"agents">) {
   return agent;
 }
 
-export const publish = mutation({
+async function publishCard(
+  ctx: MutationCtx,
   args: {
-    agentId: v.id("agents"),
-    purpose: v.string(),
-    category: v.string(),
-    description: v.optional(v.string()),
+    agentId: Id<"agents">;
+    purpose: string;
+    category: string;
+    description?: string;
   },
+) {
+  const agent = await owned(ctx, args.agentId);
+  const category = await ctx.db
+    .query("categories")
+    .withIndex("by_slug", (q) => q.eq("slug", args.category))
+    .unique();
+  if (!category) fail("InvalidArgument", "unknown category");
+  const updates = {
+    purpose: text(args.purpose, 1000),
+    description:
+      args.description === undefined
+        ? agent.description
+        : text(args.description, 1000),
+    categories: [category.slug],
+    primaryCategory: category.slug,
+    capabilities: agent.capabilities.includes("info")
+      ? agent.capabilities
+      : [...agent.capabilities, "info" as const],
+    status: "active" as const,
+  };
+  await ctx.db.patch(agent._id, {
+    ...updates,
+    searchText: searchText({ ...agent, ...updates }),
+    embedding: undefined,
+  });
+  return null;
+}
+
+export const publish = mutation({
+  args: { agentId: v.id("agents"), ...publicationFields },
   returns: v.null(),
-  handler: async (ctx, args) => {
-    const agent = await owned(ctx, args.agentId);
-    const category = await ctx.db
-      .query("categories")
-      .withIndex("by_slug", (q) => q.eq("slug", args.category))
-      .unique();
-    if (!category) fail("InvalidArgument", "unknown category");
-    const updates = {
-      purpose: text(args.purpose, 1000),
-      description:
-        args.description === undefined
-          ? agent.description
-          : text(args.description, 1000),
-      categories: [category.slug],
-      primaryCategory: category.slug,
-      capabilities: agent.capabilities.includes("info")
-        ? agent.capabilities
-        : [...agent.capabilities, "info" as const],
-      status: "active" as const,
-    };
-    await ctx.db.patch(agent._id, {
-      ...updates,
-      searchText: searchText({ ...agent, ...updates }),
-      embedding: undefined,
-    });
-    return null;
-  },
+  handler: publishCard,
 });
 
 export const unpublish = mutation({

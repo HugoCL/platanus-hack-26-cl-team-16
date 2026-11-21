@@ -21,7 +21,8 @@ export async function POST(request: Request) {
     typeof body.name !== "string" ||
     typeof body.description !== "string" ||
     ("purpose" in body && typeof body.purpose !== "string") ||
-    ("category" in body && typeof body.category !== "string")
+    ("category" in body && typeof body.category !== "string") ||
+    ("wantsPublic" in body && typeof body.wantsPublic !== "boolean")
   ) {
     return Response.json(
       {
@@ -43,6 +44,9 @@ export async function POST(request: Request) {
         clientIp,
         ...("purpose" in body ? { purpose: body.purpose as string } : {}),
         ...("category" in body ? { category: body.category as string } : {}),
+        ...("wantsPublic" in body
+          ? { wantsPublic: body.wantsPublic as boolean }
+          : {}),
       },
     );
     const origin = publicOrigin(request);

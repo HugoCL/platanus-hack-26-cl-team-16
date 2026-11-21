@@ -1,3 +1,4 @@
+import { getFunctionName } from "convex/server";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, it, vi } from "vitest";
@@ -13,7 +14,10 @@ vi.mock("@clerk/nextjs", () => ({
 }));
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isLoading: false, isAuthenticated: state.signedIn }),
-  useQuery: () => state.info,
+  useQuery: (reference: Parameters<typeof getFunctionName>[0]) =>
+    getFunctionName(reference) === "directory:categories"
+      ? [{ slug: "medicina_general", label: "Medicina general" }]
+      : state.info,
   useMutation: () => vi.fn(),
 }));
 beforeEach(() => {
@@ -55,8 +59,32 @@ it("offers linking to a signed-in account", () => {
     status: "draft",
     linkedToCurrentUser: false,
   };
-  expect(render()).toContain("Vincular a mi cuenta");
+  expect(render()).toContain(">Vincular</button>");
+  expect(render()).not.toContain("Vincular y publicar");
 });
+
+it.each([false, true])(
+  "prefills editable publication data with wantsPublic=%s",
+  (linked) => {
+    state.signedIn = true;
+    state.info = {
+      agentId: "agent",
+      name: "Servicio",
+      description: "Descripción preparada",
+      purpose: "Propósito preparado",
+      category: "medicina_general",
+      wantsPublic: true,
+      status: "draft",
+      linkedToCurrentUser: linked,
+    };
+    const html = render();
+    expect(html).toContain(">Propósito preparado</textarea>");
+    expect(html).toContain(">Descripción preparada</textarea>");
+    expect(html).toContain('value="medicina_general"');
+    expect(html).toContain(linked ? "Publicar agente" : "Vincular y publicar");
+    expect(html.includes("Solo vincular")).toBe(!linked);
+  },
+);
 
 it("offers the directory link and unpublish only for the linked owner", () => {
   state.signedIn = true;

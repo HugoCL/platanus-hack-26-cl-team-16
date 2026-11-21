@@ -310,6 +310,100 @@ describe("agent self-onboarding", () => {
     }
   });
 
+  it("stores the agent's card and publication request without publishing before human confirmation", async () => {
+    const card = {
+      name: "Información",
+      description: "Descripción preparada",
+      purpose: "Propósito preparado",
+      category: "medicina_general",
+      wantsPublic: true,
+    };
+    const agent = await rooms.t.action(api.agentRegistration.register, card);
+    await expect(
+      rooms.t.query(api.agentRegistration.linkInfo, { code: agent.linkCode }),
+    ).resolves.toMatchObject({
+      description: card.description,
+      purpose: card.purpose,
+      category: card.category,
+      wantsPublic: true,
+      status: "draft",
+    });
+    await expect(
+      rooms.t.query(api.directory.get, { agentId: agent.agentId }),
+    ).resolves.toBeNull();
+    await owner().mutation(api.agentRegistration.link, {
+      code: agent.linkCode,
+    });
+    await expect(
+      owner().query(api.agentRegistration.linkInfo, { code: agent.linkCode }),
+    ).resolves.toMatchObject({ status: "draft", wantsPublic: true });
+    const privateAgent = await rooms.t.action(api.agentRegistration.register, {
+      ...card,
+      wantsPublic: false,
+    });
+    await expect(
+      rooms.t.query(api.agentRegistration.linkInfo, {
+        code: privateAgent.linkCode,
+      }),
+    ).resolves.toMatchObject({ wantsPublic: false, status: "draft" });
+  });
+
+  it("links and publishes atomically with human-reviewed values", async () => {
+    const agent = await register();
+    const publication = {
+      purpose: "Propósito editado",
+      description: "Descripción editada",
+      category: "medicina_general",
+    };
+    await expect(
+      rooms.t.mutation(api.agentRegistration.link, {
+        code: agent.linkCode,
+        publish: publication,
+      }),
+    ).rejects.toThrow(/sign in/);
+    await expect(
+      owner().mutation(api.agentRegistration.link, {
+        code: agent.linkCode,
+        publish: { ...publication, category: "missing" },
+      }),
+    ).rejects.toThrow(/unknown category/);
+    await expect(
+      rooms.t.query(api.agentRegistration.linkInfo, { code: agent.linkCode }),
+    ).resolves.toMatchObject({ alreadyLinked: false, status: "draft" });
+    await expect(
+      owner().mutation(api.agentRegistration.link, {
+        code: agent.linkCode,
+        publish: { ...publication, purpose: " " },
+      }),
+    ).rejects.toThrow(/text must/);
+    await owner().mutation(api.agentRegistration.link, {
+      code: agent.linkCode,
+      publish: publication,
+    });
+    await expect(
+      owner().query(api.agentRegistration.linkInfo, { code: agent.linkCode }),
+    ).resolves.toMatchObject({
+      alreadyLinked: true,
+      linkedToCurrentUser: true,
+      status: "active",
+      ...publication,
+    });
+    await expect(
+      rooms.t.query(api.directory.get, { agentId: agent.agentId }),
+    ).resolves.toMatchObject({
+      status: "active",
+      description: publication.description,
+      purpose: publication.purpose,
+      allowedIntents: ["ask_info"],
+    });
+    await expect(
+      other().mutation(api.agentRegistration.link, {
+        code: agent.linkCode,
+        publish: publication,
+      }),
+    ).rejects.toThrow(/another user/);
+  });
+
   it("rate limits missing IPs and the global registration bucket", async () => {
     for (let i = 0; i < 5; i++) await register();
     await expect(register()).rejects.toThrow(/registration quota exhausted/);

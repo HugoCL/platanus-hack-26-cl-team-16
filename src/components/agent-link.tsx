@@ -86,20 +86,30 @@ export function AgentLink({ code }: { code: string }) {
           sesión o contacta al administrador.
         </p>
       ) : !info.linkedToCurrentUser ? (
-        <div className="space-y-4">
-          <p>
-            Al vincularlo podrás entrar a sus salas y actuar en tu nombre, por
-            ejemplo, confirmar una reserva.
-          </p>
-          <Button
-            data-variant="solid"
-            disabled={pending}
-            data-agent-confirm="Vincula este agente a tu cuenta"
-            onClick={() => change(() => link({ code }))}
-          >
-            Vincular a mi cuenta
-          </Button>
-        </div>
+        info.wantsPublic ? (
+          <PublishForm
+            agentId={info.agentId}
+            description={info.description}
+            purpose={info.purpose}
+            category={info.category}
+            code={code}
+          />
+        ) : (
+          <div className="space-y-4">
+            <p>
+              Al vincularlo podrás entrar a sus salas y actuar en tu nombre, por
+              ejemplo, confirmar una reserva.
+            </p>
+            <Button
+              data-variant="solid"
+              disabled={pending}
+              data-agent-confirm="Vincula este agente a tu cuenta"
+              onClick={() => change(() => link({ code }))}
+            >
+              Vincular
+            </Button>
+          </div>
+        )
       ) : (
         <div className="space-y-5">
           <p role="status" className="font-medium">
@@ -129,6 +139,8 @@ export function AgentLink({ code }: { code: string }) {
             <PublishForm
               agentId={info.agentId}
               description={info.description}
+              purpose={info.purpose}
+              category={info.category}
             />
           )}
         </div>
@@ -145,47 +157,60 @@ export function AgentLink({ code }: { code: string }) {
 function PublishForm({
   agentId,
   description: initialDescription,
+  purpose: initialPurpose,
+  category: initialCategory,
+  code,
 }: {
   agentId: Id<"agents">;
   description: string;
+  purpose: string;
+  category: string;
+  code?: string;
 }) {
   const categories = useQuery(api.directory.categories, {});
   const publish = useMutation(api.agentRegistration.publish);
-  const [purpose, setPurpose] = useState(initialDescription);
-  const [category, setCategory] = useState("asistente_personal");
-  const [description, setDescription] = useState("");
+  const link = useMutation(api.agentRegistration.link);
+  const [purpose, setPurpose] = useState(initialPurpose);
+  const [category, setCategory] = useState(initialCategory);
+  const [description, setDescription] = useState(initialDescription);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function save(onlyLink = false) {
+    if (pending) return;
+    setError(null);
+    setPending(true);
+    try {
+      const values = {
+        purpose,
+        category,
+        description: description.trim() || undefined,
+      };
+      if (code) await link({ code, ...(onlyLink ? {} : { publish: values }) });
+      else await publish({ agentId, ...values });
+    } catch {
+      setError(
+        "No pudimos guardar el cambio. Revisa los campos y tu sesión e inténtalo de nuevo.",
+      );
+    } finally {
+      setPending(false);
+    }
+  }
 
   return (
     <form
       className="space-y-5"
-      onSubmit={async (event) => {
+      onSubmit={(event) => {
         event.preventDefault();
-        if (pending) return;
-        setError(null);
-        setPending(true);
-        try {
-          await publish({
-            agentId,
-            purpose,
-            category,
-            description: description.trim() || undefined,
-          });
-        } catch {
-          setError(
-            "No pudimos publicar el agente. Revisa los campos e inténtalo de nuevo.",
-          );
-        } finally {
-          setPending(false);
-        }
+        void save();
       }}
     >
       <div>
         <h3 className="text-lg font-semibold">Publicar en el directorio</h3>
         <p className="mt-2 text-sm text-subtle-foreground">
-          Es opcional. Publicar hará visibles el nombre, la descripción y el
-          propósito de tu agente.
+          {code
+            ? "Tu agente solicita aparecer en el directorio. Revisa los datos que preparó; puedes editarlos o vincularlo sin publicar."
+            : "Tu agente preparó estos datos. Puedes editarlos. Publicar es opcional y permite que otros lo descubran por su propósito."}
         </p>
       </div>
       <Field name="purpose">
@@ -241,10 +266,28 @@ function PublishForm({
         type="submit"
         data-variant="solid"
         disabled={pending || !categories || !category || !purpose.trim()}
-        data-agent-confirm="Publica tu agente en el directorio para que otras personas lo vean"
+        data-agent-confirm={
+          code
+            ? "Vincula este agente a tu cuenta y publica su ficha en el directorio"
+            : "Publica tu agente en el directorio para que otras personas lo vean"
+        }
       >
-        {pending ? "Publicando…" : "Publicar agente"}
+        {pending
+          ? "Guardando…"
+          : code
+            ? "Vincular y publicar"
+            : "Publicar agente"}
       </Button>
+      {code && (
+        <Button
+          type="button"
+          disabled={pending}
+          data-agent-confirm="Vincula este agente a tu cuenta sin publicarlo"
+          onClick={() => save(true)}
+        >
+          Solo vincular
+        </Button>
+      )}
     </form>
   );
 }

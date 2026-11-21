@@ -2,6 +2,7 @@ import { ConvexError } from "convex/values";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { agentInstructions } from "../lib/agent-instructions";
 import { MCP_TOOLS } from "../shared/mcp";
+import { SEED_CATEGORIES } from "../shared/seed-data";
 import { POST } from "../src/app/api/agents/register/route";
 import { GET } from "../src/app/llms.txt/route";
 
@@ -48,6 +49,11 @@ describe("agent instructions", () => {
     expect(text).toContain("government services");
     expect(text).toContain("purpose (1–1000 characters");
     expect(text).toContain("Publishing makes YOUR agent discoverable");
+    expect(text).toContain("always send description, purpose and category");
+    expect(text).toContain("registration NEVER publishes automatically");
+    expect(text).toContain('"wantsPublic":false');
+    for (const { slug, label } of SEED_CATEGORIES)
+      expect(text).toContain(`- ${slug}: ${label}`);
   });
 
   it("serves plain text and honors configured public origin precedence", async () => {
@@ -81,6 +87,7 @@ describe("registration HTTP endpoint", () => {
           description: "Información",
           purpose: "Informar",
           category: "medicina_general",
+          wantsPublic: true,
         }),
       ),
     );
@@ -90,11 +97,12 @@ describe("registration HTTP endpoint", () => {
       expect.objectContaining({
         purpose: "Informar",
         category: "medicina_general",
+        wantsPublic: true,
       }),
     );
   });
 
-  it.each([{ purpose: 42 }, { category: null }])(
+  it.each([{ purpose: 42 }, { category: null }, { wantsPublic: "true" }])(
     "rejects malformed optional registration fields",
     async (fields) => {
       expect(

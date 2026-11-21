@@ -77,6 +77,7 @@ export default defineSchema({
     ownerTokenIdentifier: v.optional(v.string()),
     primaryCategory: v.string(),
     selfRegistered: v.optional(v.boolean()),
+    wantsPublic: v.optional(v.boolean()),
     searchText: v.string(),
     embedding: v.optional(v.array(v.float64())),
   })
