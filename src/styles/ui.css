@@ -1,0 +1,257 @@
+/*
+ * Sala moderada on top of UI SDK's web.css.
+ * Rules sit directly in `components`, which outranks web.css's nested `ui-sdk` sublayer at equal
+ * specificity, and stay below Tailwind utilities so a class still wins.
+ */
+@layer components {
+  /* Lucide icons: 1.5px strokes, as the system asks (Lucide draws 2px). */
+  .lucide {
+    stroke-width: 1.5;
+  }
+
+  :is(
+    [data-slot="button"],
+    [data-slot="dialog-trigger"],
+    [data-slot="dialog-close"],
+    [data-slot="tooltip-trigger"],
+    [data-slot="collapsible-trigger"]
+  ) {
+    height: calc(var(--ui-spacing) * 9);
+    padding-inline: calc(var(--ui-spacing) * 4);
+    border-radius: var(--sm-radius-full);
+    background: var(--sm-card);
+    transition:
+      transform 150ms ease-out,
+      background-color 150ms ease-out;
+
+    &:active:not([data-disabled]) {
+      transform: scale(0.97);
+    }
+
+    &[data-size="sm"] {
+      height: calc(var(--ui-spacing) * 8);
+      padding-inline: calc(var(--ui-spacing) * 3);
+      font-size: 0.8125rem;
+    }
+
+    &[data-size="lg"] {
+      height: calc(var(--ui-spacing) * 10);
+    }
+
+    &[data-size="xl"] {
+      height: calc(var(--ui-spacing) * 12);
+      padding-inline: calc(var(--ui-spacing) * 5);
+      font-size: 0.9375rem;
+    }
+
+    &[data-size="icon"] {
+      width: calc(var(--ui-spacing) * 9);
+      padding-inline: 0;
+    }
+
+    &[data-variant="ghost"] {
+      border-color: transparent;
+      background: transparent;
+    }
+
+    &[data-variant="solid"] {
+      background: var(--ui-primary);
+    }
+
+    /* Disabled: a flat muted fill with readable text, instead of web.css's half opacity. */
+    &[data-disabled] {
+      opacity: 1;
+      border-color: transparent;
+      background: var(--ui-muted);
+      color: var(--sm-subtle-foreground);
+    }
+  }
+
+  :is(
+    [data-slot="input"],
+    [data-slot="textarea"],
+    [data-slot="select-trigger"]
+  ) {
+    border-radius: var(--sm-radius-3xl);
+    background: var(--sm-card);
+    padding-inline: calc(var(--ui-spacing) * 3.5);
+  }
+
+  :is([data-slot="input"], [data-slot="select-trigger"]) {
+    height: calc(var(--ui-spacing) * 10);
+  }
+
+  [data-slot="textarea"] {
+    padding-block: calc(var(--ui-spacing) * 2.5);
+  }
+
+  :is(
+    [data-slot="select-content"],
+    [data-slot="dialog-content"],
+    [data-slot="tooltip-content"],
+    [data-slot="popover-content"]
+  ) {
+    border-radius: var(--sm-radius-3xl);
+    background: var(--sm-card);
+  }
+
+  [data-slot="dialog-content"] {
+    border-radius: var(--sm-radius-4xl);
+    padding: calc(var(--ui-spacing) * 6);
+  }
+
+  [data-slot="tooltip-content"] {
+    border-radius: var(--ui-radius);
+    background: var(--ui-primary);
+    color: var(--ui-primary-foreground);
+    font-size: 0.75rem;
+  }
+
+  /* Choice cards: a label wrapping a radio or checkbox. The 2px ring is the selected state (3:1). */
+  label[data-slot="card"] {
+    border-radius: var(--sm-radius-3xl);
+    background: var(--sm-card);
+
+    &:has([data-checked]) {
+      border-color: transparent;
+      box-shadow: 0 0 0 2px var(--ui-foreground);
+    }
+  }
+
+  /* Tabs as a segmented control: a muted track, the selected tab raised on it. */
+  [data-slot="tabs-list"] {
+    gap: 2px;
+    padding: 3px;
+    border-bottom: 0;
+    border-radius: var(--sm-radius-full);
+    background: var(--ui-muted);
+  }
+
+  [data-slot="tabs-tab"] {
+    flex: 1;
+    justify-content: center;
+    margin-bottom: 0;
+    border-bottom: 0;
+    border-radius: var(--sm-radius-full);
+    color: var(--sm-subtle-foreground);
+
+    &[data-selected] {
+      background: light-dark(
+        var(--sm-card),
+        color-mix(in oklch, var(--ui-foreground) 14%, var(--ui-muted))
+      );
+      box-shadow: var(--ui-shadow);
+      color: var(--ui-foreground);
+    }
+  }
+
+  /* Slot picker tiles: the time is the control; the chosen one takes the action color. */
+  .room-slot {
+    background: var(--ui-muted);
+    transition: background-color 150ms ease-out;
+
+    &:hover:not(:has([data-disabled], [data-checked])) {
+      background: color-mix(
+        in oklch,
+        var(--ui-foreground) 10%,
+        var(--ui-muted)
+      );
+    }
+
+    &:has([data-checked]) {
+      background: var(--ui-primary);
+      color: var(--ui-primary-foreground);
+    }
+
+    &:has(:focus-visible) {
+      outline: 4px solid var(--ui-ring);
+    }
+  }
+
+  [data-slot="meter-track"] {
+    border-radius: var(--sm-radius-full);
+  }
+
+  [data-slot="meter-indicator"] {
+    border-radius: var(--sm-radius-full);
+    background: var(--ui-foreground);
+  }
+}
+
+/* Sala moderada: motion for pending messages and audit highlights. */
+@keyframes room-scan {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes room-flash {
+  from {
+    box-shadow: 0 0 0 3px var(--ui-ring);
+  }
+  to {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+
+.room-bubble {
+  transition:
+    opacity 180ms ease-out,
+    border-color 180ms ease-out;
+}
+
+.room-pending {
+  opacity: 0.6;
+}
+
+.room-stage {
+  animation: room-scan 1.2s ease-in-out infinite;
+}
+
+.room-highlight > .room-bubble {
+  border-radius: var(--sm-radius-3xl);
+  animation: room-flash 1.6s ease-out;
+}
+
+.room-typing {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--sm-radius-full);
+  background: currentColor;
+  animation: room-scan 1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .room-bubble,
+  .room-slot,
+  :is(
+    [data-slot="button"],
+    [data-slot="dialog-trigger"],
+    [data-slot="dialog-close"],
+    [data-slot="tooltip-trigger"],
+    [data-slot="collapsible-trigger"]
+  ) {
+    transition: none;
+  }
+
+  .room-stage,
+  .room-typing,
+  .room-highlight > .room-bubble {
+    animation: none;
+  }
+
+  :is(
+    [data-slot="button"],
+    [data-slot="dialog-trigger"],
+    [data-slot="dialog-close"],
+    [data-slot="tooltip-trigger"],
+    [data-slot="collapsible-trigger"]
+  ):active {
+    transform: none;
+  }
+}

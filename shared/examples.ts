@@ -1,12 +1,12 @@
 import type { z } from "zod";
 import { AgentCard } from "./agent";
 import { Availability, Offering, Transaction } from "./catalog";
-import { REFERENCE_ATTACK } from "./fixtures/moderationSet";
+import { REFERENCE_ATTACK } from "./fixtures/moderation-set";
 import { Phase1UiSpec, UiSpec } from "./genui";
 import { GetAgentInput, SearchAgentsOutput, WaitForMessagesInput } from "./mcp";
 import { Message, SendableContent, UiResponseContent } from "./messages";
 import { Verdict } from "./moderation";
-import { SEED_AGENTS } from "./seedData";
+import { SEED_AGENTS } from "./seed-data";
 import { Session, SessionContract } from "./session";
 
 export type ContractExamples = {

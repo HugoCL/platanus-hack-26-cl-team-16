@@ -3,7 +3,7 @@ import {
   MODERATION_CASES,
   type ModerationCase,
   moderationInput,
-} from "../shared/fixtures/moderationSet";
+} from "../shared/fixtures/moderation-set";
 import { JUDGE_HISTORY_SIZE } from "../shared/moderator/judge";
 import {
   createModerator,

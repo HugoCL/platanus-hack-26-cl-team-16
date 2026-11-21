@@ -10,7 +10,7 @@ import {
   EXTERNAL_AGENT_SLUG,
   SEED_AGENTS,
   SEED_CATEGORIES,
-} from "../../shared/seedData";
+} from "../../shared/seed-data";
 
 const modules = import.meta.glob("../../convex/**/*.ts");
 

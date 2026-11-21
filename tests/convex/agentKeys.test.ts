@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
 import { isApiKeyFormat, sha256Hex } from "../../convex/agentKeys";
 import schema from "../../convex/schema";
-import { CONSUMER_AGENT_SLUG } from "../../shared/seedData";
+import { CONSUMER_AGENT_SLUG } from "../../shared/seed-data";
 
 const modules = import.meta.glob("../../convex/**/*.ts");
 

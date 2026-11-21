@@ -13,7 +13,7 @@ import { internal } from "../convex/_generated/api";
 import schema from "../convex/schema";
 import { type ConvexCaller, createMcpEndpoint } from "../lib/mcp";
 import { AgentDetail, MCP_TOOLS, SearchAgentsOutput } from "../shared/mcp";
-import { CLINIC_AGENT_SLUG, CONSUMER_AGENT_SLUG } from "../shared/seedData";
+import { CLINIC_AGENT_SLUG, CONSUMER_AGENT_SLUG } from "../shared/seed-data";
 
 const modules = import.meta.glob("../convex/**/*.ts");
 const MCP_URL = "http://localhost/api/mcp";

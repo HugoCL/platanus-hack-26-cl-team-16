@@ -8,17 +8,17 @@ From a clean clone, one command installs and starts the app. It needs no account
 pnpm install && pnpm dev
 ```
 
-`pnpm dev` starts a local Convex backend, loads the seed data into every empty table (`seed:ensure`), and serves the app at http://localhost:3000. The seed data lives in `shared/seedData.ts`: 15 fictitious agent cards across 13 categories, the Providencia clinic with 2 doctors and 4 open slots, a hotel with nightly availability, shops with priced products, and one example room.
+`pnpm dev` starts a local Convex backend, loads the seed data into every empty table (`seed:ensure`), and serves the app at http://localhost:3000. The seed data lives in `shared/seed-data.ts`: 15 fictitious agent cards across 13 categories, the Providencia clinic with 2 doctors and 4 open slots, a hotel with nightly availability, shops with priced products, and one example room.
 
 The directory, the MCP server and the tests work like this. Rooms do not: the default `fake` LLM has no judge, so the moderator blocks every request that reaches it (`RequestBlocked`, "El moderador falló") and the reference scene answers `NotConfigured`. To open rooms locally, set `LLM_PROVIDER=openrouter` and `OPENROUTER_API_KEY` on the local deployment as described in [Try Claude through OpenRouter locally](#try-claude-through-openrouter-locally).
 
-If a schema change is rejected because your local data no longer matches it, stop `pnpm dev`, delete `.convex/local`, and start again. That gives you a fresh local database that is reseeded from `shared/seedData.ts`.
+If a schema change is rejected because your local data no longer matches it, stop `pnpm dev`, delete `.convex/local`, and start again. That gives you a fresh local database that is reseeded from `shared/seed-data.ts`.
 
 Rooms seeded before E2 have a contract without the provider's `purpose`. The schema still accepts them, and `pnpm migrate` (with `pnpm dev` running) copies the purpose from the recipient's card (`backfillSessionPurpose`). Run it once on every deployment that kept its data: local, the team's cloud dev and reused previews. `pnpm seed:reset` also works on a local deployment.
 
 ## Agent directory (E1)
 
-The directory lives in `convex/directory.ts` and the page at http://localhost:3000/directorio. Other code calls these functions:
+The directory lives in `convex/directory.ts` and the page at http://localhost:3000/directory. Other code calls these functions:
 
 | Function | Kind | What it does |
 | --- | --- | --- |
@@ -101,10 +101,13 @@ This runs Vitest offline, with no network and no credentials. `tests/setup.ts` r
 - the valid and invalid examples of every shared contract (`shared/examples.ts`),
 - the seed data: every card and offering validates, including offerings against their category's `attributeSchema`,
 - the fake LLM, model selection from the environment, and the business sources,
+- the directory: text parsing (`lib/directory.ts`), the list view, and `directory.*` against an in-memory Convex,
+- the moderator: the versioned moderation set (`shared/fixtures/moderation-set.ts`), the deterministic rules and the full moderator with the fake LLM,
+- the room demo UI's formatting helpers (`src/components/room/room-format.ts`),
 - `seed:ensure` against an in-memory Convex (convex-test): every seeded agent is a valid card,
 - bookings and the reference agents against the same in-memory Convex, with the fake LLM.
 
-`pnpm smoke` starts `pnpm dev` and drives the home and directory pages in Chromium. The room checks run offline with a scripted judge and Convex test identities. They re-read the live history query as a member and the internal views as each agent after sends, and check membership, pagination and hosted replies. This verifies the visibility of successive snapshots, not authenticated WebSocket delivery; verify the latter with a signed-in client when integrating the E4/E8 room view.
+`pnpm smoke` starts `pnpm dev` and drives the landing and directory pages in Chromium. The room checks run offline with a scripted judge and Convex test identities. They re-read the live history query as a member and the internal views as each agent after sends, and check membership, pagination and hosted replies. This verifies the visibility of successive snapshots, not authenticated WebSocket delivery; verify the latter with a signed-in client when integrating the E4/E8 room view.
 
 ## Configuration
 

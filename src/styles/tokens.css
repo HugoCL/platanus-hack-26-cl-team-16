@@ -1,0 +1,115 @@
+/*
+ * Design tokens: Sala moderada.
+ * Source: the "Sala moderada" design system artifact (tokens.json, version 1795245386-2a5f).
+ * Stone in OKLCH, light and dark through light-dark() (web.css sets `color-scheme: light dark`).
+ *
+ * Two groups:
+ * - `--ui-*`: the tokens UI SDK's web.css reads. Every primitive picks them up.
+ * - `--sm-*`: tokens UI SDK has no slot for (card, subtle text, semantic dots, radii scale,
+ *   shadow, hatch). Tailwind maps them in globals.css.
+ *
+ * Contrast notes (checked against the token values, confirm in a browser):
+ * - `--ui-ring` uses muted-foreground (~4.6:1 on background) instead of the system's `ring`
+ *   (~2.5:1), so keyboard focus passes 3:1.
+ * - `--ui-input` keeps the system's soft control edge (~1.2:1). It fails WCAG 1.4.11 on its own;
+ *   controls that rely on the edge alone need a fill or `--ui-ring` in their CSS.
+ * - muted-foreground on muted is ~4.4:1: put text on muted in `--sm-subtle-foreground`.
+ */
+:root {
+  /* Surfaces and text */
+  --ui-background: light-dark(
+    oklch(0.985 0.001 106.423),
+    oklch(0.147 0.004 49.25)
+  );
+  --ui-foreground: light-dark(
+    oklch(0.147 0.004 49.25),
+    oklch(0.985 0.001 106.423)
+  );
+  --ui-muted: light-dark(oklch(0.97 0.001 106.424), oklch(0.268 0.007 34.298));
+  --ui-muted-foreground: light-dark(
+    oklch(0.553 0.013 58.071),
+    oklch(0.709 0.01 56.259)
+  );
+
+  /* Lines */
+  --ui-border: light-dark(oklch(0.923 0.003 48.717 / 0.7), oklch(1 0 0 / 8%));
+  --ui-input: light-dark(oklch(0.923 0.003 48.717), oklch(1 0 0 / 12%));
+  --ui-ring: var(--ui-muted-foreground);
+  --ui-ring-border: var(--ui-muted-foreground);
+
+  /* Action: the only action color, also your agent's bubble */
+  --ui-primary: light-dark(
+    oklch(0.216 0.006 56.043),
+    oklch(0.923 0.003 48.717)
+  );
+  --ui-primary-foreground: light-dark(
+    oklch(0.985 0.001 106.423),
+    oklch(0.216 0.006 56.043)
+  );
+  --ui-destructive: light-dark(
+    oklch(0.577 0.245 27.325),
+    oklch(0.704 0.191 22.216)
+  );
+
+  /* Elevation: shadow-card is the highest, also for dialogs and popovers */
+  --ui-shadow:
+    0 1px 2px light-dark(oklch(0 0 0 / 0.05), transparent),
+    0 0 0 1px oklch(0.709 0.01 56.259 / 0.12);
+  --ui-overlay: light-dark(oklch(0.147 0.004 49.25 / 0.2), oklch(0 0 0 / 0.6));
+
+  /* Shape, rhythm, type */
+  --ui-radius: 0.4375rem; /* radius-lg 7px; web.css derives popups (×1.5) and thumbs from it */
+  --ui-spacing: 0.25rem;
+  --ui-font-size: 0.875rem; /* body 14px desktop */
+  --ui-line-height: 1.6;
+  --ui-font-sans: var(--font-geist), system-ui, sans-serif;
+  --ui-font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Icons: 1.5px round strokes, as the system asks (web.css defaults are 2px square) */
+  --ui-icon-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  --ui-icon-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  --ui-icon-minus: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round'%3E%3Cpath d='M5 12h14'/%3E%3C/svg%3E");
+  --ui-icon-plus: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round'%3E%3Cpath d='M5 12h14M12 5v14'/%3E%3C/svg%3E");
+  --ui-icon-x: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round'%3E%3Cpath d='M18 6 6 18M6 6l12 12'/%3E%3C/svg%3E");
+
+  /* Sala moderada tokens with no UI SDK slot */
+  --sm-card: light-dark(oklch(1 0 0), oklch(0.216 0.006 56.043));
+  --sm-subtle-foreground: light-dark(
+    oklch(0.444 0.011 73.639),
+    oklch(0.8 0.008 56)
+  );
+  --sm-destructive-text: light-dark(
+    oklch(0.505 0.213 27.518),
+    oklch(0.76 0.16 22)
+  );
+  --sm-destructive-soft: light-dark(
+    oklch(0.577 0.245 27.325 / 0.1),
+    oklch(0.704 0.191 22.216 / 0.18)
+  );
+  /* success, warning, destructive: only as a 6px dot or an explicit alert */
+  --sm-success: light-dark(
+    oklch(0.627 0.194 149.214),
+    oklch(0.792 0.209 151.711)
+  );
+  --sm-warning: light-dark(oklch(0.666 0.179 58.318), oklch(0.769 0.188 70.08));
+
+  /* Directory map: land fill and the viewer's own position */
+  --sm-map-land: light-dark(oklch(0.955 0.004 95), oklch(0.2 0.005 56));
+  --sm-map-grid: light-dark(oklch(0.9 0.004 95), oklch(0.26 0.006 56));
+  --sm-map-you: oklch(0.6 0.15 250);
+
+  /* Landing: the phone-book yellow, the brand's one loud color. Ink text on it, never yellow text on light. */
+  --sm-yellow: oklch(0.9 0.18 97);
+
+  --sm-radius-2xl: 13px; /* swatches, map, inner panels */
+  --sm-radius-3xl: 16px; /* bubbles, inputs, options */
+  --sm-radius-4xl: 19px; /* cards */
+  --sm-radius-full: 999px; /* pill buttons, badges, dots */
+
+  /* Moderator hatch: what the moderator held back. CSS pattern, laid over muted or destructive-soft */
+  --sm-hatch: repeating-linear-gradient(
+    -45deg,
+    color-mix(in oklch, var(--ui-muted-foreground) 18%, transparent) 0 1px,
+    transparent 1px 7px
+  );
+}

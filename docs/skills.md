@@ -15,6 +15,7 @@ Repo skills live in `.agents/skills/<name>/SKILL.md`, which Capy reads. Pick one
 | tstack | `tstack` | [t3dotgg/tstack](https://github.com/t3dotgg/tstack) | MIT (`licenses/tstack.txt`) | 9 |
 | Ponytail (skills only) | `ponytail` | [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) | MIT (`licenses/ponytail.txt`) | 6 |
 | Anthropic skills | `anthropic-skills` | [anthropics/skills](https://github.com/anthropics/skills) | Apache-2.0 (`licenses/anthropic-skills.txt`) | 2 |
+| Emil Kowalski skills (design and motion) | `emilkowalski-skills` | [emilkowalski/skills](https://github.com/emilkowalski/skills) | MIT (`licenses/emilkowalski-skills.txt`) | 13 |
 | Matt Pocock skills | `mattpocock-skills` | [mattpocock/skills](https://github.com/mattpocock/skills) | MIT (`licenses/mattpocock-skills.txt`) | 1 |
 | Superpowers | `superpowers` | [obra/superpowers](https://github.com/obra/superpowers) | MIT (`licenses/superpowers.txt`) | 1 |
 | Vercel AI SDK | `vercel-ai` | [vercel/ai](https://github.com/vercel/ai) | Apache-2.0 (`licenses/vercel-ai.txt`) | 1 |
@@ -112,6 +113,19 @@ Repo skills live in `.agents/skills/<name>/SKILL.md`, which Capy reads. Pick one
 | `$ponytail-review` | ponytail | Quality review of a change: is the logic right, is it safe, does it hold under real load, is risky code tested, is it fast enough, and is every line needed. |
 | `$frontend-design` | anthropic-skills | Guidance for distinctive, intentional visual design when building new UI or reshaping an existing one. |
 | `$webapp-testing` | anthropic-skills | Toolkit for interacting with and testing local web applications using Playwright. |
+| `$animate` | emilkowalski-skills | Build an animation from scratch, making the decisions in the order that determines whether it feels right — should it animate at all, what purpose, which tool, which properties, which curve and dur... |
+| `$animation-performance` | emilkowalski-skills | Keep web animations inside the frame budget — animate composite-only properties, keep motion off the main thread when the page is busy, and find the cause when an animation drops frames. |
+| `$animation-vocabulary` | emilkowalski-skills | Reverse-lookup glossary that turns a vague description of a web animation or motion effect into its exact term ("the bouncy thing when a popover opens" → Pop in; "the iOS rubber-band scroll" → Rubb... |
+| `$apple-design` | emilkowalski-skills | Apple's approach to interface design and fluid, physical motion, translated for the web. |
+| `$ask-emil` | emilkowalski-skills | Ask which skill or flow fits your situation. |
+| `$break-ui` | emilkowalski-skills | Try to break a piece of UI by feeding it worst-case data — long names, unbreakable emails, one-letter names, missing fields, huge counts, zero items, long labels, non-Latin text, emoji, extreme num... |
+| `$choreograph` | emilkowalski-skills | Coordinate several elements that animate together — decide what moves, in what order, how much they overlap, and what stays still — so a group reads as one intentional motion instead of a pile of s... |
+| `$emil-design-eng` | emilkowalski-skills | Emil Kowalski's design-engineering philosophy for UI polish, component design, animation decisions, and the invisible details that make software feel great. |
+| `$gestures` | emilkowalski-skills | Build drag, swipe, and sheet interactions that track the finger 1:1 and stay interruptible. |
+| `$improve-animations` | emilkowalski-skills | Survey a codebase's animation and motion code as a senior motion advisor, then produce a prioritized audit and self-contained implementation plans for other agents (or cheaper models) to execute. |
+| `$learn-taste` | emilkowalski-skills | Turn a session's design corrections into rules, with their why, in DESIGN.md, a project skill, or a lint check. |
+| `$mobile-native` | emilkowalski-skills | Make a web app feel native on a phone — the small CSS and meta-tag fixes that separate "a website in a browser" from something that feels installed. |
+| `$prototype` | emilkowalski-skills | Build multiple genuinely different versions of a UI piece you describe, rendered behind a visual picker so you can flip through them live and promote the one that feels right. |
 | `$to-tickets` | mattpocock-skills | Break a plan, spec, or the current conversation into a set of tracer-bullet tickets, each declaring its blocking edges, published to the configured tracker (edges as text in one file per ticket loc... |
 | `$dispatching-parallel-agents` | superpowers | Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies |
 | `$ai-sdk` | vercel-ai | Answer questions about the AI SDK and help build AI-powered features. |
@@ -231,6 +245,17 @@ Limitations:
 - `webapp-testing`: its scripts and examples use the Python `playwright` package (`from playwright.sync_api import sync_playwright`) and Chromium. `SKILL.md` declares no install step, so Python 3 plus `pip install playwright && python -m playwright install chromium` must come from the repo setup. `scripts/with_server.py` itself uses only the Python standard library.
 - `frontend-design` steers away from a cream background, serif display type and a terracotta accent, which it calls common tells. The rules are Anthropic's and are vendored unchanged.
 - Each skill ships its own `LICENSE.txt` (Apache-2.0). Upstream has no root LICENSE, so `licenses/anthropic-skills.txt` is a copy of `skills/frontend-design/LICENSE.txt`.
+
+### Emil Kowalski skills (design and motion)
+
+Selection:
+
+- 13 of the repo's web skills. Not vendored: `animate-expo` and `write-swift` (native), `ask-sonner`, `find-animation-opportunities`, `pick-ui-library`, `remove-animations`, `review-animations`.
+
+Limitations:
+
+- Several vendored skills (`animate`, `ask-emil`, `choreograph`, `improve-animations`, `prototype` and others) point to skills that are not vendored, mostly `review-animations`. Those names do nothing here; add them to this collection's `skills` list if the team wants them.
+- Each skill answers its first bare invocation with a fixed one-line greeting and waits for a question.
 
 ### Matt Pocock skills
 

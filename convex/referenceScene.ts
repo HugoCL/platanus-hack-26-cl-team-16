@@ -2,7 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { chooseProvider } from "../lib/agents/consumer";
 import { agentWithRole } from "../lib/agents/turn";
 import { MAX_TEXT_LENGTH, type Message } from "../shared/messages";
-import { CONSUMER_AGENT_SLUG } from "../shared/seedData";
+import { CONSUMER_AGENT_SLUG } from "../shared/seed-data";
 import type { Session } from "../shared/session";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";

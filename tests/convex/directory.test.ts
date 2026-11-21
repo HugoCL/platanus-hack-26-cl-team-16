@@ -14,7 +14,7 @@ import {
 } from "../../convex/directory";
 import schema from "../../convex/schema";
 import { AgentDetail, AgentSummary } from "../../shared/mcp";
-import { CLINIC_AGENT_SLUG } from "../../shared/seedData";
+import { CLINIC_AGENT_SLUG } from "../../shared/seed-data";
 
 const modules = import.meta.glob("../../convex/**/*.ts");
 
