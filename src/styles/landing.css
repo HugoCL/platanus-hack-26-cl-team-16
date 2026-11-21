@@ -7,18 +7,18 @@
  * Text on yellow is always ink.
  */
 .landing {
-  --landing-ink: oklch(0.13 0.004 49);
-  --landing-bg: light-dark(oklch(0.985 0.008 95), oklch(0.13 0.004 49));
-  --landing-alt: light-dark(oklch(0.955 0.07 100), oklch(0.175 0.006 60));
-  --landing-panel: light-dark(oklch(1 0 0), oklch(0.17 0.005 49));
+  --landing-ink: var(--brand-ink);
+  --landing-bg: var(--ui-background);
+  --landing-alt: var(--sm-paper);
+  --landing-panel: var(--sm-card);
   --landing-bubble: light-dark(oklch(0.94 0.006 90), oklch(0.25 0.006 49));
-  --landing-fg: light-dark(oklch(0.13 0.004 49), oklch(0.985 0.001 106));
-  --landing-muted: light-dark(oklch(0.13 0.004 49 / 0.58), oklch(0.7 0.01 70));
+  --landing-fg: var(--ui-foreground);
+  --landing-muted: var(--sm-headline-muted);
   --landing-subtle: light-dark(
     oklch(0.13 0.004 49 / 0.72),
     oklch(0.8 0.008 56)
   );
-  --landing-line: light-dark(oklch(0.13 0.004 49 / 0.14), oklch(1 0 0 / 0.1));
+  --landing-line: var(--ui-border);
   --landing-wall-text: light-dark(
     oklch(0.13 0.004 49 / 0.17),
     oklch(1 0 0 / 0.11)
@@ -40,7 +40,7 @@
     color-mix(in oklch, var(--brand-yellow) 85%, transparent)
   );
   --landing-pad: clamp(1.25rem, 6vw, 6rem);
-  --landing-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --landing-ease-out: var(--ease-out);
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
