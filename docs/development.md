@@ -18,9 +18,9 @@ The directory lives in `convex/directory.ts` and the page at http://localhost:30
 
 | Function | Kind | What it does |
 | --- | --- | --- |
-| `directory.search` | query | Cards by `category` (slug or label; a parent includes its children, so `salud` matches `cardiologia`) and `comuna`, both optional, plus `limit`. Verified cards come first, then active before unclaimed. No match returns `[]`. |
-| `directory.searchText` | action | Free text such as "cardiólogo en Providencia". `lib/directory.ts` turns it into a category and a comuna with synonyms and the list of comunas of the Región Metropolitana. Only when that finds nothing does it ask the `LlmProvider`, and an answer outside the known categories and comunas is ignored. Returns the interpretation and the cards. |
-| `directory.get` | query | One card by `slug` or `agentId`, or `null`. |
+| `directory.search` | query | Cards by `category` (slug or label; a parent includes its children, so `salud` matches `cardiologia`) and `comuna`, both optional, plus `limit` (an integer from 1 to 20; omitted lists every match). Verified cards come first, then active before unclaimed. No match returns `[]`. |
+| `directory.searchText` | action | Free text such as "cardiólogo en Providencia". `lib/directory.ts` turns it into a category and a comuna with synonyms and the list of comunas of the Región Metropolitana. When the text names a need or a place (after "en", "cerca de" or "comuna") that the parser can't resolve, it asks the `LlmProvider` for that half only; an answer outside the known categories and comunas is ignored. If a half stays unresolved ("cardiólogo en Narnia"), it returns no cards rather than searching with the other half alone. Returns the interpretation, with `unresolved`, and the cards. |
+| `directory.get` | query | One card by exactly one of `slug` or `agentId`, or `null`. |
 | `directory.categories` | query | The category tree. |
 
 Each card is an `AgentDetail` (the full `AgentCard` with purpose and scope) plus `comuna` and `allowedIntents`, so it also validates as an `AgentSummary`. Draft cards are never listed.
