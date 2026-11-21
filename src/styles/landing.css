@@ -1,0 +1,750 @@
+/*
+ * Landing: a hero over a wall of phone-book listings, then sections that alternate between the
+ * page background and a second surface (the "page" of the book). The wall follows the Vercel
+ * 404 (a dense field of tiny names lit around the pointer), the hero follows Sentry's (two-tone
+ * headline, a glow rising from the bottom) with the glow and the call to action in phone-book
+ * yellow. It follows the theme: light is warm paper with ink, dark is ink with light text.
+ * Text on yellow is always ink.
+ */
+.landing {
+  --landing-ink: oklch(0.13 0.004 49);
+  --landing-bg: light-dark(oklch(0.985 0.008 95), oklch(0.13 0.004 49));
+  --landing-alt: light-dark(oklch(0.955 0.07 100), oklch(0.175 0.006 60));
+  --landing-panel: light-dark(oklch(1 0 0), oklch(0.17 0.005 49));
+  --landing-bubble: light-dark(oklch(0.94 0.006 90), oklch(0.25 0.006 49));
+  --landing-fg: light-dark(oklch(0.13 0.004 49), oklch(0.985 0.001 106));
+  --landing-muted: light-dark(oklch(0.13 0.004 49 / 0.45), oklch(0.7 0.01 70));
+  --landing-subtle: light-dark(
+    oklch(0.13 0.004 49 / 0.72),
+    oklch(0.8 0.008 56)
+  );
+  --landing-line: light-dark(oklch(0.13 0.004 49 / 0.14), oklch(1 0 0 / 0.1));
+  --landing-wall-text: light-dark(oklch(0.25 0.012 70), oklch(0.78 0.012 90));
+  --landing-wall-heading: light-dark(oklch(0.13 0.004 49), var(--sm-yellow));
+  --landing-pad: clamp(1.25rem, 6vw, 6rem);
+  --landing-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: var(--landing-bg);
+  color: var(--landing-fg);
+}
+
+/*
+ * Scroll moves one section at a time: the header (with the hero under it), the demo, how it
+ * works, and the closing call to action, which snaps to the end with the footer. Sections fill
+ * the viewport and center their content. Only on screens tall and wide enough for a section to
+ * fit; on phones the page scrolls freely.
+ */
+@media (min-width: 48rem) and (min-height: 40rem) {
+  html:has(.landing) {
+    scroll-snap-type: y mandatory;
+  }
+
+  .landing > header,
+  .landing-section {
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+
+  .landing-section {
+    min-height: 100svh;
+    align-content: center;
+  }
+
+  .landing-final {
+    min-height: calc(100svh - 5.25rem);
+    justify-content: center;
+  }
+
+  .landing-footer {
+    scroll-snap-align: end;
+  }
+}
+
+.landing-main {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 3rem;
+  min-height: calc(100svh - 61px);
+  padding: clamp(3rem, 9vh, 6rem) var(--landing-pad) 2rem;
+}
+
+.landing-spotlight {
+  --x: 72%;
+  --y: 38%;
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  overflow: hidden;
+  color: var(--landing-wall-text);
+  mask-image:
+    radial-gradient(
+      circle 15rem at var(--x) var(--y),
+      rgb(0 0 0 / 0.75),
+      rgb(0 0 0 / 0.07) 100%
+    ),
+    linear-gradient(to bottom, transparent, black 8%, black 88%, transparent);
+  mask-composite: intersect;
+}
+
+/*
+ * The wall is drawn into one image per column (listing-wall.tsx). Each track shows that image
+ * twice and slides by one copy (-50%), so the loop is seamless; even columns run up, odd ones
+ * down. Only transform animates, so the compositor moves it without layout or repaint.
+ */
+@keyframes landing-scroll {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-50%);
+  }
+}
+
+.landing-wall {
+  display: flex;
+  gap: 1.25rem;
+  height: 100%;
+  padding-inline: 1rem;
+  font: 500 0.5625rem / 1.45 var(--ui-font-mono);
+  opacity: 0;
+  transition: opacity 600ms var(--landing-ease-out);
+
+  &[data-ready] {
+    opacity: 1;
+  }
+}
+
+.landing-column {
+  flex: 0 0 auto;
+}
+
+.landing-track {
+  animation: landing-scroll 140s linear infinite;
+  will-change: transform;
+
+  &[data-direction="down"] {
+    animation-direction: reverse;
+  }
+
+  & img {
+    display: block;
+  }
+}
+
+.landing-spotlight[data-paused] .landing-track {
+  animation-play-state: paused;
+}
+
+.landing-glow {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      85% 60% at 10% 115%,
+      color-mix(in oklch, var(--sm-yellow) 96%, transparent),
+      color-mix(in oklch, var(--sm-yellow) 45%, transparent) 38%,
+      transparent 72%
+    ),
+    linear-gradient(
+      to top,
+      color-mix(in oklch, var(--sm-yellow) 55%, transparent),
+      color-mix(in oklch, var(--sm-yellow) 18%, transparent) 18%,
+      transparent 45%
+    ),
+    radial-gradient(
+      60% 55% at 22% 45%,
+      color-mix(in oklch, var(--landing-bg) 92%, transparent),
+      transparent 80%
+    );
+}
+
+.landing-hero {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.25rem;
+  max-width: 68rem;
+
+  & h1 {
+    margin: 0;
+    color: var(--landing-fg);
+    font: 500 clamp(2.75rem, 6.4vw, 5.5rem) / 0.98 var(--ui-font-sans);
+    letter-spacing: -0.055em;
+    text-wrap: balance;
+  }
+
+  & h1 > span:not(.landing-word) {
+    display: block;
+    color: var(--landing-muted);
+  }
+
+  & > p {
+    max-width: 30rem;
+    margin: 0;
+    color: var(--landing-subtle);
+    font-size: 1rem;
+    line-height: 1.55;
+    text-wrap: pretty;
+  }
+}
+
+.landing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.5rem;
+  margin-top: 0.75rem;
+}
+
+.landing-cta {
+  display: inline-flex;
+  gap: 2px;
+  height: 2.875rem;
+  border-radius: 0.5rem;
+  color: var(--landing-ink);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+
+  & span {
+    display: flex;
+    align-items: center;
+    padding-inline: 1.25rem;
+    border-radius: 0.5rem;
+    background: linear-gradient(
+      to bottom,
+      oklch(0.94 0.15 100),
+      var(--sm-yellow)
+    );
+    transition:
+      filter 150ms ease,
+      transform 160ms var(--landing-ease-out);
+  }
+
+  & span + span {
+    padding-inline: 1rem;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover span {
+      filter: brightness(1.06);
+    }
+  }
+
+  &:active span {
+    transform: scale(0.97);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sm-yellow);
+    outline-offset: 3px;
+  }
+}
+
+.landing-secondary {
+  color: var(--landing-fg);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: color-mix(
+    in oklch,
+    var(--landing-fg) 30%,
+    transparent
+  );
+  text-underline-offset: 0.3em;
+  transition: text-decoration-color 150ms ease;
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      text-decoration-color: var(--sm-yellow);
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sm-yellow);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+}
+
+.landing-agents {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+
+  & p {
+    margin: 0;
+    color: oklch(0.13 0.004 49 / 0.75);
+    font: 600 0.625rem / 1 var(--ui-font-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  & ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 2rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--landing-ink);
+    font-size: clamp(1rem, 2vw, 1.25rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+  }
+}
+
+/* Sections below the hero: paper ones read like the inside of the phone book. */
+.landing-section {
+  position: relative;
+  padding: clamp(4rem, 10vw, 8rem) var(--landing-pad);
+}
+
+.landing-alt {
+  background: var(--landing-alt);
+}
+
+.landing-section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: clamp(2.5rem, 5vw, 4rem);
+
+  & > p {
+    margin: 0;
+    padding-top: 0.5rem;
+    border-top: 3px solid currentColor;
+    font: 700 0.75rem / 1 var(--ui-font-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    width: fit-content;
+  }
+
+  & h2 {
+    max-width: 52rem;
+    margin: 0;
+    font: 500 clamp(2.25rem, 5vw, 4.25rem) / 1 var(--ui-font-sans);
+    letter-spacing: -0.05em;
+    text-wrap: balance;
+  }
+
+  & h2 > span {
+    color: var(--landing-muted);
+  }
+}
+
+.landing-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: 2rem clamp(1.5rem, 3vw, 3rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  & li {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--landing-line);
+  }
+
+  & h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+  }
+
+  & li > p {
+    margin: 0;
+    max-width: 22rem;
+    color: var(--landing-subtle);
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+}
+
+.landing-step-number {
+  font: 800 3.5rem / 0.9 var(--ui-font-sans);
+  letter-spacing: -0.06em;
+}
+
+.landing-sample {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: auto;
+  padding: 1rem;
+  background: light-dark(oklch(1 0 0 / 0.6), oklch(1 0 0 / 0.05));
+  font: 500 0.75rem / 1.4 var(--ui-font-mono);
+
+  & p {
+    display: flex;
+    gap: 0.5em;
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  & p > span:first-child {
+    flex: 1;
+    overflow: hidden;
+  }
+
+  & p > span:first-child::after {
+    content: " . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .";
+    opacity: 0.4;
+  }
+
+  & p[data-featured] {
+    margin-inline: -0.25rem;
+    padding-inline: 0.25rem;
+    background: var(--sm-yellow);
+    color: var(--landing-ink);
+    font-weight: 700;
+  }
+}
+
+.landing-sample-query {
+  margin-bottom: 0.25rem;
+  font-weight: 700;
+}
+
+.landing-sample-stamp {
+  width: fit-content;
+  margin-bottom: 0.25rem;
+  padding: 0.15rem 0.4rem;
+  border: 2px solid currentColor;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.landing-room {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+  align-items: center;
+  gap: clamp(2.5rem, 6vw, 6rem);
+}
+
+.landing-room-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.5rem;
+
+  & .landing-section-head {
+    margin-bottom: 0.5rem;
+  }
+
+  & > p {
+    max-width: 30rem;
+    margin: 0;
+    color: var(--landing-subtle);
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+
+  & ul {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 1rem;
+  }
+
+  & li {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  & li::before {
+    content: "";
+    width: 0.5rem;
+    height: 0.5rem;
+    background: var(--sm-yellow);
+  }
+}
+
+.landing-replay {
+  display: flex;
+  flex-direction: column;
+  min-height: 34rem;
+  border: 1px solid var(--landing-line);
+  background: var(--landing-panel);
+  font-size: 0.875rem;
+
+  & ol {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 1.25rem;
+    list-style: none;
+  }
+
+  & li {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    max-width: 85%;
+    animation: landing-in 400ms var(--landing-ease-out) both;
+  }
+
+  & li > p {
+    margin: 0;
+    padding: 0.6rem 0.85rem;
+    border-radius: 0.75rem;
+    background: var(--landing-bubble);
+    line-height: 1.45;
+  }
+
+  & li[data-kind="self"] {
+    align-self: flex-end;
+  }
+
+  & li[data-kind="self"] > p {
+    background: var(--landing-fg);
+    color: var(--landing-bg);
+  }
+
+  & li[data-kind="system"] {
+    align-self: center;
+    max-width: none;
+  }
+
+  & li[data-kind="system"] > p {
+    padding: 0;
+    background: none;
+    color: var(--landing-muted);
+    font: 500 0.6875rem / 1 var(--ui-font-mono);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  & s {
+    padding-inline: 0.15em;
+    background: var(--sm-hatch), oklch(0.704 0.191 22.216 / 0.18);
+    color: transparent;
+    text-decoration: none;
+  }
+
+  & small {
+    color: light-dark(oklch(0.45 0.1 85), var(--sm-yellow));
+    font: 600 0.6875rem / 1.3 var(--ui-font-mono);
+  }
+
+  & li[data-kind="receipt"] {
+    gap: 0.25rem;
+    padding: 0.75rem 0.9rem;
+    border-radius: 0.75rem;
+    background: var(--sm-yellow);
+    color: var(--landing-ink);
+  }
+
+  & li[data-kind="receipt"] > p {
+    padding: 0;
+    background: none;
+  }
+
+  & li > p.landing-replay-hatch {
+    background: var(--sm-hatch), var(--landing-bubble);
+    color: var(--landing-muted);
+    font-style: italic;
+  }
+}
+
+.landing-replay-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--landing-line);
+
+  & div:first-child {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  & div:first-child span {
+    color: var(--landing-muted);
+    font-size: 0.75rem;
+  }
+}
+
+.landing-replay-faults {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font: 500 0.6875rem / 1 var(--ui-font-mono);
+  text-transform: uppercase;
+
+  & span {
+    margin-right: 0.35rem;
+    color: var(--landing-muted);
+  }
+
+  & i {
+    width: 1.1rem;
+    height: 0.35rem;
+    background: var(--landing-line);
+    transition: background-color 200ms var(--landing-ease-out);
+  }
+
+  & i[data-on] {
+    background: var(--sm-yellow);
+  }
+}
+
+.landing-replay-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+
+  & span {
+    padding: 0.45rem 0.7rem;
+    border: 1px solid var(--landing-line);
+    font: 500 0.75rem / 1 var(--ui-font-mono);
+  }
+
+  & span[data-chosen] {
+    border-color: var(--sm-yellow);
+    background: var(--sm-yellow);
+    color: var(--landing-ink);
+  }
+}
+
+@keyframes landing-in {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+.landing-final {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2rem;
+  padding: clamp(5rem, 12vw, 10rem) var(--landing-pad);
+
+  & h2 {
+    max-width: 56rem;
+    margin: 0;
+    font: 500 clamp(2.5rem, 6vw, 5rem) / 0.98 var(--ui-font-sans);
+    letter-spacing: -0.055em;
+    text-wrap: balance;
+  }
+
+  & h2 > span {
+    display: block;
+    color: var(--landing-muted);
+  }
+}
+
+.landing-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+  padding: 1.5rem var(--landing-pad);
+  background: var(--sm-yellow);
+  color: var(--landing-ink);
+  font: 500 0.75rem / 1.4 var(--ui-font-mono);
+
+  & nav {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+  }
+
+  & a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+  }
+}
+
+.landing-footer-logo {
+  font: 700 1.25rem / 1 var(--ui-font-sans);
+  letter-spacing: -0.03em;
+}
+
+/* Scroll reveal: elements marked data-reveal fade in from a blur as they first enter the
+   viewport, staggered by --reveal-i, and stay revealed: scrolling back does not replay them.
+   Hidden only when scripts run. Reduced motion keeps the fade and drops the blur and the rise. */
+.landing-word {
+  display: inline-block;
+  white-space: pre;
+}
+
+@media (scripting: enabled) {
+  .landing [data-reveal]:not([data-revealed]) {
+    opacity: 0;
+  }
+
+  .landing [data-reveal] {
+    transition: opacity 400ms ease;
+    transition-delay: calc(var(--reveal-i, 0) * 60ms);
+  }
+}
+
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  .landing [data-reveal]:not([data-revealed]) {
+    filter: blur(8px);
+    translate: 0 0.75rem;
+  }
+
+  .landing [data-reveal] {
+    transition:
+      opacity 700ms var(--landing-ease-out),
+      filter 700ms var(--landing-ease-out),
+      translate 900ms var(--landing-ease-out);
+    transition-delay: calc(var(--reveal-i, 0) * 70ms);
+  }
+}
+
+@media (max-width: 40rem) {
+  .landing-spotlight {
+    --x: 90%;
+    --y: 10%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-track {
+    animation: none;
+  }
+
+  .landing-replay li {
+    animation-name: landing-fade;
+  }
+
+  .landing-cta:active span {
+    transform: none;
+  }
+}
+
+@keyframes landing-fade {
+  from {
+    opacity: 0;
+  }
+}

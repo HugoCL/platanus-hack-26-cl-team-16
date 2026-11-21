@@ -1,5 +1,7 @@
 # hackathon-toolbox
 
+Domain vocabulary: every session uses the terms in [`GLOSSARY.md`](GLOSSARY.md) (code, identifiers and file names in English; UI copy in Spanish).
+
 Template for team hackathons, opened in [Capy](https://capy.ai) and usable from T3 Code, Claude Code, Codex, Cursor and Gemini/Antigravity. A Captain coordinates agent threads; you pick skills with `$`. It ships a Next.js + Convex + Clerk app that runs on a fresh clone, 100+ skills in `.agents/skills/` (catalog and limits: `docs/skills.md`), and the local tools agents use to develop and test.
 
 ## Stack and commands
@@ -12,10 +14,10 @@ Next.js 16 (App Router, Turbopack), Convex, Clerk, Tailwind 4, [UI SDK](https://
 | `pnpm dev` | Seeds empty Convex tables, then Convex plus Next.js on http://localhost:3000. Anonymous local Convex unless you switched to real accounts. `DEV_SEED=0` skips seeding. To stop one running in the background, send SIGINT to the `scripts/dev.mjs` process (`pkill -INT -f scripts/dev.mjs`): on Linux a signal sent to `pnpm` does not reach it, and other signals can leave `next dev` and the Convex backend running. |
 | `pnpm dev:cloud` | Plain `convex dev --start 'next dev'`: no seed, and it does not force anonymous mode (Convex itself picks an anonymous deployment when you are not logged in or stdin is not a TTY). Needs `npx convex login`, which a human runs. |
 | `pnpm lint`, `pnpm format` | `biome check .`, `biome check --write .`. Markdown is not linted. |
-| `pnpm typecheck`, `pnpm build` | `tsc --noEmit`, then `next build` (it passes without `.env.local`; running needs `NEXT_PUBLIC_CONVEX_URL`). `pnpm start` serves the build. |
+| `pnpm typecheck`, `pnpm build` | `next typegen` plus `tsc --noEmit`; `pnpm build` runs `pnpm typecheck`, then `next build` (it passes without `.env.local`; running needs `NEXT_PUBLIC_CONVEX_URL`). `pnpm start` serves the build. |
 | `pnpm seed`, `pnpm seed:reset`, `pnpm migrate` | `convex run seed:ensure` (idempotent), a wipe plus reseed (local deployments only), and `convex run migrations:runAll`. They talk to the running deployment, so start `pnpm dev` first. |
 | `pnpm mcp:key '{"slug":"<agent-slug>"}'` | Issues an API key for that agent to call the MCP server at `/api/mcp` (`Authorization: Bearer <key>`). The key prints once; only its SHA-256 hash and prefix are stored. Talks to the running deployment like `pnpm seed`. |
-| `pnpm test` | Vitest, offline: contract examples, seed data, fake LLM, business fixture, and `seed:ensure` through convex-test. No network or keys (`fetch` is stubbed to throw). |
+| `pnpm test` | Vitest, offline: contract examples, seed data, fake LLM, business fixture, directory search and text parsing, the moderation set, rules and moderator, the room UI's formatting, and `seed:ensure` and `directory` through convex-test. No network or keys (`fetch` is stubbed to throw). |
 | `pnpm eval:moderator` | Runs the moderation set against the real model on OpenRouter, for the full moderator and for the judge alone, and prints the E3 criteria and the cost. Needs `OPENROUTER_API_KEY` and spends credit, so it never runs in CI or `pnpm test`. `EVAL_RUNS` (default 10), `EVAL_CONCURRENCY` (default 4) and `MODERATOR_MODEL` tune it; the raw samples go to `artifacts/moderator-eval.json`. |
 | `pnpm smoke` | Playwright smoke test. Starts `pnpm dev` itself, bootstraps `.venv` and Chromium on first run, saves `artifacts/smoke.png` and `artifacts/dev.log`. With a server already running: `SMOKE_REUSE=1 pnpm smoke`. `PORT` changes the port. |
 | `pnpm browser:install` | Download Chrome for `agent-browser`. |
@@ -23,7 +25,7 @@ Next.js 16 (App Router, Turbopack), Convex, Clerk, Tailwind 4, [UI SDK](https://
 | `pnpm skills:check` | Validate skill names and frontmatter, the lock, content hashes (a hand-edited vendored skill fails), no symlinks, and that `docs/skills.md` is fresh. |
 | `pnpm skills:link` | Claude Code only: symlink `.agents/skills` into `.claude/skills` (gitignored). |
 
-Code lives in `app/` (UI), `components/`, and `convex/` (backend). Before touching `convex/`, read `convex/_generated/ai/guidelines.md`.
+Code lives in `src/` (`src/app/` routes, `src/components/`, `src/styles/`, `src/proxy.ts`), `convex/` (backend), `shared/` (contracts, seed data, moderator) and `lib/` (directory text parsing, shared by Convex and tests). Tests are in `tests/`, the paid moderator eval in `evals/`. `@/*` maps to `src/*`, `@/convex/*` to `convex/*` and `@/shared/*` to `shared/*` (tsconfig and `vitest.config.mts`). Before touching `convex/`, read `convex/_generated/ai/guidelines.md`.
 
 Architecture (Spanish) and the contracts every track builds on: `docs/architecture.md`; the zod schemas in `shared/` are the source of truth for `convex/schema.ts`. Start and test from a clean clone: `docs/development.md`. CI, the production deploy on Render and PR previews, with their costs and the human-only setup: `docs/deploy.md`.
 
@@ -33,10 +35,11 @@ The UI uses [UI SDK](https://ui-sdk.dev) (Vercel): unstyled, accessible primitiv
 
 - Before using UI SDK, follow `$ui-sdk` and read `node_modules/@ui-sdk/react/docs/llms.txt`, then only the component pages you need. To build a component it does not ship, search `node_modules/@ui-sdk/react/docs/core.md` by heading (it is large) and read `rendering.md` next to it.
 - Import each component from its entry (`@ui-sdk/react/button`), never from a package root. Components already say `"use client"`, so server components can render them.
+- File naming: first-party files and folders use kebab-case (`toggle-theme.tsx`, not `ToggleTheme.tsx`; `seed-data.ts`, not `seedData.ts`). Exported React components stay PascalCase (`export default function ToggleTheme`). Exceptions: `convex/` modules use camelCase (`myFunctions.ts`), because a Convex file path becomes its function path (`api.myFunctions.addNumber`) and Convex only accepts letters, digits, underscores and periods there; names a tool expects (`README.md`, `AGENTS.md`, `CLAUDE.md`, `SKILL.md`, `.github/pull_request_template.md`, Next.js files such as `page.tsx`, `layout.tsx`, `proxy.ts` and `next-env.d.ts`, config files, `convex/_generated/`); and vendored files under `.agents/` and `licenses/`.
 - Use a UI SDK component wherever one exists (Button, Dialog, Select, Field...). Do not hand-roll `role=` widgets.
-- `app/globals.css` declares `@layer ui-sdk;` above Tailwind and imports `@ui-sdk/core/web.css` (the default look) into `layer(components)`. Keep that order.
+- `src/styles/globals.css` declares `@layer ui-sdk;` above Tailwind and imports `@ui-sdk/core/web.css` (the default look) into `layer(components)`. Keep that order.
 - `web.css` also restyles bare `a`, `code`, `hr` and `kbd` app-wide, and gives buttons a filled look with `data-variant="solid"` (a `web.css` hook, not a component prop; its sizes and icons are only written down in `node_modules/@ui-sdk/core/dist/web.css`).
-- Tokens live in `app/tokens.css`: neutral `--ui-*` placeholders at UI SDK's defaults (except `--ui-ring`, raised to 3:1 so keyboard focus shows), mapped to Tailwind colors (`bg-muted`, `text-muted-foreground`, `border-border`) in `globals.css`. The design system starts there: set the team's palette, type, radius and spacing with `$frontend-design`, then style parts by `data-slot` and state attributes (`data-pressed`, `data-open`). Check contrast in a real browser.
+- Tokens live in `src/styles/tokens.css`: neutral `--ui-*` placeholders at UI SDK's defaults (except `--ui-ring`, raised to 3:1 so keyboard focus shows), mapped to Tailwind colors (`bg-muted`, `text-muted-foreground`, `border-border`) in `globals.css`. The design system starts there: set the team's palette, type, radius and spacing with `$frontend-design`, then style parts by `data-slot` and state attributes (`data-pressed`, `data-open`). Check contrast in a real browser.
 - The packages are pinned to `0.1.0-beta.7`, the newest beta past `minimumReleaseAge` on 2026-11-20. Bump `@ui-sdk/react`, `@ui-sdk/core` and the `ui-sdk` skill commit in `scripts/skills/sources.json` together.
 
 Convex conventions (details in the file headers):
@@ -45,7 +48,7 @@ Convex conventions (details in the file headers):
 - Destructive schema change or backfill: write a migration in `convex/migrations.ts`, add it to `runAll`, run `pnpm migrate`.
 - Components: `@convex-dev/migrations`, `@convex-dev/rate-limiter` (`addNumber` is limited and throws a `ConvexError` whose `data.kind` is `"RateLimited"`, see `isRateLimitError`), `@convex-dev/workpool` mounted as `backgroundWork` (example in `convex/jobs.ts`).
 
-Smoke checks the home page's `h1` ("Convex + Next.js + Clerk") and the `data-testid`s `add-number` and `numbers` (it adds a number and waits for the newest number's id, `data-latest-id`, to change; `loading` is not checked). Then it opens `/directorio` and waits for one `data-testid="agent-card"` per non-draft card in `SEED_AGENTS` (read from `shared/seedData.ts` with Node, capped at the page size of 20). The PR that changes the home page updates `check()` in `scripts/smoke.py` in the same PR.
+Smoke checks the landing's `h1` ("Todos los negocios"). Then it opens `/directory` and waits for one `data-testid="agent-card"` per non-draft card in `SEED_AGENTS` (read from `shared/seed-data.ts` with Node, capped at the page size of 20). The PR that changes the home page updates `check()` in `scripts/smoke.py` in the same PR.
 
 ## Local dev with no accounts
 
@@ -53,7 +56,7 @@ Smoke checks the home page's `h1` ("Convex + Next.js + Clerk") and the `data-tes
 
 - **Convex.** A local deployment runs as a subprocess of `convex dev` (`CONVEX_AGENT_MODE=anonymous`, set by `scripts/dev.mjs`). State is in `.convex/` and `.env.local`, both gitignored. `pnpm dev` stays anonymous unless `CONVEX_DEPLOY_KEY` or `CONVEX_DEPLOYMENT_TOKEN` is set, or `.env.local` or `.env` selects a deployment (`CONVEX_DEPLOYMENT=` that does not start with `anonymous:`, or `CONVEX_SELF_HOSTED_*`). In anonymous mode every Convex deployment variable is removed from the children's environment, and cloud mode refuses a production key or deployment (`pnpm dev` pushes and seeds).
 - **Clerk.** The SDK is pinned to 7.7.9, the last release with automatic keyless mode. Keyless provisions temporary dev keys on first load; the "Configure your application" prompt is expected. Keyless stays off when `CI` is set, so run `pnpm smoke` without it. Clerk 7.8 and later no longer create keyless keys, so they need real keys or a key file from `clerk init`; so revisit this setup and smoke before bumping the pin.
-- `convex/auth.config.ts` accepts tokens from the team's Clerk app only (`cheerful-cougar-1086.clerk.accounts.dev`, a development instance). The keyless app is a different Clerk app, so in this mode Convex sees every user as signed out. The signed-in UI needs the team's Clerk keys (the switch below). `/server` requires sign-in (`proxy.ts` protects it).
+- `convex/auth.config.ts` accepts tokens from the team's Clerk app only (`cheerful-cougar-1086.clerk.accounts.dev`, a development instance). The keyless app is a different Clerk app, so in this mode Convex sees every user as signed out. The signed-in UI needs the team's Clerk keys (the switch below). `/server` requires sign-in (`src/proxy.ts` protects it).
 - `@clerk/nextjs` 7 loads Clerk JS 6, replacing the Clerk JS 5 build that returned `action_blocked` for sign-in and sign-up. To verify the team's login and Convex identity, use real accounts as described below.
 
 ### Switch to real accounts (a human does this once)
@@ -86,7 +89,7 @@ Local Markdown tracker, committed so teammates see them: `.scratch/<feature>/spe
 | Plan | `$gstack` (then its `/office-hours` or `/autoplan` workflow), `$how` |
 | Tickets | `$to-tickets`. The Captain fans out with `$dispatching-parallel-agents`. |
 | Implement | `$poteto-mode` (Feature playbook), `$tdd`, `$ponytail`. For the stack: `$convex`, `$clerk-nextjs-patterns`, `$ai-sdk`, `$ui-sdk`. |
-| Design | UI SDK primitives (`$ui-sdk`) plus `$frontend-design` for the design system (tokens in `app/tokens.css`). Capy built-in: `$make-a-prototype`. |
+| Design | UI SDK primitives (`$ui-sdk`) plus `$frontend-design` for the design system (tokens in `src/styles/tokens.css`). Capy built-in: `$make-a-prototype`. |
 | QA | `$webapp-testing` (run its scripts with `.venv/bin/python`; `pnpm smoke` creates it), `$agent-browser` (outside Capy run `pnpm exec agent-browser`; on Capy `initialize` writes a wrapper script at `~/.local/bin/agent-browser`, UNCONFIRMED on a real Capy VM), `$ponytail-review`. gstack `/qa` through `$gstack`. |
 | Before review | `$deslop`, then `$make-pr-easy-to-review` |
 | Review | `$thermo-nuclear-code-quality-review` as the maintainability lens, seats and models per `$subagent-routing` |

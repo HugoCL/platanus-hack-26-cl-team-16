@@ -9,7 +9,7 @@ import schema from "../../convex/schema";
 import {
   CONSUMER_AGENT_SLUG,
   EXTERNAL_AGENT_SLUG,
-} from "../../shared/seedData";
+} from "../../shared/seed-data";
 
 const modules = import.meta.glob("../../convex/**/*.ts");
 
