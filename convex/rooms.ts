@@ -355,7 +355,11 @@ async function planRoom(ctx: QueryCtx, args: ObjectType<typeof openArgs>) {
     invalidArgument("an agent cannot open a room with itself");
   }
   const initiator = await ctx.db.get(args.initiatorAgentId);
-  if (!initiator || !listedCard(initiator)) {
+  if (
+    !initiator ||
+    (!listedCard(initiator) &&
+      !(initiator.kind === "external" && initiator.status === "draft"))
+  ) {
     invalidArgument("the initiator agent does not exist or is not listed");
   }
   const provider = await ctx.db.get(args.providerAgentId);

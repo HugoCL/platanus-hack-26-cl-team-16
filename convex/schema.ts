@@ -76,6 +76,7 @@ export default defineSchema({
     entityId: v.optional(v.id("entities")),
     ownerTokenIdentifier: v.optional(v.string()),
     primaryCategory: v.string(),
+    selfRegistered: v.optional(v.boolean()),
     searchText: v.string(),
     embedding: v.optional(v.array(v.float64())),
   })
@@ -94,6 +95,13 @@ export default defineSchema({
       dimensions: EMBEDDING_DIMENSIONS,
       filterFields: ["status", "primaryCategory"],
     }),
+
+  agentLinkCodes: defineTable({
+    agentId: v.id("agents"),
+    codeHash: v.string(),
+    expiresAt: v.number(),
+    usedAt: v.optional(v.number()),
+  }).index("by_codeHash", ["codeHash"]),
 
   agentApiKeys: defineTable({
     agentId: v.id("agents"),
