@@ -3,12 +3,17 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { FunctionReturnType } from "convex/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "../../convex/_generated/api";
+import { api, internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { Message } from "../../shared/messages";
 import { MODERATOR_TIMEOUT_MS } from "../../shared/moderator/moderator";
 import * as rules from "../../shared/moderator/rules";
-import { errorKind, roomWithHuman, seededRooms } from "./roomFixture";
+import {
+  errorKind,
+  ROOM_OWNER,
+  roomWithHuman,
+  seededRooms,
+} from "./roomFixture";
 
 let rooms: Awaited<ReturnType<typeof seededRooms>>;
 let room: Awaited<ReturnType<typeof roomWithHuman>>;
@@ -27,7 +32,7 @@ const send = (
   recipient: Id<"participants"> | "all",
   content: unknown,
 ) =>
-  rooms.t.action(api.gate.send, {
+  rooms.t.action(internal.gate.sendAsParticipant, {
     sessionId: room.sessionId,
     senderParticipantId: sender,
     recipient,
@@ -35,9 +40,14 @@ const send = (
   });
 
 const history = (viewerParticipantId = room.consumer) =>
-  rooms.t.query(api.gate.history, {
+  rooms.t.query(internal.gate.historyForParticipant, {
     sessionId: room.sessionId,
     viewerParticipantId,
+  });
+
+const humanHistory = () =>
+  rooms.t.withIdentity(ROOM_OWNER).query(api.gate.history, {
+    sessionId: room.sessionId,
   });
 
 function convexSources(dir: string): string[] {
@@ -53,15 +63,32 @@ function convexSources(dir: string): string[] {
 describe("E2 success criteria", () => {
   it("2. both agents and the human see each allowed message in the same order", async () => {
     const viewers = [room.consumer, room.provider, room.human];
+    const snapshots = () =>
+      Promise.all([
+        history(room.consumer),
+        history(room.provider),
+        humanHistory(),
+      ]);
     const [openingNotice] = await history();
     expect(openingNotice.content).toMatchObject({ code: "session_opened" });
     const expected = [openingNotice];
 
     for (const [i, sender] of viewers.entries()) {
-      expected.push(await send(sender, "all", text(`Message ${i + 1}`)));
-      expect(await Promise.all(viewers.map(history))).toEqual(
-        viewers.map(() => expected),
-      );
+      const content = text(`Message ${i + 1}`);
+      const message =
+        sender === room.human
+          ? await rooms.t.withIdentity(ROOM_OWNER).action(api.gate.send, {
+              sessionId: room.sessionId,
+              recipient: "all",
+              content,
+            })
+          : await send(sender, "all", content);
+      expect(message).toMatchObject({
+        status: "allowed",
+        senderParticipantId: sender,
+      });
+      expected.push(message);
+      expect(await snapshots()).toEqual(viewers.map(() => expected));
     }
   });
 
@@ -116,12 +143,13 @@ describe("E2 success criteria", () => {
     const all: Message[] = [];
     let cursor: string | null = null;
     while (true) {
-      const result: FunctionReturnType<typeof api.gate.historyPage> =
-        await rooms.t.query(api.gate.historyPage, {
-          sessionId: room.sessionId,
-          viewerParticipantId: room.consumer,
-          paginationOpts: { numItems: 200, cursor },
-        });
+      const result: FunctionReturnType<
+        typeof internal.gate.historyPageForParticipant
+      > = await rooms.t.query(internal.gate.historyPageForParticipant, {
+        sessionId: room.sessionId,
+        viewerParticipantId: room.consumer,
+        paginationOpts: { numItems: 200, cursor },
+      });
       all.push(...result.page);
       if (result.isDone) break;
       expect(result.continueCursor).not.toBe(cursor);
@@ -207,20 +235,39 @@ describe("the moderation gate", () => {
       },
     });
     expect((await history(room.consumer)).slice(1)).toEqual([blocked, alert]);
-    expect((await history(room.human)).slice(1)).toEqual([blocked, alert]);
+    expect((await humanHistory()).slice(1)).toEqual([blocked, alert]);
     expect(await history(room.provider)).toHaveLength(1);
     for (const [viewerParticipantId, expected] of [
       [room.consumer, [blocked, alert]],
-      [room.human, [blocked, alert]],
       [room.provider, []],
     ] as const) {
-      const { page } = await rooms.t.query(api.gate.historyPage, {
-        sessionId: room.sessionId,
-        viewerParticipantId,
-        paginationOpts: { numItems: 10, cursor: null },
-      });
+      const { page } = await rooms.t.query(
+        internal.gate.historyPageForParticipant,
+        {
+          sessionId: room.sessionId,
+          viewerParticipantId,
+          paginationOpts: { numItems: 10, cursor: null },
+        },
+      );
       expect(page.slice(1)).toEqual(expected);
     }
+    const { page } = await rooms.t
+      .withIdentity(ROOM_OWNER)
+      .query(api.gate.historyPage, {
+        sessionId: room.sessionId,
+        paginationOpts: { numItems: 10, cursor: null },
+      });
+    expect(page.slice(1)).toEqual([blocked, alert]);
+
+    const allowed = await send(room.consumer, "all", text("Gracias."));
+    expect(allowed.status).toBe("allowed");
+    expect((await history(room.consumer)).slice(1)).toEqual([
+      blocked,
+      alert,
+      allowed,
+    ]);
+    expect((await humanHistory()).slice(1)).toEqual([blocked, alert, allowed]);
+    expect((await history(room.provider)).slice(1)).toEqual([allowed]);
     const events = await rooms.t.run((ctx) =>
       ctx.db
         .query("moderationEvents")
@@ -417,12 +464,13 @@ describe("long rooms", () => {
     const all: Message[] = [];
     let cursor: string | null = null;
     while (true) {
-      const result: FunctionReturnType<typeof api.gate.historyPage> =
-        await rooms.t.query(api.gate.historyPage, {
-          sessionId: room.sessionId,
-          viewerParticipantId: room.human,
-          paginationOpts: { numItems: 200, cursor },
-        });
+      const result: FunctionReturnType<
+        typeof internal.gate.historyPageForParticipant
+      > = await rooms.t.query(internal.gate.historyPageForParticipant, {
+        sessionId: room.sessionId,
+        viewerParticipantId: room.human,
+        paginationOpts: { numItems: 200, cursor },
+      });
       all.push(...result.page);
       if (result.isDone) break;
       cursor = result.continueCursor;

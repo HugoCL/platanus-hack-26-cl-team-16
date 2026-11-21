@@ -27,13 +27,10 @@ began and is still the same process (`next dev` can sit in its own group and out
 
 import hashlib
 import os
-import shlex
-import shutil
 import signal
 import socket
 import subprocess
 import sys
-import tempfile
 import time
 from pathlib import Path
 
@@ -171,52 +168,18 @@ def check():
     if page_errors:
         print("FAIL: uncaught page errors", *page_errors, sep="\n  ")
         return 1
-    check_room_delivery()
+    subprocess.run(
+        ["pnpm", "test", "tests/convex/gate.test.ts",
+         "tests/convex/roomAuthorization.test.ts", "tests/convex/roomAgent.test.ts",
+         "tests/convex/rooms.test.ts"],
+        cwd=ROOT, check=True, timeout=30,
+    )
     print(
         f"PASS: {URL} rendered the template page and Convex stored a number"
         f" ({before} -> {after} shown: {shown}), /directorio listed {listed} cards,"
         " screenshot of /directorio at artifacts/smoke.png"
     )
     return 0
-
-
-def check_room_delivery():
-    """Use a judge double only in a disposable anonymous Convex project."""
-    with tempfile.TemporaryDirectory(prefix="room-smoke-") as tmp:
-        project = Path(tmp)
-        for directory in ("convex", "lib", "shared"):
-            shutil.copytree(ROOT / directory, project / directory)
-        for config in ("convex.json", "package.json", "tsconfig.json"):
-            shutil.copy2(ROOT / config, project)
-        (project / "node_modules").symlink_to(ROOT / "node_modules", target_is_directory=True)
-        (project / "scripts").mkdir()
-        shutil.copy2(ROOT / "scripts" / "room-smoke-llm.ts", project / "scripts")
-
-        adapter = project / "convex" / "moderator.ts"
-        source = adapter.read_text()
-        provider = 'import { createLlmProvider } from "../shared/providers/llm";'
-        if source.count(provider) != 1:
-            raise AssertionError("room smoke could not install the judge double")
-        adapter.write_text(source.replace(
-            provider, 'import { createLlmProvider } from "../scripts/room-smoke-llm";'
-        ))
-
-        env = {
-            key: value for key, value in os.environ.items()
-            if not key.startswith("CONVEX_")
-            and key not in ("NEXT_PUBLIC_CONVEX_URL", "OPENROUTER_API_KEY")
-        }
-        env["CONVEX_AGENT_MODE"] = "anonymous"
-        dev = [str(ROOT / "node_modules" / ".bin" / "convex"), "dev", "--once"]
-        check = f"node --env-file=.env.local {shlex.quote(str(ROOT / 'scripts' / 'smoke-rooms.mjs'))}"
-        for args in (["--run", "seed:ensure"], ["--start", check]):
-            with subprocess.Popen([*dev, *args], cwd=project, env=env,
-                                  stdin=subprocess.DEVNULL, start_new_session=True) as proc:
-                try:
-                    if code := proc.wait(timeout=90):
-                        raise AssertionError(f"local room smoke failed (exit {code})")
-                finally:
-                    stop_server(proc)
 
 
 def print_log_tail(log, lines=40):
@@ -267,6 +230,7 @@ def stop_server(proc, grace=45):
     convex stops `next dev` and the local backend. If that takes longer than grace, SIGKILL the
     process group and every process that was below the dev server when we started, if it is still the
     same process (`next dev` can be in its own group and survive with the port open)."""
+    state["phase"] = "stopping"
     if proc.poll() is not None:
         return
     tree = descendants(proc.pid)
@@ -369,7 +333,6 @@ def launch():
         return code
     finally:
         if proc is not None:
-            state["phase"] = "stopping"
             stop_server(proc)
 
 

@@ -27,20 +27,23 @@ Each card is an `AgentDetail` (the full `AgentCard` with purpose and scope) plus
 
 ## Rooms (E2)
 
-A room is a `session` in `convex/rooms.ts`. Other code calls these functions:
+A room is a `session` in `convex/rooms.ts`. E4 calls these public functions with the signed-in user's Clerk token. The server finds that user's active human participant by `tokenIdentifier` and `sessionId`. The client never supplies a sender or viewer ID.
 
 | Function | Kind | What it does |
 | --- | --- | --- |
-| `rooms.open` | action | Opens a room from `initiatorAgentId` (the consumer agent), `providerAgentId` (the card) and the free-text `request`, with an optional `intent` (one the card allows; defaults to its first), `maxTurns` (default 12) and `human` (`{ displayName }`, added as the owner acting for the initiator). The contract is the request plus the card's purpose, capabilities, allowed intents, forbidden topics and data rules, and it never changes. Before anything is stored, the moderator reviews the request as a broadcast from the initiator, since everyone in the room can read it. Returns the room as a shared `Session`, already `active`. A missing, draft or invalid card, a room with oneself, a disallowed intent or a contract that fails validation throws a `ConvexError` with `data.kind` `"InvalidArgument"`. A request the moderator blocks, or a moderator that throws, throws `"RequestBlocked"` with the verdict's `rule` and reason as `message`, and stores nothing. If the provider card changes the contract during moderation, retry after `RoomContractChanged`. |
-| `rooms.close` | mutation | Closes the room `sessionId` on behalf of `participantId`, one of its participants. It publishes one `session_closed` notice, and calling it again changes nothing. Later sends fail with `RoomClosed`, even when their moderation started before the close. A participant from another room throws `NotParticipant`. |
-| `rooms.get` | query | One room by `sessionId` as a shared `Session` with its participants, or `null`. |
-| `gate.send` | action | The single path for a participant's message: `sessionId`, `senderParticipantId`, `recipient` (a participant or `"all"`) and `content` (`SendableContent`: text, a UI block or a UI response). It asks the moderator, then stores the message with its verdict and returns it as a shared `Message`. A blocked message is stored as `blocked` and the gate adds a `moderator_alert` addressed to the sender. If the moderator throws, the message is blocked. Errors are `ConvexError`s whose `data.kind` is `NotFound`, `RoomClosed`, `NotParticipant`, `InvalidArgument` or, for an agent once the room used its turns, `TurnLimitReached`. |
-| `gate.history` | reactive query | The latest messages of a room (up to 500, and no more than 4 MiB of them), in chronological order and filtered for `viewerParticipantId`. |
-| `gate.historyPage` | paginated query | The full room history in chronological order, with the same visibility rules. Pass Convex `paginationOpts` and use the returned cursor until `isDone`, even if a filtered page is empty. A page reads at most 4 MiB, so it can hold fewer than `numItems`. |
+| `rooms.get({ sessionId })` | query | Returns the shared `Session` and its participants. |
+| `rooms.close({ sessionId })` | mutation | Closes the room and publishes one `session_closed` notice. Calling it again changes nothing. Later sends fail with `RoomClosed`, even if moderation started before the close. |
+| `gate.send({ sessionId, recipient, content })` | action | Sends as the signed-in participant. `recipient` is a participant ID or `"all"`; `content` is `SendableContent` (text, a UI block or a UI response). Returns the message with its verdict. A blocked send is stored as `blocked` and generates a `moderator_alert`. |
+| `gate.history({ sessionId })` | reactive query | Returns the latest visible messages in chronological order (up to 500 messages and 4 MiB). |
+| `gate.historyPage({ sessionId, paginationOpts })` | paginated query | Returns visible messages in chronological order. Use the returned cursor until `isDone`, even if a filtered page is empty. A page reads at most 4 MiB, so it can hold fewer than `numItems`. |
 
-Both agents and the human see allowed messages; only the sender and humans see a blocked message and its alert. An ID from another room throws `NotParticipant`. The viewer ID selects a perspective, not an authenticated identity. A client that falls further behind than the `gate.history` window between two updates reads the gap with `gate.historyPage`.
+These calls return `Unauthorized` without a Clerk identity, and `NotParticipant` for an authenticated user without active membership. Both agents and the human see allowed messages; only the sender and humans see a blocked message and its alert. A client that falls behind the `gate.history` window reads the gap with `gate.historyPage`.
 
-Only `convex/gate.ts` writes to `messages` (the seed is the one exception), and a test fails if another module does. Platform notices go through the same module without asking the moderator; the request quoted in `session_opened` was already moderated by `rooms.open`, and its `moderationEvents` rows point to that notice. The moderator sits behind the shared `Moderator` interface in `shared/moderation.ts`: `moderate({ content, sender, recipient, participants, contract, history })` (history holds the same latest messages as `gate.history`, in order) returns `{ verdict, events }`, and the gate stores one `moderationEvents` row per event. Until E3, `currentModerator()` returns `allowAllModerator`, which allows everything; E3 replaces it there and nowhere else.
+The E4 launch form needs an authenticated Convex action from E8. That action must choose the consumer agent on the server and call `openRoom(ctx, args)` from `convex/rooms.ts`. The internal `rooms.open` action takes the same arguments: `initiatorAgentId`, `providerAgentId`, `request`, and optionally `intent`, `maxTurns` and `human: { displayName }`. If `human` is set, the server attaches the signed-in user as the room owner; it never uses a shared anonymous identity. The moderator checks the request as a broadcast before any write and raises `RequestBlocked` if it refuses the request. If the card now yields a different valid contract, retry after `RoomContractChanged`. If the card no longer allows the intent, opening fails with `InvalidArgument`.
+
+Trusted agent code sends through `sendThroughGate(ctx, args)` with its server-resolved participant ID. To close from an action, call `internal.rooms.closeAsParticipant` with `sessionId` and the server-resolved `participantId`. Existing anonymous room fixtures are not memberships for signed-in users.
+
+Only `convex/gate.ts` writes to `messages` (the seed is the one exception), and a test fails if another module does. Platform notices go through the same module without asking the moderator; the request quoted in `session_opened` was already moderated by `rooms.open`, and its `moderationEvents` rows point to that notice. The compound moderator runs deterministic rules and then, if needed, the configured judge. The gate stores an event for each stage, and a failed provider or judge blocks the send with a fixed reason.
 
 An allowed message addressed to a hosted agent schedules a reply after the message is stored. The agent gets only the history it could see as a participant. The reply goes back to the original sender through the same gate and gets its own verdict. E2 uses a deterministic acknowledgment backed by the fake LLM; E8 supplies real room agents.
 
@@ -59,7 +62,7 @@ This runs Vitest offline, with no network and no credentials. `tests/setup.ts` r
 - the fake LLM, model selection from the environment, and the business sources,
 - `seed:ensure` against an in-memory Convex (convex-test): every seeded agent is a valid card.
 
-`pnpm smoke` starts `pnpm dev` and drives the home and directory pages in Chromium. A separate, disposable local Convex project runs the room check with a scripted judge. Three WebSocket clients see allowed messages in order; only the sender and human see a blocked message and its alert. The room check never calls OpenRouter or changes the provider in your dev deployment.
+`pnpm smoke` starts `pnpm dev` and drives the home and directory pages in Chromium. The room checks run offline with a scripted judge and Convex test identities. They re-read the live history query as a member and the internal views as each agent after sends, and check membership, pagination and hosted replies. This verifies the visibility of successive snapshots, not authenticated WebSocket delivery; verify the latter with a signed-in client when integrating the E4/E8 room view.
 
 ## Configuration
 
@@ -79,7 +82,7 @@ Everything has an offline default. You set these variables only to use real serv
 
 Code in Convex reads these variables from the deployment's environment. A human sets them with `npx convex env set`. Next.js reads them from `.env.local`.
 
-For interactive room sends, configure `LLM_PROVIDER=openrouter` and its key in the Convex deployment. The default `fake` provider has no judge script outside the test harnesses, so room requests and messages that need the judge fail closed.
+For interactive room sends, configure `LLM_PROVIDER=openrouter` and its key in the Convex deployment. The default `fake` provider has no judge script outside tests, so requests and messages that need the judge fail closed.
 
 ### Try Claude through OpenRouter locally
 

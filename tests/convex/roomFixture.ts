@@ -3,7 +3,7 @@ import rateLimiter from "@convex-dev/rate-limiter/test";
 import type { FunctionArgs } from "convex/server";
 import { convexTest } from "convex-test";
 import { afterEach, vi } from "vitest";
-import { api, internal } from "../../convex/_generated/api";
+import { internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import schema from "../../convex/schema";
 import * as providers from "../../shared/providers/llm";
@@ -14,8 +14,9 @@ const modules = import.meta.glob("../../convex/**/*.ts");
 afterEach(() => vi.restoreAllMocks());
 
 export const REQUEST = "Necesito hora con un cardiólogo en Providencia";
+export const ROOM_OWNER = { subject: "room-owner" };
 
-export type OpenArgs = FunctionArgs<typeof api.rooms.open>;
+export type OpenArgs = FunctionArgs<typeof internal.rooms.open>;
 
 export async function seededRooms({
   transactionLimits = false,
@@ -42,7 +43,7 @@ export async function seededRooms({
   const consumerId = await agentId(CONSUMER_AGENT_SLUG);
   const clinicId = await agentId(CLINIC_AGENT_SLUG);
   const open = (overrides: Partial<OpenArgs> = {}) =>
-    t.action(api.rooms.open, {
+    t.withIdentity(ROOM_OWNER).action(internal.rooms.open, {
       initiatorAgentId: consumerId,
       providerAgentId: clinicId,
       request: REQUEST,
