@@ -256,6 +256,32 @@ describe("the moderation gate", () => {
     ).toBe("InvalidArgument");
   });
 
+  it("rejects a recipient who has left the room without storing the message", async () => {
+    await rooms.t.run((ctx) =>
+      ctx.db.patch("participants", room.provider, { leftAt: 1 }),
+    );
+    expect(
+      await errorKind(send(room.consumer, room.provider, text("Hola"))),
+    ).toBe("InvalidArgument");
+    expect(await history()).toHaveLength(1);
+  });
+
+  it("rejects a history reader who has left the room", async () => {
+    await rooms.t.run((ctx) =>
+      ctx.db.patch("participants", room.provider, { leftAt: 1 }),
+    );
+    expect(await errorKind(history(room.provider))).toBe("NotParticipant");
+    expect(
+      await errorKind(
+        rooms.t.query(internal.gate.historyPageForParticipant, {
+          sessionId: room.sessionId,
+          viewerParticipantId: room.provider,
+          paginationOpts: { numItems: 10, cursor: null },
+        }),
+      ),
+    ).toBe("NotParticipant");
+  });
+
   it.each([
     ["a system notice", { kind: "system", code: "session_closed", text: "x" }],
     [
