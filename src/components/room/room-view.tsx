@@ -102,6 +102,7 @@ export function DemoRoom({
       onRespond={room.respond}
       onSendText={room.sendText}
       onRestart={room.reset}
+      onReview={room.review}
       toolbar={
         <DemoToolbar role={role} onRole={setRole} onReset={room.reset} />
       }
@@ -121,6 +122,7 @@ export function RoomView({
   onSendText,
   onCloseRoom,
   onRestart,
+  onReview,
   toolbar,
   error,
   sessions,
@@ -139,6 +141,7 @@ export function RoomView({
   onSendText: (text: string) => void | Promise<boolean | void>;
   onCloseRoom?: () => void;
   onRestart?: () => void;
+  onReview?: (messageId: string, approve: boolean) => void;
   toolbar?: ReactNode;
   error?: string;
   sending?: boolean;
@@ -241,6 +244,7 @@ export function RoomView({
                       onRespond(response, message.messageId)
                     }
                     onShowAudit={setAuditFor}
+                    onReview={onReview}
                   />
                 </Fragment>
               );
