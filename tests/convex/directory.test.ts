@@ -228,12 +228,15 @@ describe("directory search", () => {
   it("lets an explicit category or comuna win over the text without the LLM", async () => {
     for (const args of [
       { query: "cardiólogo en Valparaíso", comuna: "Providencia" },
+      { query: "cardiólogo en Ñuñoa", comuna: "Providencia" },
       { query: "algo rarísimo en Providencia", category: "cardiologia" },
       { query: "", category: "cardiologia", comuna: "Providencia" },
+      { query: "cardiólogo en Providencia", category: "", comuna: "" },
     ]) {
       const result = await t.action(api.directory.searchText, args);
       expect(result.interpretation.diagnostic).toBeUndefined();
       expect(result.agents.map((c) => c.slug)).toEqual([CLINIC_AGENT_SLUG]);
+      if (args.comuna) expect(result.interpretation.comuna).toBeNull();
     }
     const unmatched = await t.action(api.directory.searchText, {
       query: "cardiólogo",

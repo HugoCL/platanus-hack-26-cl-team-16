@@ -133,6 +133,17 @@ describe("LLM fallback", () => {
       unresolved: [],
       source: "none",
     });
+    await expect(
+      interpretDirectoryText("dentista en Ñuñoa", SEED_CATEGORIES, noLlm, [
+        "category",
+        "comuna",
+      ]),
+    ).resolves.toEqual({
+      category: null,
+      comuna: null,
+      unresolved: [],
+      source: "none",
+    });
   });
 
   it("fills only the half the parser could not resolve", async () => {

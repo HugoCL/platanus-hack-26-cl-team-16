@@ -148,6 +148,7 @@ describe.each<[Negotiation, string]>([
       { query: "cardiólogo en Valparaíso", comuna: "Providencia" },
       { query: "en Providencia", category: "cardiologia" },
       { query: "hora médica", category: "cardiologia", comuna: "Providencia" },
+      { query: "cardiólogo en Providencia", category: "", comuna: "" },
     ]) {
       await expect(searchSlugs(args)).resolves.toEqual([CLINIC_AGENT_SLUG]);
     }

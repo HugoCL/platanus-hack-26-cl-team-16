@@ -249,7 +249,8 @@ export const get = query({
   },
 });
 
-// An explicit category or comuna wins over what the text says about it.
+// An explicit category or comuna wins over what the text says about it. An empty one counts as absent,
+// because LLM clients often fill optional strings with "".
 export const searchText = action({
   args: {
     query: v.string(),
@@ -280,10 +281,10 @@ export const searchText = action({
         },
         createLlm: () => createLlmProvider(),
       },
-      DIRECTORY_FIELDS.filter((field) => given[field] !== undefined),
+      DIRECTORY_FIELDS.filter((field) => given[field]),
     );
-    const category = given.category ?? interpretation.category ?? undefined;
-    const comuna = given.comuna ?? interpretation.comuna ?? undefined;
+    const category = given.category || interpretation.category || undefined;
+    const comuna = given.comuna || interpretation.comuna || undefined;
     if (interpretation.unresolved.length > 0 || (!category && !comuna)) {
       return { interpretation, agents: [], truncated: false };
     }
