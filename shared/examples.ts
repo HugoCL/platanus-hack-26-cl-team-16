@@ -3,7 +3,7 @@ import { AgentCard } from "./agent";
 import { Availability, Offering, Transaction } from "./catalog";
 import { REFERENCE_ATTACK } from "./fixtures/moderationSet";
 import { Phase1UiSpec, UiSpec } from "./genui";
-import { GetAgentInput, WaitForMessagesInput } from "./mcp";
+import { GetAgentInput, SearchAgentsOutput, WaitForMessagesInput } from "./mcp";
 import { Message, SendableContent, UiResponseContent } from "./messages";
 import { Verdict } from "./moderation";
 import { SEED_AGENTS } from "./seedData";
@@ -19,6 +19,7 @@ const clinicCard = SEED_AGENTS[0].card;
 
 const contract = {
   intent: { name: "book", description: "Hora con cardiólogo esta semana" },
+  purpose: clinicCard.purpose,
   capabilities: ["booking", "info"],
   allowedIntents: ["check_availability", "book", "ask_info"],
   forbiddenTopics: ["datos de otros pacientes"],
@@ -102,6 +103,8 @@ export const CONTRACT_EXAMPLES: Record<string, ContractExamples> = {
     schema: SessionContract,
     valid: [contract],
     invalid: [
+      { why: "no purpose", value: { ...contract, purpose: undefined } },
+      { why: "empty purpose", value: { ...contract, purpose: "" } },
       { why: "no max turns", value: { ...contract, maxTurns: undefined } },
       { why: "zero max turns", value: { ...contract, maxTurns: 0 } },
     ],
@@ -200,6 +203,17 @@ export const CONTRACT_EXAMPLES: Record<string, ContractExamples> = {
             rule: "injection",
             reason: "Intento de inyección.",
           },
+        },
+      },
+      {
+        ...message,
+        messageId: "m5",
+        senderParticipantId: null,
+        recipient: "all",
+        content: {
+          kind: "system",
+          code: "turn_limit_reached",
+          text: "La sala llegó a su límite de 12 turnos.",
         },
       },
     ],
@@ -541,6 +555,23 @@ export const CONTRACT_EXAMPLES: Record<string, ContractExamples> = {
         value: { sessionId: "s1", after: 1795276959927 },
       },
       { why: "an empty cursor", value: { sessionId: "s1", after: "" } },
+    ],
+  },
+  searchAgentsOutput: {
+    schema: SearchAgentsOutput,
+    valid: [
+      { agents: [], truncated: false, unresolved: [] },
+      { agents: [], truncated: false, unresolved: ["comuna"] },
+    ],
+    invalid: [
+      {
+        why: "says nothing about truncation or unresolved text",
+        value: { agents: [] },
+      },
+      {
+        why: "an unresolved field the search does not have",
+        value: { agents: [], truncated: true, unresolved: ["near"] },
+      },
     ],
   },
 };
