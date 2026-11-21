@@ -308,3 +308,80 @@ it("stores one confirmation when hosted replies publish the same card concurrent
     },
   ]);
 });
+
+const confirmation = (summary: string) => ({
+  kind: "ui" as const,
+  spec: {
+    type: "confirmation" as const,
+    id: "reserva-1",
+    title: "Reserva confirmada",
+    summary,
+    details: [],
+    confirmLabel: "Listo",
+    cancelLabel: "Cerrar",
+  },
+});
+
+it("records a blocked confirmation even when one with the same id was allowed", async () => {
+  const room = await setup();
+  const agent = vi.spyOn(testRoomAgent, "reply");
+  agent.mockResolvedValueOnce([
+    { kind: "send", recipient: room.human, content: confirmation("Martes.") },
+  ]);
+  await room.send();
+  await room.finishReplies();
+
+  agent.mockResolvedValueOnce([
+    {
+      kind: "send",
+      recipient: room.human,
+      content: confirmation("Miércoles."),
+    },
+    { kind: "close" },
+  ]);
+  const moderate = vi.spyOn(allowAllModerator, "moderate");
+  moderate.mockResolvedValueOnce({
+    verdict: { decision: "allow", reason: "Within the room's purpose." },
+    events: [],
+  });
+  moderate.mockResolvedValueOnce({
+    verdict: { decision: "block", rule: "sensitive_data", reason: "Datos." },
+    events: [],
+  });
+  await room.send();
+  await room.finishReplies();
+
+  const cards = (await room.history(room.provider)).filter(
+    (m) => m.content.kind === "ui" && m.content.spec.type === "confirmation",
+  );
+  expect(cards).toMatchObject([
+    { content: confirmation("Martes."), status: "allowed" },
+    { content: confirmation("Miércoles."), status: "blocked" },
+  ]);
+  expect((await room.history(room.human)).at(-1)).toMatchObject({
+    content: { kind: "ui", spec: { type: "moderator_alert" } },
+  });
+  expect(
+    (await room.t.query(api.rooms.get, { sessionId: room.sessionId }))?.status,
+  ).toBe("active");
+});
+
+it("stores a confirmation that reuses an id with different content", async () => {
+  const room = await setup();
+  const agent = vi.spyOn(testRoomAgent, "reply");
+  for (const summary of ["Martes.", "Miércoles."]) {
+    agent.mockResolvedValueOnce([
+      { kind: "send", recipient: room.human, content: confirmation(summary) },
+    ]);
+    await room.send();
+    await room.finishReplies();
+  }
+
+  const cards = (await room.history(room.human)).filter(
+    (m) => m.content.kind === "ui" && m.content.spec.type === "confirmation",
+  );
+  expect(cards).toMatchObject([
+    { content: confirmation("Martes."), status: "allowed" },
+    { content: confirmation("Miércoles."), status: "allowed" },
+  ]);
+});

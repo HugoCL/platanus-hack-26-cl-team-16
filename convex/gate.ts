@@ -127,6 +127,17 @@ export const eventValidator = v.object({
   latencyMs: v.optional(v.number()),
 });
 
+const canonical = (value: unknown) =>
+  JSON.stringify(value, (_key, field) =>
+    field && typeof field === "object" && !Array.isArray(field)
+      ? Object.fromEntries(
+          Object.entries(field).sort(([a], [b]) =>
+            a < b ? -1 : a > b ? 1 : 0,
+          ),
+        )
+      : field,
+  );
+
 export const commit = internalMutation({
   args: {
     sessionId: v.id("sessions"),
@@ -139,9 +150,10 @@ export const commit = internalMutation({
   },
   handler: async (ctx, args): Promise<Message> => {
     const { session, sender } = await checkSend(ctx, args);
-    const { content } = args;
+    const { content, verdict } = args;
     if (
       args.hostedReply &&
+      verdict.decision === "allow" &&
       sender.kind === "agent" &&
       content.kind === "ui" &&
       content.spec.type === "confirmation"
@@ -162,12 +174,13 @@ export const commit = internalMutation({
           ),
         )
         .first();
-      if (previous) return toMessage(previous);
+      if (previous && canonical(previous.content) === canonical(content)) {
+        return toMessage(previous);
+      }
     }
     const agentTurn = sender.kind === "agent";
     const turnCount = session.turnCount + (agentTurn ? 1 : 0);
     const exhausted = turnCount >= session.contract.maxTurns;
-    const { verdict } = args;
     const messageId = await ctx.db.insert("messages", {
       sessionId: args.sessionId,
       senderParticipantId: args.senderParticipantId,
