@@ -55,6 +55,7 @@ Things to know:
 
 - A preview instance copies the variables of the base service when it is created, including the production deploy key. The build script therefore picks the key from `IS_PULL_REQUEST` and refuses a preview build with a production key and a production build with a preview key. Later changes to the base service's variables do not reach previews that already exist.
 - That guard works and fails fast: on 2026-11-21 the first preview build stopped 30 s after the label went on with `This is a preview build, but its Convex deploy key is not a preview key`, and the preview service was deleted within a minute of the label coming off.
+- **Saving a variable on the base service redeploys production.** Render redeploys the current `main` commit as soon as a variable changes, with trigger `service_updated`; on 2026-11-21 that put production through a 69 s deploy although no code had changed.
 - Convex functions in a preview read their variables from the project's default environment variables for preview deployments, not from Render.
 - Previews need the Hobby workspace plan only. Render's full "preview environments" need the Pro plan ($25/month) and are for projects with several Render services or Render databases, which this app does not have.
 - The repository is public. A Render employee wrote in 2021 that a pull request from a fork does not create a preview, and the current docs do not mention forks. Check it before you rely on it: a preview build runs the pull request's code with the service's secrets.
@@ -92,7 +93,7 @@ Clerk keyless mode works only under `next dev`. A deployed build runs `next star
 
 1. In a terminal, `npx convex login`, then `npx convex dev --configure=new` to create the cloud project. Stop it once it runs. This is step 1 of "Switch to real accounts" in `AGENTS.md`.
 2. In the [Convex Dashboard](https://dashboard.convex.dev), create the project's production deployment if it has none. On that deployment's Deployment Settings page, General tab, click "Generate Production Deploy Key" and enable the `deployment:deploy` permission. The key starts with `prod:`. It becomes `CONVEX_DEPLOY_KEY` on Render.
-3. On the project's Settings page, click "Generate Preview Deploy Key". The key starts with `preview:`. It becomes `CONVEX_PREVIEW_DEPLOY_KEY` on Render.
+3. On the project's Settings page (not a deployment's), section Preview Deploy Keys, click "Generate Preview Deploy Key". The key starts with `preview:team-slug:project-slug|`. It becomes `CONVEX_PREVIEW_DEPLOY_KEY` on Render. A `dev:`, `prod:` or `project:` key fails the preview build: the Dev deployment's Deployment Settings page generates the first of those.
 4. Only when the app should use real providers: set the variables from `docs/development.md` (for example `LLM_PROVIDER` and `AI_GATEWAY_API_KEY`) on the production deployment (Settings, Environment Variables), and as default environment variables for preview deployments (Project Settings).
 
 ### Clerk
@@ -123,6 +124,15 @@ Sign-in and sign-up do not work yet, locally or deployed. Clerk answers both wit
 12. Create the label once: `gh label create render-preview --repo HugoCL/platanus-hack-26-cl-team-16`.
 13. GitHub Actions needs no secrets. CI is offline and the deploy runs on Render. Only a future smoke step would need the Clerk development keys.
 14. Put the production URL in `deploy-url` in `platanus-hack-project.jsonc`.
+
+## The first working preview
+
+On 2026-11-21 the label on PR #5, head `1350ced`, produced a preview that went live 67 s after the service was created:
+
+- It deployed to the Convex preview deployment `preview/feat-clerk-convex-auth`, `fine-caterpillar-547.convex.cloud`, and `seed:ensure` filled 12 tables.
+- From outside, `/` answered 200 and showed the 5 seeded numbers, `/directorio` listed 15 agents, and `/server` redirected to Clerk's sign-in page.
+- The two apps keep their data apart: the preview's WebSocket pointed at `fine-caterpillar-547`, production's at the production deployment `courteous-gnu-824`, which still had no agent cards.
+- Removing the label deleted the preview service within a minute and its URL answers 404. The Convex preview deployment stays until Convex expires it, 5 days after creation, or a person deletes it in the dashboard.
 
 ## Measured on the first deploy
 
