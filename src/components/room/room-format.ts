@@ -167,6 +167,15 @@ export function canAnswerUi(viewer: Viewer) {
   return viewer.role === "owner" || viewer.role === "operator";
 }
 
+export function countViolations(messages: RoomMessage[]) {
+  return messages.filter(
+    (message) =>
+      message.status === "blocked" &&
+      message.senderParticipantId !== null &&
+      !message.reasons?.some((reason) => reason.code === "moderator_error"),
+  ).length;
+}
+
 export function uiInteractionState(
   canInteract: boolean,
   readOnly: boolean,

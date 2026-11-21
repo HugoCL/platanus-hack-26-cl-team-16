@@ -54,6 +54,7 @@ import { MessageItem } from "./message-item";
 import { ReasonList } from "./moderation";
 import {
   auditMetrics,
+  countViolations,
   dataFieldLabel,
   formatLatency,
   formatLongDay,
@@ -172,9 +173,7 @@ export function RoomView({
     return map;
   }, [messages]);
 
-  const blocked = messages.filter(
-    (m) => m.status === "blocked" && m.senderParticipantId !== null,
-  ).length;
+  const blocked = countViolations(messages);
   const readOnly = status !== "active";
   const canControl = role !== "observer";
 
@@ -936,9 +935,7 @@ function AuditView({
   maxBlocked: number;
   onJump: (messageId: string) => void;
 }) {
-  const blocked = messages.filter(
-    (m) => m.status === "blocked" && m.senderParticipantId !== null,
-  ).length;
+  const blocked = countViolations(messages);
   const [onlyInterventions, setOnlyInterventions] = useState(false);
   const metrics = auditMetrics(messages);
   const events = messages.filter(
