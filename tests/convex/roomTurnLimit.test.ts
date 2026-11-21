@@ -57,10 +57,15 @@ it.each([
   async (_name, maxTurns, expectedTurns) => {
     const { consumer, provider, human, send, history, room, finishReplies } =
       await setup(maxTurns);
-    const reply = vi.spyOn(testRoomAgent, "reply").mockResolvedValue({
-      kind: "text",
-      text: "Tell me more.",
-    });
+    const reply = vi
+      .spyOn(testRoomAgent, "reply")
+      .mockImplementation(async ({ message }) => [
+        {
+          kind: "send",
+          recipient: message.senderParticipantId as Id<"participants">,
+          content: { kind: "text", text: "Tell me more." },
+        },
+      ]);
 
     await send(consumer, provider);
     await finishReplies();
@@ -113,10 +118,13 @@ it("only admits one agent send when two compete for the last turn", async () => 
 it("keeps two answering agents going past the judge's rate limit until the turn cap", async () => {
   const { consumer, provider, send, history, room, finishReplies } =
     await setup(30);
-  vi.spyOn(testRoomAgent, "reply").mockResolvedValue({
-    kind: "text",
-    text: "Tell me more.",
-  });
+  vi.spyOn(testRoomAgent, "reply").mockImplementation(async ({ message }) => [
+    {
+      kind: "send",
+      recipient: message.senderParticipantId as Id<"participants">,
+      content: { kind: "text", text: "Tell me more." },
+    },
+  ]);
 
   await send(consumer, provider);
   await finishReplies();

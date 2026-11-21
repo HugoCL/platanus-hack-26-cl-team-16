@@ -47,11 +47,42 @@ Trusted agent code sends through `sendThroughGate(ctx, args)` with its server-re
 
 Only `convex/gate.ts` writes to `messages` (the seed is the one exception), and a test fails if another module does. Platform notices go through the same module without asking the moderator; `session_opened` quotes only the request, which `rooms.open` already moderated, and never the card's name, and its `moderationEvents` rows point to that notice. The compound moderator runs deterministic rules and then, if needed, the configured judge. The gate stores an event for each stage, and a failed provider or judge blocks the send with a fixed reason.
 
-An allowed message addressed to a hosted agent schedules a reply after the message is stored. The agent gets only the history it could see as a participant. The reply goes back to the original sender through the same gate and gets its own verdict. E2 uses a deterministic acknowledgment backed by the fake LLM; E8 supplies real room agents.
+An allowed message gives a turn to the hosted agent it is addressed to. A human's message to `"all"` gives a turn to every hosted agent in the room; an agent's message to `"all"` gives none, so agents cannot keep each other talking through broadcasts. `roomAgentFor(agent, ctx)` in `convex/roomAgent.ts` picks the `RoomAgent` that answers for that card and the `LlmProvider` it uses. The agent gets its own participant ID, the message, the contract, the participants, and only the history it could see as a participant, but never the action context: it acts only through the actions it returns, run in order. Each `send` goes through the same gate with the agent as sender, to any participant or to `"all"`, and gets its own verdict; `close` closes the room through `internal.rooms.closeAsParticipant`. A reply that addresses someone outside the room is dropped whole, and the actions after a blocked send, or after the room closed or ran out of turns, are dropped. When a hosted agent's allowed confirmation card repeats one it already published to the same participant, with the same `id` and the same content, the gate keeps the first and stores no second copy, so two concurrent turns confirm once; a card with new content or a blocked verdict is stored like any other message. E2 answers every card with a deterministic acknowledgment backed by the fake LLM, sent back to the sender; E8 supplies real room agents.
 
 Every stored agent message consumes one turn, a blocked one included. The final turn records `turn_limit_reached` in the same transaction. After that, extra agent sends fail with `TurnLimitReached` and no more agent replies are scheduled; humans can still send.
 
 The paid judge is rate limited per sender and per room (`convex/moderator.ts`): a token bucket of 10 per minute for each agent (shared between opening rooms and speaking in them) or human participant, and one of 20 per minute for each room (for `openRoom`, each initiator and provider pair). Only a message that passed the deterministic rules and is about to reach the judge takes a token, and one mutation takes both tokens or neither. With either bucket empty, `gate.send` and `openRoom` throw a `ConvexError` whose `data.kind` is `RateLimited`, store nothing and don't call the LLM; a hosted agent's reply is retried after `retryAfter`. Every block the moderator decides also counts toward the contract's `maxViolations`, but a block caused by a moderator failure (`moderator_error`) does not. The one that reaches the limit terminates the room in the same transaction (`status: "terminated"`, `closedReason: "max_violations"`, and a `session_terminated` notice), and later sends fail with `RoomClosed`.
+
+## Bookings (E8)
+
+`convex/bookings.ts` holds the booking state of providers with the `booking` capability. It is internal: the provider agent books from inside a room.
+
+| Function | Kind | What it does |
+| --- | --- | --- |
+| `freeSlots(ctx, agentId, now)` | helper | The provider's slots that start after `now` and have `booked < capacity`, in start order (at most 200 rows scanned), so a taken or past slot is never offered. Queries take `now` as an argument because they cannot read the clock. |
+| `bookings.book` | internal mutation | Books one slot for a room where the agent is the provider. A room holds one booking: when it has one, `book` returns it, whatever slot was asked and even after the room closed. Otherwise the room must be open (`active`) with a contract that allows booking, and the slot must belong to a bookable offering of the provider. It creates a confirmed `booking` transaction and raises `booked` in the same mutation, never past `capacity`. A booking names its slot in `slotId`. A full slot, one that starts at or before `now`, or one whose offering the provider turned off returns `{ status: "unavailable" }`. The result type is `Booking` in `lib/agents/booking.ts`. |
+
+## Reference agents (E8)
+
+The agents' cores live in `lib/agents/` and are pure. A turn goes in (`AgentTurn`: the room contract, its participants, the history the agent can see and the message it answers) and actions come out (`AgentAction`: messages to send through the room's moderation, or closing the room). They reach the model only through `LlmProvider`, so the tests run them on the fake LLM.
+
+The provider (`lib/agents/provider.ts`) is generic. Its configuration is its card, its active offerings and their free slots, plus the `systemPrompt` of its `hostedAgentConfigs` row when it has one, all loaded by the internal query `providerAgent.context` (with `now`, so past slots are left out). That query reads nothing from other rooms, so the provider has nobody else's data to give away even when a message gets past the moderator (criterion 4).
+
+It acts only on a delivered message addressed to it (or to `all`). For a text, the model picks one action:
+
+- `offer_slots` (only when the room's contract has the `booking` capability): the provider sends the room's human owner a `slot_picker` with the first two free slots of the offerings the model picked. The model chooses offerings by key and never writes slots itself. With no human in the room, it says so in text.
+- `reply`: the model's answer goes back to the sender.
+- `decline`: a fixed refusal goes back to the sender.
+
+A `slot_selected` answer, from the human its picker was sent to, books that slot through `bookings.book` without asking the model. The provider then sends that human a `confirmation` card and closes the room, so the scenario ends the same way whatever consumer is in the room. A room holds one booking: a choice of another slot gets no answer, and the booked slot is confirmed again only while its confirmation (`reserva-<slot id>`) has not reached the human, so a turn cut short after booking can be retried. Two simultaneous choices of the same slot can still both confirm it: the booking stays one, and only the card repeats. If another room took the slot meanwhile, the human gets a new picker with the same offering's other slots.
+
+The consumer (`lib/agents/consumer.ts`) starts from the human's request as written. `chooseProvider` searches with `directory.searchText`, using the request as written or, when it is longer than the search's 300 characters, a short query the model writes from it. It gives the model the first five cards that allow some intent, as `<card>:<intent>` pairs. The model picks one pair, or none, and writes the opening message. The request never enters the room's contract, which skips moderation: the contract's intent description names only the intent and the provider, and the provider learns the request from the moderated opening. In the room, `consumerTurn` answers only delivered messages its provider sent to it or to everyone: the model replies, waits, or closes, and always sees the consumer's opening, however long the room gets. The provider closes the room when it confirms the booking.
+
+### Reference rooms
+
+`api.referenceScene.start` accepts a request and display name from a signed-in user. The seed consumer searches the directory and chooses a provider. The action opens an E2 room with the neutral intent description, then sends the actual opening through the gate. The hosted provider uses the same room and gate regardless of which consumer opened the room; a trusted external consumer can send its own opening and receive replies without running the seed consumer.
+
+The reference agents use a model with structured output (`LLM_PROVIDER=openrouter` on the Convex deployment). In unconfigured local rooms E2 still uses its acknowledgment double. Tests inject a scripted fake through the model factory. The room moderator is configured independently; PLTNS-39 owns connecting the real moderator.
 
 ## Test
 
@@ -64,7 +95,8 @@ This runs Vitest offline, with no network and no credentials. `tests/setup.ts` r
 - the valid and invalid examples of every shared contract (`shared/examples.ts`),
 - the seed data: every card and offering validates, including offerings against their category's `attributeSchema`,
 - the fake LLM, model selection from the environment, and the business sources,
-- `seed:ensure` against an in-memory Convex (convex-test): every seeded agent is a valid card.
+- `seed:ensure` against an in-memory Convex (convex-test): every seeded agent is a valid card,
+- bookings and the reference agents against the same in-memory Convex, with the fake LLM.
 
 `pnpm smoke` starts `pnpm dev` and drives the home and directory pages in Chromium. The room checks run offline with a scripted judge and Convex test identities. They re-read the live history query as a member and the internal views as each agent after sends, and check membership, pagination and hosted replies. This verifies the visibility of successive snapshots, not authenticated WebSocket delivery; verify the latter with a signed-in client when integrating the E4/E8 room view.
 
