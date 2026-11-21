@@ -12,6 +12,19 @@ pnpm install && pnpm dev
 
 If a schema change is rejected because your local data no longer matches it, stop `pnpm dev`, delete `.convex/local`, and start again. That gives you a fresh local database that is reseeded from `shared/seedData.ts`.
 
+## Agent directory (E1)
+
+The directory lives in `convex/directory.ts` and the page at http://localhost:3000/directorio. Other code calls these functions:
+
+| Function | Kind | What it does |
+| --- | --- | --- |
+| `directory.search` | query | Cards by `category` (slug or label; a parent includes its children, so `salud` matches `cardiologia`) and `comuna`, both optional, plus `limit`. Verified cards come first, then active before unclaimed. No match returns `[]`. |
+| `directory.searchText` | action | Free text such as "cardiólogo en Providencia". `lib/directory.ts` turns it into a category and a comuna with synonyms and the list of comunas of the Región Metropolitana. Only when that finds nothing does it ask the `LlmProvider`, and an answer outside the known categories and comunas is ignored. Returns the interpretation and the cards. |
+| `directory.get` | query | One card by `slug` or `agentId`, or `null`. |
+| `directory.categories` | query | The category tree. |
+
+Each card is an `AgentDetail` (the full `AgentCard` with purpose and scope) plus `comuna` and `allowedIntents`, so it also validates as an `AgentSummary`. Draft cards are never listed.
+
 ## Test
 
 ```sh
