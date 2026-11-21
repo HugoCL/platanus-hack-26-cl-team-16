@@ -192,8 +192,10 @@ function rutAllowed({
   return (
     contract.recipientRequests.includes("rut") &&
     fromConsumerSide &&
-    to?.kind === "agent" &&
-    to.role === "recipient"
+    ((to?.kind === "agent" && to.role === "recipient") ||
+      (sender.kind === "human" &&
+        sender.role === "owner" &&
+        recipient === "all"))
   );
 }
 
