@@ -1,12 +1,16 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import {
   DEMO_CONTRACT,
   DEMO_PARTICIPANTS,
   DEMO_VIEWER,
 } from "../src/components/room/demo-session";
 import { RoomView } from "../src/components/room/room-view";
+
+vi.mock("../src/components/header-account", () => ({
+  HeaderAccount: () => null,
+}));
 
 it.each([true, false, undefined])(
   "shows the room badge only for an explicitly verified agent (%s)",
