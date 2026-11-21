@@ -72,14 +72,16 @@ export const SendMessageInput = z.object({
 });
 export const SendMessageOutput = z.object({ message: Message });
 
+// The cursor is opaque: pass back the last `cursor` you received as `after`. It follows the room's
+// commit order, so resuming from it never skips or repeats a message.
 export const WaitForMessagesInput = z.object({
   sessionId,
-  after: z.number().optional(),
+  after: z.string().min(1).max(200).optional(),
   timeoutMs: z.number().int().min(0).max(25000).default(20000),
 });
 export const WaitForMessagesOutput = z.object({
   messages: z.array(Message),
-  cursor: z.number(),
+  cursor: z.string().nullable(),
   sessionStatus: SessionStatus,
 });
 
