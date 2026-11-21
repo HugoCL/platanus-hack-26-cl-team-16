@@ -153,16 +153,35 @@ describe("consumer agent", () => {
     ).resolves.toBeNull();
   });
 
-  it("chooses nothing when the directory has no match, however long the request", async () => {
+  it("chooses nothing when the directory has no match", async () => {
     await expect(
       chooseProvider("Necesito un gimnasio en Pirque", { llm: noLlm, search }),
     ).resolves.toBeNull();
     await expect(
       chooseProvider("Necesito un gimnasio en Pirque. ".repeat(12), {
-        llm: noLlm,
+        llm: decide({ query: "gimnasio en Pirque" }),
         search,
       }),
     ).resolves.toBeNull();
+  });
+
+  it("searches a request too long for the directory with a short query the model writes", async () => {
+    const long = `${"Hola, te cuento mi situación. ".repeat(12)}${REQUEST}`;
+    const prompts: string[] = [];
+    const llm = createFakeLlmProvider({
+      object: ({ prompt }) => {
+        prompts.push(prompt);
+        return prompt.includes("<proveedores>")
+          ? { choice: `${keyOf(prompt, CLINIC)}:book`, message: OPENING }
+          : { query: "cardiólogo en Providencia" };
+      },
+    });
+
+    const choice = await chooseProvider(long, { llm, search });
+
+    expect(long.length).toBeGreaterThan(300);
+    expect(prompts[0]).toContain(RUT);
+    expect(choice?.agentId).toBe(await clinicId());
   });
 
   it("answers its provider through the model, or stays quiet", async () => {
