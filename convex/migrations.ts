@@ -16,6 +16,7 @@ export const run = migrations.runner();
 // `pnpm migrate`: runs the listed migrations in order. Add new ones to this list.
 export const runAll = migrations.runner([
   internal.migrations.exampleBackfillNumbers,
+  internal.migrations.backfillSessionPurpose,
 ]);
 
 // TEMPLATE, copy this to write a real migration. It runs over every document of `numbers`
@@ -27,5 +28,24 @@ export const exampleBackfillNumbers = migrations.define({
     // Example, once `label: v.optional(v.string())` exists in convex/schema.ts:
     //   if (_doc.label === undefined) return { label: `n${_doc.value}` };
     return undefined;
+  },
+});
+
+// Rooms seeded before E2 have a contract without the provider's purpose. Copy it from the
+// recipient agent's card. Once every deployment has run it, make `purpose` required again in
+// convex/schema.ts.
+export const backfillSessionPurpose = migrations.define({
+  table: "sessions",
+  migrateOne: async (ctx, session) => {
+    if (!session.contract || session.contract.purpose !== undefined) return;
+    const participants = await ctx.db
+      .query("participants")
+      .withIndex("by_sessionId", (q) => q.eq("sessionId", session._id))
+      .take(10);
+    const recipient = participants.find((p) => p.role === "recipient");
+    if (recipient?.kind !== "agent") return;
+    const provider = await ctx.db.get(recipient.agentId);
+    if (!provider) return;
+    return { contract: { ...session.contract, purpose: provider.purpose } };
   },
 });
