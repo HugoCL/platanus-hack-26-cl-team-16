@@ -308,7 +308,7 @@ export function initials(name: string) {
       (word) =>
         (graphemes
           ? graphemes.segment(word)[Symbol.iterator]().next().value?.segment
-          : Array.from(word)[0]) ?? "",
+          : word.match(/^\P{M}\p{M}*/u)?.[0].normalize("NFC")) ?? "",
     )
     .join("")
     .toLocaleUpperCase("es");
