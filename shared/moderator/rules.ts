@@ -16,6 +16,11 @@ export type RuleFinding = {
 const RUT_FORMATTED =
   /(?<![\d.])(\d{1,2}(?:\.\d{3}){2}|\d{7,8})-([\dk])(?![\dk])/gi;
 const RUT_AFTER_KEYWORD = /\bru[tn]\b[\s:#]*(\d{7,8})([\dk])(?![\dk])/gi;
+// A RUT with no dots, hyphen or label: 7 or 8 digits and the check digit,
+// standing alone, so not part of a longer number, a price or a phone.
+const RUT_COMPACT =
+  /(?<![\p{L}\d.,+$-])(\d{7,8})([\dk])(?![\p{L}\d]|[.,-]\d)/giu;
+const CHILEAN_MOBILE = /^9\d{8}$/;
 // A card number has 13 to 19 digits, unbroken or in groups split either by
 // spaces (any Unicode space) and hyphens, mixed freely, or by dots alone. Every
 // run of whole consecutive groups whose separators are all dotted or all
@@ -62,7 +67,7 @@ export function checkRules(input: ModerationInput): RuleFinding[] {
       rule: "sensitive_data",
       code: "pii",
       detail:
-        "El mensaje trae un RUT, y el contrato solo permite que el agente consumidor se lo entregue al proveedor cuando este lo pide.",
+        "El mensaje trae un RUT, y el contrato solo permite que el lado consumidor se lo entregue al proveedor cuando este lo pide.",
     });
   }
   const normalized = text
@@ -134,6 +139,9 @@ function hasRut(text: string): boolean {
   const candidates = [
     ...text.matchAll(RUT_FORMATTED),
     ...text.matchAll(RUT_AFTER_KEYWORD),
+    ...[...text.matchAll(RUT_COMPACT)].filter(
+      ([compact]) => !CHILEAN_MOBILE.test(compact),
+    ),
   ];
   return candidates.some(
     ([, body, checkDigit]) =>
@@ -161,10 +169,18 @@ function rutAllowed({
   participants,
 }: ModerationInput): boolean {
   const to = participants.find((p) => p.participantId === recipient);
+  const fromConsumerSide =
+    sender.kind === "agent"
+      ? sender.role === "initiator"
+      : participants.some(
+          (p) =>
+            p.kind === "agent" &&
+            p.role === "initiator" &&
+            p.agentId === sender.onBehalfOfAgentId,
+        );
   return (
     contract.recipientRequests.includes("rut") &&
-    sender.kind === "agent" &&
-    sender.role === "initiator" &&
+    fromConsumerSide &&
     to?.kind === "agent" &&
     to.role === "recipient"
   );
