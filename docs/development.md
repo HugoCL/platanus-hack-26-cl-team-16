@@ -27,7 +27,7 @@ Each card is an `AgentDetail` (the full `AgentCard` with purpose and scope) plus
 
 ## Rooms (E2)
 
-A room is a `session` in `convex/rooms.ts`. Other code calls these functions:
+A room is a `session` in `convex/rooms.ts`. Call `rooms.close` with the room's `sessionId` and a `participantId` to close it. Closing publishes one system notice, even if called again, and later sends fail with `RoomClosed`.
 
 | Function | Kind | What it does |
 | --- | --- | --- |
