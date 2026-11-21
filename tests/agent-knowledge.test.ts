@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  decodeWebsiteBody,
   formatKnowledge,
   htmlToText,
   knowledgePrompt,
@@ -7,6 +8,29 @@ import {
 } from "../lib/agent-knowledge";
 
 describe("website knowledge", () => {
+  it.each([
+    ["text/html; charset=ISO-8859-1", ""],
+    ["text/html; charset=windows-1252", ""],
+    ["text/html", '<meta charset="iso-8859-1">'],
+    [
+      "text/html",
+      '<meta content="text/html; charset=windows-1252" http-equiv="Content-Type">',
+    ],
+    ["text/html; charset=iso-8859-1", '<meta charset="utf-8">'],
+  ])("decodes latin1 bytes using %s %s", (contentType, meta) => {
+    const html = `${meta}<p>Información de la peluquería: café y piñón</p>`;
+    expect(decodeWebsiteBody(Buffer.from(html, "latin1"), contentType)).toBe(
+      html,
+    );
+  });
+  it("defaults to utf-8 for absent or unsupported charsets and accepts empty bodies", () => {
+    const bytes = new TextEncoder().encode("Información pública");
+    expect(decodeWebsiteBody(bytes)).toBe("Información pública");
+    expect(
+      decodeWebsiteBody(bytes, "text/html; charset=unknown-encoding"),
+    ).toBe("Información pública");
+    expect(decodeWebsiteBody(new Uint8Array())).toBe("");
+  });
   it.each([
     "http://localhost",
     "http://127.0.0.1",

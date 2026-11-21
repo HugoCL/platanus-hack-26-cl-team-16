@@ -10,6 +10,7 @@ const network = vi.hoisted(() => ({
   status: 200,
   type: "text/html",
   bytes: "100",
+  encoding: "utf8" as BufferEncoding,
   redirects: [] as string[],
   visited: [] as string[],
   blockedHost: "",
@@ -45,7 +46,7 @@ function mockRequest(
         destroy: () => {},
       });
       callback(response);
-      response.emit("data", Buffer.from(network.body));
+      response.emit("data", Buffer.from(network.body, network.encoding));
       response.emit("end");
     },
   });
@@ -72,6 +73,7 @@ beforeEach(async () => {
     status: 200,
     type: "text/html",
     bytes: "100",
+    encoding: "utf8",
     redirects: [],
     visited: [],
     blockedHost: "",
@@ -98,6 +100,17 @@ it("extracts and labels a public website", async () => {
     status: "ready",
     label: "Mi web",
     text: "Mi web Información pública",
+  });
+});
+
+it("extracts accented website text from latin1 response bytes", async () => {
+  network.encoding = "latin1";
+  network.type = "text/html; charset=iso-8859-1";
+  network.body = "<title>Peluquería</title><p>Información pública</p>";
+  expect(await extractWebsite()).toMatchObject({
+    status: "ready",
+    label: "Peluquería",
+    text: "Peluquería Información pública",
   });
 });
 

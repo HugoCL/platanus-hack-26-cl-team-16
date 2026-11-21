@@ -2,6 +2,24 @@ export const SOURCE_TEXT_LIMIT = 20_000;
 export const KNOWLEDGE_LIMIT = 24_000;
 export const WEBSITE_BYTE_LIMIT = 2 * 1024 * 1024;
 
+export function decodeWebsiteBody(
+  bytes: Uint8Array,
+  contentType?: string,
+): string {
+  const charset = /\bcharset\s*=\s*["']?\s*([^\s"';>]+)/i;
+  const head = new TextDecoder().decode(bytes.subarray(0, 4096));
+  const meta = head.match(/<meta\b[^>]*>/gi) ?? [];
+  const label =
+    contentType?.match(charset)?.[1] ??
+    meta.map((tag) => tag.match(charset)?.[1]).find(Boolean) ??
+    "utf-8";
+  try {
+    return new TextDecoder(label).decode(bytes);
+  } catch {
+    return new TextDecoder().decode(bytes);
+  }
+}
+
 export function validateWebsiteUrl(input: string): string {
   const url = new URL(input);
   const host = url.hostname.toLowerCase().replace(/\.$/, "");

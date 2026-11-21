@@ -6,6 +6,7 @@ import { request as httpsRequest } from "node:https";
 import { v } from "convex/values";
 import { extractText, getDocumentProxy } from "unpdf";
 import {
+  decodeWebsiteBody,
   htmlToText,
   SOURCE_TEXT_LIMIT,
   validateWebsiteUrl,
@@ -95,7 +96,10 @@ async function website(
         });
         response.on("error", reject);
         response.on("end", () => {
-          const content = Buffer.concat(chunks).toString("utf8");
+          const content = decodeWebsiteBody(
+            Buffer.concat(chunks),
+            response.headers["content-type"],
+          );
           resolve(
             type === "text/html"
               ? htmlToText(content)
