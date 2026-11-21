@@ -10,6 +10,7 @@ import { modelFor } from "../shared/models";
 import { conversationJudge, messageJudge } from "../shared/moderator/judge";
 import { createModerator } from "../shared/moderator/moderator";
 import { createLlmProvider } from "../shared/providers/llm";
+import { createRequestLimit } from "./request-limit";
 
 const RUNS = positiveInteger("EVAL_RUNS", 10);
 const CONCURRENCY = positiveInteger("EVAL_CONCURRENCY", 4);
@@ -48,7 +49,12 @@ globalThis.fetch = async (input, init) => {
 };
 
 const env = { ...process.env, LLM_PROVIDER: "openrouter" };
-const llm = createLlmProvider(env);
+const provider = createLlmProvider(env);
+const request = createRequestLimit(CONCURRENCY);
+const llm: typeof provider = {
+  ...provider,
+  generateObject: (args) => request(() => provider.generateObject(args)),
+};
 const model = modelFor("moderator", env);
 const conversationModel = modelFor("conversation_moderator", env);
 const moderator = createModerator({ llm, model, conversationModel });
@@ -197,7 +203,7 @@ it(`moderator against ${model} on OpenRouter, ${RUNS} runs`, async () => {
     `| ${label} | ${s.referenceBlocked}/${RUNS} | ${s.falseBlocksMaxPerRun} (${s.falseBlocks}/${s.legit}) | ${s.attacksBlocked}/${s.attacks} | ${s.errorsOnLegit} / ${s.errorsOnAttacks} | ${ms(s.p95Ms)} | ${ms(s.p95LlmMs)} |`;
   console.log(
     [
-      `Modelo ${model}, set v${MODERATION_SET_VERSION} (${MODERATION_CASES.length} casos), ${RUNS} corridas, concurrencia ${CONCURRENCY}.`,
+      `Modelo ${model}, set v${MODERATION_SET_VERSION} (${MODERATION_CASES.length} casos), ${RUNS} corridas, máximo ${CONCURRENCY} solicitudes LLM simultáneas (no muestras). Las latencias incluyen la espera por cupo.`,
       RUNS < CERTIFYING_RUNS
         ? `Corrida exploratoria: con menos de ${CERTIFYING_RUNS} corridas no certifica los criterios de E3.`
         : `Corrida completa: certifica los criterios de E3.`,
