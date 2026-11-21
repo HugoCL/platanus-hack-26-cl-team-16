@@ -1,7 +1,6 @@
 // @vitest-environment edge-runtime
 import { expect, it, vi } from "vitest";
 import { api } from "../../convex/_generated/api";
-import { allowAllModerator } from "../../convex/moderator";
 import { errorKind, roomWithHuman, seededRooms } from "./roomFixture";
 
 async function setup() {
@@ -53,21 +52,19 @@ it("does not let a participant from another room close this one", async () => {
 });
 
 it("rejects a message if the room closes while moderation is running", async () => {
-  const { close, send, notices } = await setup();
-  const moderate = vi
-    .spyOn(allowAllModerator, "moderate")
-    .mockImplementationOnce(async () => {
+  const { close, send, notices, fixture } = await setup();
+  const llm = fixture.llm;
+  const generateObject = llm.generateObject.bind(llm);
+  const judge = vi
+    .spyOn(llm, "generateObject")
+    .mockImplementationOnce(async (args) => {
       await close();
-      return { verdict: { decision: "allow", reason: "Allowed" }, events: [] };
+      return generateObject(args);
     });
-  try {
-    expect(await errorKind(send())).toBe("RoomClosed");
-    expect(moderate).toHaveBeenCalledOnce();
-    expect(await notices()).toMatchObject([
-      { code: "session_opened" },
-      { code: "session_closed" },
-    ]);
-  } finally {
-    moderate.mockRestore();
-  }
+  expect(await errorKind(send())).toBe("RoomClosed");
+  expect(judge).toHaveBeenCalledOnce();
+  expect(await notices()).toMatchObject([
+    { code: "session_opened" },
+    { code: "session_closed" },
+  ]);
 });

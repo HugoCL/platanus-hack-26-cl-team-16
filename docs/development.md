@@ -59,7 +59,7 @@ This runs Vitest offline, with no network and no credentials. `tests/setup.ts` r
 - the fake LLM, model selection from the environment, and the business sources,
 - `seed:ensure` against an in-memory Convex (convex-test): every seeded agent is a valid card.
 
-`pnpm smoke` starts `pnpm dev`, drives the home and directory pages in Chromium, and verifies that three independent Convex subscriptions see the same room messages in order. The room check runs only against a local Convex backend.
+`pnpm smoke` starts `pnpm dev` and drives the home and directory pages in Chromium. A separate, disposable local Convex project runs the room check with a scripted judge. Three WebSocket clients see allowed messages in order; only the sender and human see a blocked message and its alert. The room check never calls OpenRouter or changes the provider in your dev deployment.
 
 ## Configuration
 
@@ -78,6 +78,8 @@ Everything has an offline default. You set these variables only to use real serv
 | `OVERPASS_URL` | `overpass-api.de` | Another Overpass endpoint. |
 
 Code in Convex reads these variables from the deployment's environment. A human sets them with `npx convex env set`. Next.js reads them from `.env.local`.
+
+For interactive room sends, configure `LLM_PROVIDER=openrouter` and its key in the Convex deployment. The default `fake` provider has no judge script outside the test harnesses, so room requests and messages that need the judge fail closed.
 
 ### Try Claude through OpenRouter locally
 
