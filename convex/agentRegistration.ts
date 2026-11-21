@@ -248,6 +248,8 @@ export const linkInfo = query({
       ...summary.fields,
       alreadyLinked: v.boolean(),
       linkedToCurrentUser: v.boolean(),
+      expiresAt: v.number(),
+      usedAt: v.optional(v.number()),
       purpose: v.string(),
       category: v.string(),
       wantsPublic: v.optional(v.boolean()),
@@ -260,12 +262,13 @@ export const linkInfo = query({
     const identity = await ctx.auth.getUserIdentity();
     const linkedToCurrentUser =
       !!identity && agent.ownerTokenIdentifier === identity.tokenIdentifier;
-    if (row.expiresAt <= Date.now() && !linkedToCurrentUser) return null;
     if (row.usedAt !== undefined && !linkedToCurrentUser) return null;
     return {
       ...toSummary(agent),
       alreadyLinked: agent.ownerTokenIdentifier !== undefined,
       linkedToCurrentUser,
+      expiresAt: row.expiresAt,
+      usedAt: row.usedAt,
       purpose: agent.purpose,
       category: agent.primaryCategory,
       wantsPublic: agent.wantsPublic,

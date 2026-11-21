@@ -19,14 +19,33 @@ import {
   useQuery,
 } from "convex/react";
 import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+
+function useExpired(expiresAt: number | undefined) {
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      if (expiresAt === undefined) return () => {};
+      const timer = setTimeout(onChange, Math.max(0, expiresAt - Date.now()));
+      return () => clearTimeout(timer);
+    },
+    [expiresAt],
+  );
+  const snapshot = useCallback(
+    () => expiresAt !== undefined && expiresAt <= Date.now(),
+    [expiresAt],
+  );
+  return useSyncExternalStore(subscribe, snapshot, snapshot);
+}
 
 export function AgentLink({ code }: { code: string }) {
   const { isLoaded, isSignedIn } = useAuth();
   const { isLoading, isAuthenticated } = useConvexAuth();
   const info = useQuery(api.agentRegistration.linkInfo, { code });
+  const expired = useExpired(
+    info?.linkedToCurrentUser ? undefined : info?.expiresAt,
+  );
   const link = useMutation(api.agentRegistration.link);
   const unpublish = useMutation(api.agentRegistration.unpublish);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +71,11 @@ export function AgentLink({ code }: { code: string }) {
         Cargando agente…
       </p>
     );
-  if (!info)
+  if (
+    !info ||
+    (!info.linkedToCurrentUser &&
+      (expired || info.usedAt !== undefined || info.alreadyLinked))
+  )
     return (
       <p className="mt-8 rounded-2xl border border-border p-6">
         Link inválido o vencido

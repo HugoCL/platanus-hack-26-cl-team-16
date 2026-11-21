@@ -1,7 +1,7 @@
 import { getFunctionName } from "convex/server";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { AgentLink } from "../src/components/agent-link";
 
 const state = vi.hoisted(() => ({
@@ -13,7 +13,22 @@ const state = vi.hoisted(() => ({
     status: string;
   }[],
   roomStatus: "Exhausted",
+  subscriptions: [] as ((onChange: () => void) => () => void)[],
 }));
+vi.mock("react", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react")>();
+  return {
+    ...actual,
+    useSyncExternalStore: <T>(
+      subscribe: (onChange: () => void) => () => void,
+      snapshot: () => T,
+      serverSnapshot?: () => T,
+    ) => {
+      state.subscriptions.push(subscribe);
+      return actual.useSyncExternalStore(subscribe, snapshot, serverSnapshot);
+    },
+  };
+});
 vi.mock("@clerk/nextjs", () => ({
   useAuth: () => ({ isLoaded: true, isSignedIn: state.signedIn }),
   SignInButton: ({ children }: { children: unknown }) => children,
@@ -36,7 +51,9 @@ beforeEach(() => {
   state.info = undefined;
   state.roomResults = [];
   state.roomStatus = "Exhausted";
+  state.subscriptions = [];
 });
+afterEach(() => vi.useRealTimers());
 const render = () =>
   renderToStaticMarkup(createElement(AgentLink, { code: "test-code" }));
 
@@ -143,4 +160,85 @@ it("shows room links, open/closed status and pagination to the linked owner", ()
   expect(html).toContain("Ver más salas");
   state.roomStatus = "LoadingFirstPage";
   expect(render()).toContain("Cargando salas…");
+});
+
+it.each([false, true])(
+  "expires an open linking page on its deadline without a new query result (publish=%s)",
+  (wantsPublic) => {
+    vi.useFakeTimers();
+    state.signedIn = true;
+    state.info = {
+      agentId: "agent",
+      name: "Servicio",
+      description: "Información",
+      purpose: "Informar",
+      category: "medicina_general",
+      status: "draft",
+      linkedToCurrentUser: false,
+      wantsPublic,
+      expiresAt: Date.now() + 1000,
+    };
+    let html = render();
+    expect(html).toContain(
+      wantsPublic ? "Vincular y publicar" : ">Vincular</button>",
+    );
+    const subscribe = state.subscriptions[0];
+    const onChange = vi.fn(() => {
+      html = render();
+    });
+    const unsubscribe = subscribe(onChange);
+    vi.advanceTimersByTime(999);
+    expect(onChange).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(html).toContain("Link inválido o vencido");
+    expect(html).not.toContain("Vincular");
+    expect(html).not.toContain("Solo vincular");
+    unsubscribe();
+  },
+);
+
+it("hides expired signed-out and used non-owner links but preserves linked-owner controls and rooms", () => {
+  state.info = {
+    agentId: "agent",
+    name: "Servicio",
+    description: "Información",
+    status: "active",
+    linkedToCurrentUser: false,
+    expiresAt: Date.now() - 1,
+  };
+  expect(render()).toContain("Link inválido o vencido");
+  expect(render()).not.toContain("Iniciar sesión");
+  state.info = {
+    ...(state.info as object),
+    expiresAt: Date.now() + 1000,
+    usedAt: Date.now(),
+  };
+  expect(render()).toContain("Link inválido o vencido");
+  state.signedIn = true;
+  state.info = {
+    ...(state.info as object),
+    linkedToCurrentUser: true,
+    expiresAt: Date.now() - 1,
+  };
+  expect(render()).toContain("Dejar de publicar");
+  expect(render()).toContain("Salas de tu agente");
+  state.info = { ...(state.info as object), status: "draft" };
+  expect(render()).toContain("Publicar agente");
+});
+
+it("cleans up the expiry subscription and does not schedule one for linked owners", () => {
+  vi.useFakeTimers();
+  state.info = { expiresAt: Date.now() + 1000, linkedToCurrentUser: false };
+  render();
+  const onChange = vi.fn();
+  const unsubscribe = state.subscriptions[0](onChange);
+  unsubscribe();
+  vi.advanceTimersByTime(1000);
+  expect(onChange).not.toHaveBeenCalled();
+  state.info = { expiresAt: Date.now() + 1000, linkedToCurrentUser: true };
+  state.subscriptions = [];
+  render();
+  state.subscriptions[0](onChange)();
+  expect(vi.getTimerCount()).toBe(0);
 });

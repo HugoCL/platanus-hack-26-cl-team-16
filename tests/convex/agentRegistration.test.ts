@@ -503,12 +503,20 @@ describe("agent self-onboarding", () => {
       owner().mutation(api.agentRegistration.link, { code: "wrong" }),
     ).rejects.toThrow(/invalid or expired/);
     const agent = await register();
+    const initial = await owner().query(api.agentRegistration.linkInfo, {
+      code: agent.linkCode,
+    });
+    expect(initial).toMatchObject({
+      expiresAt: expect.any(Number),
+      alreadyLinked: false,
+      linkedToCurrentUser: false,
+    });
     vi.useFakeTimers({ toFake: ["Date"] });
     try {
       vi.advanceTimersByTime(24 * 60 * 60 * 1000 + 1);
       await expect(
         owner().query(api.agentRegistration.linkInfo, { code: agent.linkCode }),
-      ).resolves.toBeNull();
+      ).resolves.toEqual(initial);
       await expect(
         owner().mutation(api.agentRegistration.link, { code: agent.linkCode }),
       ).rejects.toThrow(/invalid or expired/);
@@ -531,6 +539,8 @@ describe("agent self-onboarding", () => {
         linkedToCurrentUser: true,
         alreadyLinked: true,
         status: "draft",
+        expiresAt: expect.any(Number),
+        usedAt: expect.any(Number),
       });
       await expect(
         rooms.t.query(api.agentRegistration.linkInfo, { code: agent.linkCode }),
