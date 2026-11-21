@@ -215,7 +215,39 @@ export const removeSource = mutation({
     const source = await ctx.db.get("agentSources", sourceId);
     if (!source) fail("No se encontró la fuente.");
     await owned(ctx, source.agentId);
+    if (source.storageId) await ctx.storage.delete(source.storageId);
     await ctx.db.delete("agentSources", sourceId);
+    return null;
+  },
+});
+
+export const deleteAgent = mutation({
+  args: agentArgs,
+  returns: v.null(),
+  handler: async (ctx, { agentId }) => {
+    const agent = await owned(ctx, agentId);
+    if (agent.status !== "draft") fail("Oculta tu agente antes de eliminarlo.");
+    const participant = await ctx.db
+      .query("participants")
+      .withIndex("by_agentId_and_sessionId", (q) => q.eq("agentId", agentId))
+      .first();
+    const room = await ctx.db
+      .query("sessions")
+      .withIndex("by_initiatorAgentId", (q) =>
+        q.eq("initiatorAgentId", agentId),
+      )
+      .first();
+    if (participant || room)
+      fail(
+        "Este agente tiene conversaciones y no se puede eliminar. Puedes mantenerlo oculto.",
+      );
+    for (const source of await sources(ctx, agentId)) {
+      if (source.storageId) await ctx.storage.delete(source.storageId);
+      await ctx.db.delete("agentSources", source._id);
+    }
+    const config = await configFor(ctx, agentId);
+    await ctx.db.delete("hostedAgentConfigs", config._id);
+    await ctx.db.delete("agents", agentId);
     return null;
   },
 });

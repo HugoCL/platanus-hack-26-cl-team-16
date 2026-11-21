@@ -29,7 +29,10 @@ function publicIpv4(address: string) {
   );
 }
 
-async function website(input: string) {
+async function website(
+  input: string,
+  redirects = 0,
+): Promise<{ label: string; text: string }> {
   const url = new URL(validateWebsiteUrl(input));
   const addresses = await lookup(url.hostname, { all: true, family: 4 });
   if (
@@ -53,6 +56,20 @@ async function website(input: string) {
         },
       },
       (response) => {
+        if ([301, 302, 303, 307, 308].includes(response.statusCode ?? 0)) {
+          const location = response.headers.location;
+          response.destroy();
+          if (!location || redirects >= 3)
+            reject(new Error("too many redirects"));
+          else {
+            try {
+              resolve(website(new URL(location, url).href, redirects + 1));
+            } catch (error) {
+              reject(error);
+            }
+          }
+          return;
+        }
         const type = response.headers["content-type"]
           ?.split(";")[0]
           .trim()
@@ -141,7 +158,7 @@ export const extract = internalAction({
         error:
           source.kind === "pdf"
             ? "No pudimos leer el PDF. Usa un PDF con texto seleccionable, de hasta 10 MB y 200 páginas."
-            : "No pudimos leer el sitio. Usa una página pública de texto o HTML, sin redirecciones y de hasta 2 MB.",
+            : "No pudimos leer el sitio. Usa una página pública de texto o HTML, de hasta 2 MB y con un máximo de 3 redirecciones.",
       });
     }
     return null;

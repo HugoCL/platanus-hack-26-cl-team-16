@@ -30,6 +30,63 @@ const profile = {
 };
 
 describe("agent builder", () => {
+  it("deletes owned drafts and their data but refuses published agents, other owners, and agents with conversations", async () => {
+    const { agentId } = await draft();
+    const storageId = await rooms.t.run((ctx) =>
+      ctx.storage.store(new Blob(["pdf"], { type: "application/pdf" })),
+    );
+    await rooms.t.run((ctx) =>
+      ctx.db.insert("agentSources", {
+        agentId,
+        storageId,
+        label: "PDF",
+        kind: "pdf",
+        status: "ready",
+        text: "Info",
+      }),
+    );
+    await expect(
+      other().mutation(api.agentBuilder.deleteAgent, { agentId }),
+    ).rejects.toThrow(/acceso/);
+    await owner().mutation(api.agentBuilder.publish, { agentId });
+    await expect(
+      owner().mutation(api.agentBuilder.deleteAgent, { agentId }),
+    ).rejects.toThrow(/Oculta/);
+    await owner().mutation(api.agentBuilder.unpublish, { agentId });
+    const participantId = await rooms.t.run(async (ctx) => {
+      const room = await ctx.db.query("sessions").first();
+      if (!room) throw new Error("missing seeded room");
+      return ctx.db.insert("participants", {
+        sessionId: room._id,
+        kind: "agent",
+        agentId,
+        role: "recipient",
+      });
+    });
+    await expect(
+      owner().mutation(api.agentBuilder.deleteAgent, { agentId }),
+    ).rejects.toThrow(/conversaciones/);
+    await rooms.t.run((ctx) => ctx.db.delete("participants", participantId));
+    await owner().mutation(api.agentBuilder.deleteAgent, { agentId });
+    expect(await owner().query(api.agentBuilder.mine, {})).toEqual([]);
+    expect(await rooms.t.run((ctx) => ctx.storage.get(storageId))).toBeNull();
+    expect(
+      await rooms.t.run((ctx) =>
+        ctx.db
+          .query("agentSources")
+          .withIndex("by_agentId", (q) => q.eq("agentId", agentId))
+          .collect(),
+      ),
+    ).toEqual([]);
+    expect(
+      await rooms.t.run((ctx) =>
+        ctx.db
+          .query("hostedAgentConfigs")
+          .withIndex("by_agentId", (q) => q.eq("agentId", agentId))
+          .collect(),
+      ),
+    ).toEqual([]);
+  });
   it("creates a valid private draft, publishes and hides it again", async () => {
     const agent = await draft();
     expect(

@@ -35,5 +35,7 @@ it("keeps mobile sign-in in the menu when navigation is enabled", () => {
   auth.state = "signed-out";
   const html = renderToStaticMarkup(createElement(SiteHeader));
   expect(html).toContain("Abrir menú");
+  expect(html).toContain('href="/agents"');
+  expect(html).toContain("Mis agentes");
   expect(html).toContain('<div class="sm:hidden"></div>');
 });

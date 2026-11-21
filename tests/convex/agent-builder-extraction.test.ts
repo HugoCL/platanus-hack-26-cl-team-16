@@ -10,36 +10,46 @@ const network = vi.hoisted(() => ({
   status: 200,
   type: "text/html",
   bytes: "100",
+  redirects: [] as string[],
+  visited: [] as string[],
+  blockedHost: "",
 }));
 vi.mock("node:dns/promises", () => ({
-  lookup: async () => [{ address: network.address, family: 4 }],
+  lookup: async (host: string) => [
+    {
+      address: host === network.blockedHost ? "127.0.0.1" : network.address,
+      family: 4,
+    },
+  ],
 }));
-vi.mock("node:http", () => ({ request: vi.fn() }));
-vi.mock("node:https", () => ({
-  request: (
-    _url: URL,
-    _options: unknown,
-    callback: (response: EventEmitter) => void,
-  ) => {
-    const request = new EventEmitter();
-    return Object.assign(request, {
-      destroy: (error: Error) => request.emit("error", error),
-      end: () => {
-        const response = Object.assign(new EventEmitter(), {
-          statusCode: network.status,
-          headers: {
-            "content-type": network.type,
-            "content-length": network.bytes,
-          },
-          destroy: () => {},
-        });
-        callback(response);
-        response.emit("data", Buffer.from(network.body));
-        response.emit("end");
-      },
-    });
-  },
-}));
+vi.mock("node:http", () => ({ request: mockRequest }));
+vi.mock("node:https", () => ({ request: mockRequest }));
+function mockRequest(
+  url: URL,
+  _options: unknown,
+  callback: (response: EventEmitter) => void,
+) {
+  network.visited.push(url.href);
+  const request = new EventEmitter();
+  return Object.assign(request, {
+    destroy: (error: Error) => request.emit("error", error),
+    end: () => {
+      const location = network.redirects.shift();
+      const response = Object.assign(new EventEmitter(), {
+        statusCode: location ? 302 : network.status,
+        headers: {
+          "content-type": network.type,
+          "content-length": network.bytes,
+          location,
+        },
+        destroy: () => {},
+      });
+      callback(response);
+      response.emit("data", Buffer.from(network.body));
+      response.emit("end");
+    },
+  });
+}
 const pdf = vi.hoisted(() => ({
   text: "Texto del PDF",
   pages: 1,
@@ -62,11 +72,14 @@ beforeEach(async () => {
     status: 200,
     type: "text/html",
     bytes: "100",
+    redirects: [],
+    visited: [],
+    blockedHost: "",
   });
   Object.assign(pdf, { text: "Texto del PDF", pages: 1, fail: false });
 });
 
-async function extractWebsite() {
+async function extractWebsite(url = "https://example.com") {
   const caller = rooms.t.withIdentity({ subject: "owner" });
   const { agentId } = await caller.mutation(api.agentBuilder.createDraft, {
     name: "A",
@@ -74,7 +87,7 @@ async function extractWebsite() {
   });
   const sourceId = await caller.mutation(api.agentBuilder.addWebsite, {
     agentId,
-    url: "https://example.com",
+    url,
   });
   await rooms.t.action(internal.agentBuilderExtraction.extract, { sourceId });
   return rooms.t.run((ctx) => ctx.db.get("agentSources", sourceId));
@@ -86,6 +99,35 @@ it("extracts and labels a public website", async () => {
     label: "Mi web",
     text: "Mi web Información pública",
   });
+});
+
+it("follows three redirects including http to https and relative locations", async () => {
+  network.redirects = ["https://www.example.com", "/info", "/final"];
+  expect(await extractWebsite("http://example.com")).toMatchObject({
+    status: "ready",
+  });
+  expect(network.visited).toEqual([
+    "http://example.com/",
+    "https://www.example.com/",
+    "https://www.example.com/info",
+    "https://www.example.com/final",
+  ]);
+});
+it.each([
+  "http://127.0.0.1",
+  "https://example.com:8080",
+  "file:///etc/passwd",
+  "https://private.example.com",
+])("rejects unsafe redirect %s", async (target) => {
+  network.blockedHost = "private.example.com";
+  network.redirects = [target];
+  expect(await extractWebsite()).toMatchObject({ status: "failed" });
+  expect(network.visited).toHaveLength(1);
+});
+it("stops after three redirects", async () => {
+  network.redirects = ["/one", "/two", "/three", "/four"];
+  expect(await extractWebsite()).toMatchObject({ status: "failed" });
+  expect(network.visited).toHaveLength(4);
 });
 
 it("rejects non-PDF uploads", async () => {
@@ -157,6 +199,7 @@ it.each(["ready", "empty", "corrupt", "too many pages"])(
     if (scenario === "ready") expect(source?.text).toBe("Texto del PDF");
     else expect(source?.error).toContain("No pudimos leer el PDF");
     await caller.mutation(api.agentBuilder.removeSource, { sourceId });
+    expect(await rooms.t.run((ctx) => ctx.storage.get(storageId))).toBeNull();
     await rooms.t.action(internal.agentBuilderExtraction.extract, { sourceId });
     expect(
       await rooms.t.run((ctx) => ctx.db.get("agentSources", sourceId)),
