@@ -39,7 +39,7 @@ export function FixtureToggle({
     <fieldset
       aria-label="Datos de prueba"
       style={{ fontFamily: "system-ui, sans-serif" }}
-      className="fixed top-1 left-1/2 z-50 m-0 flex border-0 -translate-x-1/2 gap-0.5 rounded-full bg-neutral-200 p-0.5 text-[11px] text-neutral-700 shadow"
+      className="fixed top-1 left-1/2 max-sm:hidden z-50 m-0 flex border-0 -translate-x-1/2 gap-0.5 rounded-full bg-neutral-200 p-0.5 text-[11px] text-neutral-700 shadow"
     >
       {FIXTURE_STATES.map((key) => (
         <button
