@@ -6,11 +6,11 @@ import { freeSlots } from "./bookings";
 const OFFERING_LIMIT = 50;
 
 // The provider agent's whole view of the world: its card, its active offerings and their free
-// slots. It reads no messages, bookings or people from any room, so whatever reaches the agent,
-// it has no other patient's data to give away (E8 criterion 4).
+// slots that start after `now`. It reads no messages, bookings or people from any room, so
+// whatever reaches the agent, it has nobody else's data to give away (E8 criterion 4).
 export const context = internalQuery({
-  args: { agentId: v.id("agents") },
-  handler: async (ctx, { agentId }): Promise<ProviderContext> => {
+  args: { agentId: v.id("agents"), now: v.number() },
+  handler: async (ctx, { agentId, now }): Promise<ProviderContext> => {
     const agent = await ctx.db.get("agents", agentId);
     if (!agent) {
       throw new ConvexError({
@@ -46,7 +46,7 @@ export const context = internalQuery({
         price: o.price,
         attributes: o.attributes,
       })),
-      freeSlots: (await freeSlots(ctx, agentId))
+      freeSlots: (await freeSlots(ctx, agentId, now))
         .filter((slot) => active.has(slot.offeringId))
         .map((slot) => ({
           id: slot._id,
