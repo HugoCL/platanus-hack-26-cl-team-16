@@ -160,7 +160,10 @@ export const commit = internalMutation({
     events: v.array(eventValidator),
   },
   handler: async (ctx, args): Promise<Message> => {
-    const { session } = await checkSend(ctx, args);
+    const { session, sender } = await checkSend(ctx, args);
+    const agentTurn = sender.kind === "agent";
+    const turnCount = session.turnCount + (agentTurn ? 1 : 0);
+    const exhausted = turnCount >= session.contract.maxTurns;
     const { verdict } = args;
     const messageId = await ctx.db.insert("messages", {
       sessionId: args.sessionId,
@@ -198,7 +201,21 @@ export const commit = internalMutation({
           },
         },
       );
-    } else if (
+    }
+    if (agentTurn) {
+      await ctx.db.patch("sessions", args.sessionId, { turnCount });
+      if (exhausted) {
+        await publishNotice(
+          ctx,
+          args.sessionId,
+          "turn_limit_reached",
+          `La sala llegó a su límite de ${turnCount} turnos de agente.`,
+        );
+      }
+    }
+    if (
+      !exhausted &&
+      verdict.decision === "allow" &&
       args.recipient !== args.senderParticipantId &&
       session.participants.some(
         (p) => p.kind === "agent" && p.participantId === args.recipient,
@@ -238,7 +255,13 @@ export const replyContext = internalQuery({
     const agent = await ctx.db.get("agents", recipient.agentId);
     if (agent?.kind !== "hosted") return null;
     const room = await loadSession(ctx, source.sessionId);
-    if (room?.status !== "active" || !room.contract) return null;
+    if (
+      room?.status !== "active" ||
+      !room.contract ||
+      room.turnCount >= room.contract.maxTurns
+    ) {
+      return null;
+    }
     const viewer = room.participants.find(
       (p) => p.participantId === recipient._id,
     );
@@ -285,7 +308,8 @@ export const reply = internalAction({
       } catch (error) {
         if (
           !(error instanceof ConvexError) ||
-          error.data?.kind !== "RoomClosed"
+          (error.data?.kind !== "RoomClosed" &&
+            error.data?.kind !== "TurnLimitReached")
         ) {
           throw error;
         }
@@ -401,6 +425,12 @@ async function checkSend(
     (p) => p.participantId === args.senderParticipantId,
   );
   if (!sender) gateError("NotParticipant", "the sender is not in this room");
+  if (
+    sender.kind === "agent" &&
+    session.turnCount >= session.contract.maxTurns
+  ) {
+    gateError("TurnLimitReached", "the room has reached its agent turn limit");
+  }
   if (
     args.recipient !== "all" &&
     !session.participants.some((p) => p.participantId === args.recipient)

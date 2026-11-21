@@ -40,8 +40,9 @@ export async function seededRooms() {
 
 export async function roomWithHuman(
   rooms: Awaited<ReturnType<typeof seededRooms>>,
+  maxTurns?: number,
 ) {
-  const room = await rooms.open({ human: { displayName: "Juan" } });
+  const room = await rooms.open({ human: { displayName: "Juan" }, maxTurns });
   const id = (role: string) =>
     room.participants.find((p) => p.role === role)
       ?.participantId as Id<"participants">;
