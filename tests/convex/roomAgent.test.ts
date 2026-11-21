@@ -1,9 +1,10 @@
 // @vitest-environment edge-runtime
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import { allowAllModerator } from "../../convex/moderator";
 import { testRoomAgent } from "../../convex/roomAgent";
-import { roomWithHuman, seededRooms } from "./roomFixture";
+import { errorKind, roomWithHuman, seededRooms } from "./roomFixture";
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => {
@@ -20,7 +21,8 @@ async function setup() {
     consumer,
     provider,
     human,
-    send: (recipient = provider) =>
+    sessionId,
+    send: (recipient: Id<"participants"> | "all" = provider) =>
       t.action(api.gate.send, {
         sessionId,
         senderParticipantId: consumer,
@@ -106,4 +108,74 @@ it("does not expose previous blocked messages to the hosted recipient", async ()
   const allowed = await room.send();
   await room.finishReplies();
   expect(agent.mock.calls[0][0].history.slice(1)).toEqual([allowed]);
+});
+
+it("sends what an agent asks, to whom it asks, each through the gate", async () => {
+  const room = await setup();
+  const moderate = vi.spyOn(allowAllModerator, "moderate");
+  const agent = vi.spyOn(testRoomAgent, "reply").mockResolvedValueOnce([
+    {
+      kind: "send",
+      recipient: room.human,
+      content: { kind: "text", text: "Juan, elige un horario." },
+    },
+    {
+      kind: "send",
+      recipient: "all",
+      content: { kind: "text", text: "Aviso para todos." },
+    },
+  ]);
+
+  const sent = await room.send();
+  await room.finishReplies();
+
+  expect(agent).toHaveBeenCalledTimes(1);
+  const input = agent.mock.calls[0][0];
+  expect(input.self).toBe(room.provider);
+  expect(input.participants.map((p) => p.participantId)).toEqual([
+    room.consumer,
+    room.provider,
+    room.human,
+  ]);
+  expect(typeof input.llm.generateObject).toBe("function");
+  expect((await room.history(room.human)).slice(1)).toMatchObject([
+    sent,
+    {
+      senderParticipantId: room.provider,
+      recipient: room.human,
+      status: "allowed",
+    },
+    { senderParticipantId: room.provider, recipient: "all", status: "allowed" },
+  ]);
+  expect(moderate).toHaveBeenCalledTimes(3);
+});
+
+it("closes the room when an agent asks, like rooms.close, and drops what follows", async () => {
+  const room = await setup();
+  vi.spyOn(testRoomAgent, "reply").mockResolvedValueOnce([
+    {
+      kind: "send",
+      recipient: room.human,
+      content: { kind: "text", text: "Reserva confirmada." },
+    },
+    { kind: "close" },
+    {
+      kind: "send",
+      recipient: room.human,
+      content: { kind: "text", text: "Esto ya no sale." },
+    },
+  ]);
+
+  await room.send();
+  await room.finishReplies();
+
+  const contents = (await room.history(room.human)).map((m) => m.content);
+  expect(contents.slice(2)).toMatchObject([
+    { kind: "text", text: "Reserva confirmada." },
+    { kind: "system", code: "session_closed" },
+  ]);
+  expect(
+    (await room.t.query(api.rooms.get, { sessionId: room.sessionId }))?.status,
+  ).toBe("closed");
+  expect(await errorKind(room.send())).toBe("RoomClosed");
 });

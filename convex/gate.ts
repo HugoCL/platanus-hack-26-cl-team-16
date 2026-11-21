@@ -14,7 +14,7 @@ import {
   Verdict,
 } from "../shared/moderation";
 import type { Participant, SessionContract } from "../shared/session";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
   type ActionCtx,
@@ -27,7 +27,7 @@ import {
   query,
 } from "./_generated/server";
 import { currentModerator } from "./moderator";
-import { fakeRoomLlm, testRoomAgent } from "./roomAgent";
+import { roomAgentFor } from "./roomAgent";
 import { loadSession, toMessage } from "./roomState";
 import { visibleTo } from "./visibility";
 
@@ -230,12 +230,13 @@ export const commit = internalMutation({
 });
 
 type ReplyContext = {
+  agent: Doc<"agents">;
+  self: Id<"participants">;
+  sessionId: Id<"sessions">;
   message: Message;
   contract: SessionContract;
+  participants: Participant[];
   history: Message[];
-  senderParticipantId: Id<"participants">;
-  recipientParticipantId: Id<"participants">;
-  sessionId: Id<"sessions">;
 };
 
 export const replyContext = internalQuery({
@@ -268,12 +269,13 @@ export const replyContext = internalQuery({
     if (!viewer) return null;
     const recent = await recentMessages(ctx, source.sessionId);
     return {
+      agent,
+      self: recipient._id,
+      sessionId: source.sessionId,
       message: toMessage(source),
       contract: room.contract,
+      participants: room.participants,
       history: recent.filter((message) => visibleTo(message, viewer)),
-      senderParticipantId: recipient._id,
-      recipientParticipantId: source.senderParticipantId,
-      sessionId: source.sessionId,
     };
   },
 });
@@ -283,28 +285,24 @@ export const reply = internalAction({
   handler: async (ctx, { messageId }): Promise<null> => {
     const input = await ctx.runQuery(internal.gate.replyContext, { messageId });
     if (!input) return null;
-    const {
-      message,
-      contract,
-      history,
-      senderParticipantId,
-      recipientParticipantId,
-      sessionId,
-    } = input;
-    const content = await testRoomAgent.reply({
-      message,
-      contract,
-      history,
-      llm: fakeRoomLlm,
-    });
-    if (content) {
+    const { agent, self, sessionId, ...room } = input;
+    const { agent: roomAgent, llm } = roomAgentFor(agent);
+    const actions = await roomAgent.reply({ ctx, self, ...room, llm });
+    for (const action of actions) {
       try {
-        await sendThroughGate(ctx, {
-          sessionId,
-          senderParticipantId,
-          recipient: recipientParticipantId,
-          content,
-        });
+        if (action.kind === "close") {
+          await ctx.runMutation(api.rooms.close, {
+            sessionId,
+            participantId: self,
+          });
+        } else {
+          await sendThroughGate(ctx, {
+            sessionId,
+            senderParticipantId: self,
+            recipient: action.recipient as Doc<"messages">["recipient"],
+            content: action.content,
+          });
+        }
       } catch (error) {
         if (
           !(error instanceof ConvexError) ||
@@ -313,6 +311,7 @@ export const reply = internalAction({
         ) {
           throw error;
         }
+        return null;
       }
     }
     return null;

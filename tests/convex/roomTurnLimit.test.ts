@@ -48,10 +48,15 @@ it.each([
   async (_name, maxTurns, expectedTurns) => {
     const { consumer, provider, human, send, history, room, finishReplies } =
       await setup(maxTurns);
-    const reply = vi.spyOn(testRoomAgent, "reply").mockResolvedValue({
-      kind: "text",
-      text: "Tell me more.",
-    });
+    const reply = vi
+      .spyOn(testRoomAgent, "reply")
+      .mockImplementation(async ({ message }) => [
+        {
+          kind: "send",
+          recipient: message.senderParticipantId as Id<"participants">,
+          content: { kind: "text", text: "Tell me more." },
+        },
+      ]);
 
     await send(consumer, provider);
     await finishReplies();
