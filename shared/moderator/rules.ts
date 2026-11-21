@@ -16,7 +16,13 @@ export type RuleFinding = {
 const RUT_FORMATTED =
   /(?<![\d.])(\d{1,2}(?:\.\d{3}){2}|\d{7,8})-([\dk])(?![\dk])/gi;
 const RUT_AFTER_KEYWORD = /\bru[tn]\b[\s:#]*(\d{7,8})([\dk])(?![\dk])/gi;
-const CARD_CANDIDATE = /(?<!\d)\d(?:[ -]?\d){12,18}(?!\d)/g;
+// A card number has 13 to 19 digits, unbroken or in groups split by one kind of
+// separator: spaces (any Unicode space), hyphens or dots. Every run of whole
+// consecutive groups with the same separator is checked with Luhn, so digits
+// next to a card cannot hide it, and a list of prices like "59.990 12.990" is
+// not read as one number.
+const DIGIT_RUN = /\d+(?:[\p{Zs}.-]+\d+)*/gu;
+const CARD_SEPARATOR = /([\p{Zs}.-]+)/u;
 
 const INJECTION_PATTERNS = [
   /(?<!\bno )\b(ignora|ignore|ignoren|olvida|olviden|disregard|forget)\s+((todas|all)\s+)?((tus|sus|las|the|your)\s+)?((anteriores|previas|previous|prior|above)\s+)?(instrucciones|reglas|restricciones|instructions|rules)\b/,
@@ -26,6 +32,8 @@ const INJECTION_PATTERNS = [
   /\b(modo (desarrollador|administrador|dios)|developer mode|jailbreak)\b/,
 ];
 
+// Findings come in priority order and the first one decides the verdict:
+// sensitive data, then injection, then a ui_response that matches no offered block.
 export function checkRules(input: ModerationInput): RuleFinding[] {
   const { content } = input;
   if (content.kind === "ciphertext") {
@@ -40,17 +48,6 @@ export function checkRules(input: ModerationInput): RuleFinding[] {
   }
 
   const findings: RuleFinding[] = [];
-  if (content.kind === "ui_response") {
-    const problem = uiResponseProblem(input, content);
-    if (problem) {
-      findings.push({
-        rule: "scope",
-        code: "malformed_payload",
-        detail: problem,
-      });
-    }
-  }
-
   const text = strings(content).join("\n");
   if (hasCard(text)) {
     findings.push({
@@ -80,6 +77,16 @@ export function checkRules(input: ModerationInput): RuleFinding[] {
       detail: "El mensaje intenta cambiar las instrucciones de un agente.",
     });
   }
+  if (content.kind === "ui_response") {
+    const problem = uiResponseProblem(input, content);
+    if (problem) {
+      findings.push({
+        rule: "scope",
+        code: "malformed_payload",
+        detail: problem,
+      });
+    }
+  }
   return findings;
 }
 
@@ -94,17 +101,33 @@ function strings(value: unknown): string[] {
 }
 
 function hasCard(text: string): boolean {
-  for (const [candidate] of text.matchAll(CARD_CANDIDATE)) {
-    const digits = candidate.replace(/\D/g, "");
-    let sum = 0;
-    for (let i = 0; i < digits.length; i++) {
-      let digit = Number(digits[digits.length - 1 - i]);
-      if (i % 2 === 1) digit = digit * 2 > 9 ? digit * 2 - 9 : digit * 2;
-      sum += digit;
+  for (const [run] of text.matchAll(DIGIT_RUN)) {
+    const parts = run.split(CARD_SEPARATOR);
+    const groups = parts.filter((_, i) => i % 2 === 0);
+    const separators = parts
+      .filter((_, i) => i % 2 === 1)
+      .map((separator) => separator.replace(/\p{Zs}/gu, " "));
+    for (let first = 0; first < groups.length; first++) {
+      let digits = "";
+      for (let last = first; last < groups.length; last++) {
+        if (last > first && separators[last - 1] !== separators[first]) break;
+        digits += groups[last];
+        if (digits.length > 19) break;
+        if (digits.length >= 13 && passesLuhn(digits)) return true;
+      }
     }
-    if (sum % 10 === 0) return true;
   }
   return false;
+}
+
+function passesLuhn(digits: string): boolean {
+  let sum = 0;
+  for (let i = 0; i < digits.length; i++) {
+    let digit = Number(digits[digits.length - 1 - i]);
+    if (i % 2 === 1) digit = digit * 2 > 9 ? digit * 2 - 9 : digit * 2;
+    sum += digit;
+  }
+  return sum % 10 === 0;
 }
 
 function hasRut(text: string): boolean {
