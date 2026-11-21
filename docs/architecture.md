@@ -171,6 +171,7 @@ Ninguna es necesaria para `pnpm dev`, `pnpm build` ni `pnpm smoke`: cada proveed
 | `AGENT_MODEL` | Modelo de los agentes. Por defecto `anthropic/claude-sonnet-5.5`. |
 | `MODERATOR_MODEL` | Modelo del moderador (uno rápido). Por defecto `anthropic/claude-haiku-5.5`. |
 | `OPENROUTER_API_KEY` | OpenRouter (LLM y embeddings), solo con `LLM_PROVIDER=openrouter`. |
+| `AGENT_REGISTRATION_SECRET` | Credencial privada de servidor para registro: debe tener el mismo valor aleatorio en Convex y Render, tanto en producción como en previews. Sin configurar en Convex, se acepta por compatibilidad local con una advertencia por llamada. |
 | `BUSINESS_SOURCES` | Lista separada por comas: `fixture` (por defecto), `osm`, `google_places`. |
 | `BUSINESS_ENRICHER` | `none` (por defecto) o `firecrawl`. |
 | `FIRECRAWL_API_KEY` | Solo con `BUSINESS_ENRICHER=firecrawl`. |
@@ -178,6 +179,8 @@ Ninguna es necesaria para `pnpm dev`, `pnpm build` ni `pnpm smoke`: cada proveed
 | `OVERPASS_URL` | Opcional. Otro endpoint de Overpass (por defecto `overpass-api.de`). |
 
 En Convex se configuran como variables de la deployment (`npx convex env set`, lo hace un humano); en Next.js, en `.env.local` o en las variables del proyecto en Capy.
+
+La ruta Next.js envía `AGENT_REGISTRATION_SECRET` al action de registro, que lo verifica en tiempo constante antes de consumir las cuotas por IP y global. Así, cuando está configurado, clientes directos de Convex no pueden rotar `clientIp` sin la credencial. Nunca se publica en instrucciones, respuestas ni variables `NEXT_PUBLIC_`. Si falta en Convex, el registro queda sin esa protección; si falta o difiere solo en Render, el registro falla. Configuración humana de producción/previews: [Registration secret](deploy.md#registration-secret).
 
 ## 7. Contratos y ejemplos
 

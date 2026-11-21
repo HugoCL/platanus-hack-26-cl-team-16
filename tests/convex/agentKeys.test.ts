@@ -138,9 +138,9 @@ describe("agent API keys", () => {
     await expect(authenticate(apiKey)).resolves.toBeNull();
   });
 
-  it("stops accepting a key once its agent is no longer active", async () => {
+  it("stops accepting a key once its agent becomes a prospect", async () => {
     const { apiKey, agentId } = await issue();
-    await t.run((ctx) => ctx.db.patch(agentId, { status: "draft" }));
+    await t.run((ctx) => ctx.db.patch(agentId, { status: "prospect" }));
     await expect(authenticate(apiKey)).resolves.toBeNull();
   });
 
