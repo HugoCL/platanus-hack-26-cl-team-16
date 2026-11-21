@@ -71,9 +71,12 @@ describe("agent API keys", () => {
     await expect(authenticate(apiKey)).resolves.toBeNull();
   });
 
-  it("refuses to issue a key for an unknown agent", async () => {
+  it("refuses to issue a key for an unknown or inactive agent", async () => {
     await expect(
       t.action(internal.agentKeys.issue, { slug: "no-existe" }),
     ).rejects.toThrow(/no agent with slug no-existe/);
+    await expect(
+      t.action(internal.agentKeys.issue, { slug: "cafe-los-dominicos" }),
+    ).rejects.toThrow(/cafe-los-dominicos is prospect, not active/);
   });
 });
