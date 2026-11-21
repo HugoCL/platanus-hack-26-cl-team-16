@@ -132,6 +132,12 @@ function SourceSection({ detail }: { detail: Detail }) {
               event.preventDefault();
               if (!file) return;
               const form = event.currentTarget;
+              if (full) {
+                setError(
+                  "Llegaste a 10 fuentes. Quita una antes de subir un PDF.",
+                );
+                return;
+              }
               if (
                 file.size > 10 * 1024 * 1024 ||
                 file.type !== "application/pdf"

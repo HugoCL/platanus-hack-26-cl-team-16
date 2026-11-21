@@ -205,7 +205,13 @@ export const addPdf = mutation({
       agentId: args.agentId,
       kind: "pdf",
       storageId: args.storageId,
-      label: text(args.filename, 200),
+      label:
+        args.filename
+          .split(/[\\/]/)
+          .pop()
+          ?.replace(/\p{Cc}/gu, "")
+          .trim()
+          .slice(0, 200) || "Documento.pdf",
       status: "processing",
     });
     await ctx.scheduler.runAfter(0, internal.agentBuilderExtraction.extract, {

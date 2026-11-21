@@ -30,6 +30,31 @@ const profile = {
 };
 
 describe("agent builder", () => {
+  it.each([
+    ["a".repeat(250) + ".pdf", "a".repeat(200)],
+    ["C:\\docs\\ catálogo\n.pdf ", "catálogo.pdf"],
+    ["/docs/horarios.pdf", "horarios.pdf"],
+    ["  ", "Documento.pdf"],
+  ])(
+    "attaches uploaded PDFs with a safe label for %s",
+    async (filename, label) => {
+      const { agentId } = await draft();
+      const storageId = await rooms.t.run((ctx) =>
+        ctx.storage.store(new Blob(["pdf"], { type: "application/pdf" })),
+      );
+      const sourceId = await owner().mutation(api.agentBuilder.addPdf, {
+        agentId,
+        storageId,
+        filename,
+      });
+      expect(
+        await rooms.t.run((ctx) => ctx.db.get("agentSources", sourceId)),
+      ).toMatchObject({ label, storageId });
+      expect(
+        await rooms.t.run((ctx) => ctx.storage.get(storageId)),
+      ).not.toBeNull();
+    },
+  );
   it("rejects PDF storage reuse by the uploader or another owner without changing the original file", async () => {
     const { agentId } = await draft();
     const otherAgent = await other().mutation(api.agentBuilder.createDraft, {
