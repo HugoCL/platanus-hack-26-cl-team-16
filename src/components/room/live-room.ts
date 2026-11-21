@@ -69,3 +69,20 @@ export function sendError(error: unknown) {
       return "No se pudo completar la acción. Inténtalo de nuevo.";
   }
 }
+
+export function openRoomError(error: unknown) {
+  const data = (error as { data?: { kind?: string; message?: unknown } } | null)
+    ?.data;
+  switch (data?.kind) {
+    case "RequestBlocked":
+      return `El moderador rechazó la solicitud${typeof data.message === "string" && data.message ? `: ${data.message}` : "."}`;
+    case "InvalidArgument":
+      return "Revisa la intención y la descripción de la solicitud.";
+    case "NotFound":
+      return "No se encontró el agente. Vuelve al directorio.";
+    case "Unauthorized":
+      return "Inicia sesión para abrir una sala.";
+    default:
+      return sendError(error);
+  }
+}

@@ -4,6 +4,7 @@ import { DEMO_CONTRACT } from "../src/components/room/demo-session";
 import {
   liveAnswers,
   mapLiveRoom,
+  openRoomError,
   sendError,
 } from "../src/components/room/live-room";
 import {
@@ -145,5 +146,33 @@ describe("live room mapping", () => {
       "No se pudo completar la acción. Inténtalo de nuevo.",
     );
     expect(sendError(null)).toBe(sendError({}));
+  });
+
+  it.each([
+    ["RateLimited", "Demasiados mensajes. Espera un momento."],
+    [
+      "InvalidArgument",
+      "Revisa la intención y la descripción de la solicitud.",
+    ],
+    ["NotFound", "No se encontró el agente. Vuelve al directorio."],
+    ["Unauthorized", "Inicia sesión para abrir una sala."],
+  ])("explains opening errors: %s", (kind, message) => {
+    expect(openRoomError({ data: { kind } })).toBe(message);
+  });
+
+  it("includes the moderator reason without exposing other errors", () => {
+    expect(
+      openRoomError({
+        data: { kind: "RequestBlocked", message: "Fuera del propósito" },
+      }),
+    ).toBe("El moderador rechazó la solicitud: Fuera del propósito");
+    expect(openRoomError({ data: { kind: "RequestBlocked" } })).toBe(
+      "El moderador rechazó la solicitud.",
+    );
+    expect(
+      openRoomError({ data: { kind: "RequestBlocked", message: {} } }),
+    ).toBe("El moderador rechazó la solicitud.");
+    expect(openRoomError(new Error("private details"))).toBe(sendError(null));
+    expect(openRoomError(null)).toBe(sendError(null));
   });
 });
