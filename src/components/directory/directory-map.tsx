@@ -295,7 +295,7 @@ export function DirectoryMap({
                   ),
                   top: Math.min(
                     Math.max(selectedAt.y - 120, 64),
-                    Math.max(size.height - 200, 16),
+                    Math.max(size.height - 300, 16),
                   ),
                 }}
               >
@@ -308,18 +308,20 @@ export function DirectoryMap({
                     <span className="text-xs text-subtle-foreground">
                       También en esta dirección
                     </span>
-                    {selectedPin
-                      .filter((c) => c !== selected)
-                      .map((c) => (
-                        <button
-                          key={c.agentId}
-                          type="button"
-                          onClick={() => select(c.agentId)}
-                          className="cursor-pointer truncate border-0 bg-transparent p-0 text-left text-[13px] font-medium text-foreground underline-offset-3 hover:underline"
-                        >
-                          {c.name}
-                        </button>
-                      ))}
+                    <div className="flex max-h-32 flex-col gap-1 overflow-y-auto overscroll-contain">
+                      {selectedPin
+                        .filter((c) => c !== selected)
+                        .map((c) => (
+                          <button
+                            key={c.agentId}
+                            type="button"
+                            onClick={() => select(c.agentId)}
+                            className="cursor-pointer truncate border-0 bg-transparent p-0 text-left text-[13px] font-medium text-foreground underline-offset-3 hover:underline"
+                          >
+                            {c.name}
+                          </button>
+                        ))}
+                    </div>
                   </div>
                 ) : null}
                 <Link

@@ -23,6 +23,8 @@ export type DirectoryCard = Omit<AgentDetail, "agentId"> &
 export type DirectorySearchResult = {
   agents: DirectoryCard[];
   truncated: boolean;
+  /** Where the next page starts, when more matches can be fetched. */
+  nextOffset?: number;
 };
 
 type ListedCard = { agent: Doc<"agents">; card: AgentCard };
@@ -227,7 +229,10 @@ export const search = query({
       }
       agents.push(card);
     }
-    return { agents, truncated };
+    const next = offset + agents.length;
+    return next < matches.length && agents.length > 0
+      ? { agents, truncated, nextOffset: next }
+      : { agents, truncated };
   },
 });
 
