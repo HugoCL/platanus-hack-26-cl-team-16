@@ -154,11 +154,11 @@ describe("generic provider agent", () => {
     });
   });
 
-  it.each(["cardiología", "cardiólogo", "salud"])(
+  it.each(["cardiología", "cardiólogo", "salud", "un médico cardiólogo"])(
     "keeps matching appointments for %s, including category descendants",
     async (service) => {
       const room = await openRoom();
-      room.contract.intent.description = `Quiero una hora de ${service}`;
+      room.contract.intent.description = `Quiero una hora con ${service}`;
       const picker = await askForSlots(room);
       expect(pickerOf(picker).slots).toHaveLength(SLOT_OPTIONS);
     },

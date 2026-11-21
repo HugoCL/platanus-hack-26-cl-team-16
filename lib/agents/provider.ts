@@ -128,12 +128,17 @@ export async function providerTurn(
   const wanted = new Set(
     decision.offerings.flatMap((k) => keys.get(k)?.id ?? []),
   );
-  const requestedCategory = parseDirectoryText(
-    turn.contract.intent.description,
-    context.categories,
-  ).category;
-  const allowedCategories = requestedCategory
-    ? categoryWithDescendants(requestedCategory, context.categories)
+  const requestedCategories = context.categories.filter(
+    (category) =>
+      parseDirectoryText(turn.contract.intent.description, [category])
+        .category !== null,
+  );
+  const allowedCategories = requestedCategories.length
+    ? new Set(
+        requestedCategories.flatMap((category) => [
+          ...categoryWithDescendants(category.slug, context.categories),
+        ]),
+      )
     : null;
   const matchingOfferings = new Set(
     context.offerings
