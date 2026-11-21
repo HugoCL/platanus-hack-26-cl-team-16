@@ -18,17 +18,21 @@ export function SiteHeader({
 }) {
   return (
     <header className="flex items-center justify-between gap-6 border-b border-border px-4 py-3 sm:px-6">
-      <Link
-        href="/"
-        className="text-xl leading-none font-bold tracking-tight text-foreground no-underline"
-      >
-        Canary Room
-      </Link>
-      <div className="flex items-center gap-2 sm:hidden">
+      <div className="flex items-center gap-1">
+        <div className="-ml-2 sm:hidden">
+          <MobileMenu items={NAV} current={current} themeToggle={themeToggle} />
+        </div>
+        <Link
+          href="/"
+          className="text-xl leading-none font-bold tracking-tight text-foreground no-underline"
+        >
+          Canary Room
+        </Link>
+      </div>
+      <div className="sm:hidden">
         <Show when="signed-in">
           <UserButton />
         </Show>
-        <MobileMenu items={NAV} current={current} themeToggle={themeToggle} />
       </div>
       <div className="flex items-center gap-2 max-sm:hidden">
         <nav aria-label="Principal" className="flex items-center gap-1">
