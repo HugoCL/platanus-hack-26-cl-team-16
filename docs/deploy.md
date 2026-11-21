@@ -19,7 +19,7 @@ Nothing on Render exists until a person does the [one-time setup](#one-time-setu
 
 - **One job, one install.** The checks themselves take seconds, so separate jobs would spend more time on installs than on checks.
 - **A newer push cancels the run it supersedes**, per branch or pull request.
-- **Changes that only touch Markdown or `.scratch/` start no run.** The vendored skills and `docs/skills.md` are the exception, because `pnpm skills:check` verifies them.
+- **Every push runs it, Markdown or not.** A path filter that skipped Markdown left a commit with no check at all, so its pull request showed a head nothing had verified. A run is under a minute and free here, and `buildFilter` in `render.yaml`, not CI, decides what spends build minutes.
 - **Cache:** the pnpm store, keyed by `pnpm-lock.yaml`.
 - **Versions come from the repository:** pnpm from `packageManager` in `package.json`, Node from `.node-version`. Render reads the same two.
 - **The mirror does not run it.** Every commit is also pushed to `platanus-hack/platanus-hack-26-cl-team-16`. The job has an `if:` on the repository name, so on the mirror it is skipped and uses no minutes.
@@ -34,7 +34,7 @@ Nothing on Render exists until a person does the [one-time setup](#one-time-setu
 3. Render runs `scripts/render-build.sh`, which installs dependencies and runs `convex deploy --cmd 'pnpm build'`. That one command builds the Next.js app with `NEXT_PUBLIC_CONVEX_URL` set to the production Convex deployment, then pushes the Convex functions and schema to that same deployment. If the build or the push fails, the deploy fails and the previous version keeps serving.
 4. Render starts `next start` and switches traffic once `/` answers.
 
-The `buildFilter` in `render.yaml` keeps deploys from spending build minutes on changes that cannot alter the app: Render skips a commit that only touches Markdown, `.agents/`, `.capy/`, `.github/`, `.scratch/`, `licenses/` or `tests/`. Every commit that Render does build has had a CI run, because CI skips only Markdown and `.scratch/`.
+The `buildFilter` in `render.yaml` keeps deploys from spending build minutes on changes that cannot alter the app: Render skips a commit that only touches Markdown, `.agents/`, `.capy/`, `.github/`, `.scratch/`, `licenses/` or `tests/`. Every commit that Render builds has had a CI run.
 
 The Free instance stops after 15 minutes without traffic, and the next request waits about a minute while it starts. That is the price of $0. For a demo, change `plan` in `render.yaml` to `0.5c-512mb` (see [Costs](#costs)). Do not add a service that pings the app to keep it awake: it uses up the month's free instance hours, and when they run out Render suspends every Free service in the workspace.
 
