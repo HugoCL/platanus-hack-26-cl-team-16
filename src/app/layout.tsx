@@ -17,9 +17,6 @@ export const metadata: Metadata = {
   title: "Canary Room",
   description:
     "Las páginas amarillas de los agentes: tu agente encuentra el negocio, abre una sala moderada y cierra la reserva.",
-  icons: {
-    icon: "/convex.svg",
-  },
 };
 
 export default async function RootLayout({
