@@ -1,9 +1,10 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
+import rateLimiter from "@convex-dev/rate-limiter/test";
 import { convexTest } from "convex-test";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
-import { sha256Hex } from "../../convex/agentKeys";
+import { isApiKeyFormat, sha256Hex } from "../../convex/agentKeys";
 import schema from "../../convex/schema";
 import { CONSUMER_AGENT_SLUG } from "../../shared/seedData";
 
@@ -13,6 +14,7 @@ const createTest = () => convexTest(schema, modules);
 let t: ReturnType<typeof createTest>;
 beforeEach(async () => {
   t = createTest();
+  rateLimiter.register(t);
   await t.mutation(internal.seed.ensure, {});
 });
 
@@ -22,7 +24,16 @@ const issue = () =>
     label: "test",
   });
 const authenticate = (apiKey: string) =>
-  t.query(api.agentKeys.authenticate, { apiKey });
+  t.mutation(api.agentKeys.authenticate, { apiKey });
+const keyRow = async (apiKey: string) => {
+  const keyHash = await sha256Hex(apiKey);
+  return t.run((ctx) =>
+    ctx.db
+      .query("agentApiKeys")
+      .withIndex("by_keyHash", (q) => q.eq("keyHash", keyHash))
+      .unique(),
+  );
+};
 
 describe("agent API keys", () => {
   it("issues a key that is stored only as its hash and visible prefix", async () => {
@@ -43,9 +54,74 @@ describe("agent API keys", () => {
     expect(JSON.stringify(rows)).not.toContain(apiKey.slice(prefix.length));
   });
 
-  it("resolves the agent from a valid key", async () => {
-    const { apiKey, agentId } = await issue();
-    await expect(authenticate(apiKey)).resolves.toBe(agentId);
+  it("resolves the agent from a valid key and records when it was used", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const { apiKey, agentId } = await issue();
+      expect((await keyRow(apiKey))?.lastUsedAt).toBeUndefined();
+
+      await expect(authenticate(apiKey)).resolves.toEqual({
+        ok: true,
+        agentId,
+      });
+      const firstUse = (await keyRow(apiKey))?.lastUsedAt ?? 0;
+      expect(firstUse).toBeGreaterThan(0);
+
+      vi.advanceTimersByTime(30_000);
+      await authenticate(apiKey);
+      expect((await keyRow(apiKey))?.lastUsedAt).toBe(firstUse);
+
+      vi.advanceTimersByTime(31_000);
+      await authenticate(apiKey);
+      expect((await keyRow(apiKey))?.lastUsedAt).toBeGreaterThanOrEqual(
+        firstUse + 60_000,
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("rejects a malformed key without looking it up", async () => {
+    const { apiKey } = await issue();
+    expect(isApiKeyFormat(apiKey)).toBe(true);
+    for (const malformed of [
+      "",
+      apiKey.toUpperCase(),
+      `${apiKey}0`,
+      apiKey.slice(0, -1),
+      `sk_${apiKey.slice(4)}`,
+    ]) {
+      expect(isApiKeyFormat(malformed)).toBe(false);
+      await expect(authenticate(malformed)).resolves.toBeNull();
+    }
+  });
+
+  it("revokes a key by its agent and visible prefix", async () => {
+    const { apiKey, prefix } = await issue();
+    const other = await issue();
+    await t.mutation(internal.agentKeys.revoke, {
+      slug: CONSUMER_AGENT_SLUG,
+      prefix,
+    });
+    await expect(authenticate(apiKey)).resolves.toBeNull();
+    await expect(authenticate(other.apiKey)).resolves.toEqual({
+      ok: true,
+      agentId: other.agentId,
+    });
+
+    const revokedAt = (await keyRow(apiKey))?.revokedAt;
+    await t.mutation(internal.agentKeys.revoke, {
+      slug: CONSUMER_AGENT_SLUG,
+      prefix,
+    });
+    expect((await keyRow(apiKey))?.revokedAt).toBe(revokedAt);
+
+    await expect(
+      t.mutation(internal.agentKeys.revoke, {
+        slug: "no-existe",
+        prefix,
+      }),
+    ).rejects.toThrow(/no key/);
   });
 
   it("rejects unknown and revoked keys", async () => {
@@ -53,15 +129,9 @@ describe("agent API keys", () => {
     await expect(authenticate(`${apiKey}0`)).resolves.toBeNull();
     await expect(authenticate("")).resolves.toBeNull();
 
-    const keyHash = await sha256Hex(apiKey);
-    await t.run(async (ctx) => {
-      const row = await ctx.db
-        .query("agentApiKeys")
-        .withIndex("by_keyHash", (q) => q.eq("keyHash", keyHash))
-        .unique();
-      if (!row) throw new Error("issued key is missing");
-      await ctx.db.patch(row._id, { revokedAt: Date.now() });
-    });
+    const row = await keyRow(apiKey);
+    if (!row) throw new Error("issued key is missing");
+    await t.run((ctx) => ctx.db.patch(row._id, { revokedAt: Date.now() }));
     await expect(authenticate(apiKey)).resolves.toBeNull();
   });
 
