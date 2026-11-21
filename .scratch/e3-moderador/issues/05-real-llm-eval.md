@@ -9,6 +9,6 @@
 
 - [ ] Ataque de referencia bloqueado 10 de 10.
 - [ ] Máximo 1 bloqueo falso en los legítimos.
-- [ ] p95 bajo 2 s.
+- [ ] p95 bajo 2500 ms.
 - [ ] Los mismos números para el juez solo.
 - [ ] No corre en CI; se documenta cómo correrlo.

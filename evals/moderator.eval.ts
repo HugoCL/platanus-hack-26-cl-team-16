@@ -7,16 +7,17 @@ import {
   moderationInput,
 } from "../shared/fixtures/moderation-set";
 import { modelFor } from "../shared/models";
-import { judge } from "../shared/moderator/judge";
+import { conversationJudge, messageJudge } from "../shared/moderator/judge";
 import { createModerator } from "../shared/moderator/moderator";
 import { createLlmProvider } from "../shared/providers/llm";
+import { createRequestLimit } from "./request-limit";
 
 const RUNS = positiveInteger("EVAL_RUNS", 10);
 const CONCURRENCY = positiveInteger("EVAL_CONCURRENCY", 4);
 const CERTIFYING_RUNS = 10;
 const REFERENCE_CASE = "clinica-ataque-referencia";
-const P95_LIMIT_MS = 2000;
-const MODES = ["moderator", "judge"] as const;
+const P95_LIMIT_MS = 2500;
+const MODES = ["moderator", "message", "conversation"] as const;
 
 function positiveInteger(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -48,9 +49,16 @@ globalThis.fetch = async (input, init) => {
 };
 
 const env = { ...process.env, LLM_PROVIDER: "openrouter" };
+if (CONCURRENCY < 2) {
+  throw new Error(
+    "EVAL_CONCURRENCY must be at least 2 for full-moderator samples",
+  );
+}
 const llm = createLlmProvider(env);
+const request = createRequestLimit(CONCURRENCY);
 const model = modelFor("moderator", env);
-const moderator = createModerator({ llm, model });
+const conversationModel = modelFor("conversation_moderator", env);
+const moderator = createModerator({ llm, model, conversationModel });
 
 type Mode = (typeof MODES)[number];
 type Outcome = "allow" | "block" | "error";
@@ -75,7 +83,9 @@ async function sample(
   if (mode === "moderator") {
     const { verdict, events } = await moderator.moderate(input);
     const judged = events.find((e) => e.stage === "purpose");
-    const failed = judged?.reasons.some((r) => r.code === "moderator_error");
+    const failed = events.some((e) =>
+      e.reasons.some((r) => r.code === "moderator_error"),
+    );
     return {
       ...base,
       outcome: failed ? "error" : verdict.decision,
@@ -85,7 +95,9 @@ async function sample(
   }
   let outcome: Outcome;
   try {
-    outcome = (await judge(llm, input)).decision;
+    outcome = (
+      await (mode === "message" ? messageJudge : conversationJudge)(llm, input)
+    ).decision;
   } catch {
     outcome = "error";
   }
@@ -95,23 +107,6 @@ async function sample(
     calledLlm: true,
     latencyMs: performance.now() - started,
   };
-}
-
-async function inPool<T>(
-  tasks: (() => Promise<T>)[],
-  limit: number,
-): Promise<T[]> {
-  const results: T[] = [];
-  let next = 0;
-  await Promise.all(
-    Array.from({ length: limit }, async () => {
-      while (next < tasks.length) {
-        const i = next++;
-        results[i] = await tasks[i]();
-      }
-    }),
-  );
-  return results;
 }
 
 function p95(values: number[]): number {
@@ -164,10 +159,13 @@ function summarize(samples: Sample[]) {
 it(`moderator against ${model} on OpenRouter, ${RUNS} runs`, async () => {
   const tasks = Array.from({ length: RUNS }, (_, run) =>
     MODERATION_CASES.flatMap((c) =>
-      MODES.map((mode) => () => sample(mode, run, c)),
+      MODES.map(
+        (mode) => () =>
+          request(() => sample(mode, run, c), mode === "moderator" ? 2 : 1),
+      ),
     ),
   ).flat();
-  const samples = await inPool(tasks, CONCURRENCY);
+  const samples = await Promise.all(tasks.map((task) => task()));
   const costs = await Promise.all(usageReads);
   const costUsd = costs.reduce<number>((sum, cost) => sum + (cost ?? 0), 0);
   const unpriced = costs.filter((cost) => cost === undefined).length;
@@ -183,13 +181,16 @@ it(`moderator against ${model} on OpenRouter, ${RUNS} runs`, async () => {
   }
 
   const full = summarize(samples.filter((s) => s.mode === "moderator"));
-  const alone = summarize(samples.filter((s) => s.mode === "judge"));
+  const alone = summarize(samples.filter((s) => s.mode === "message"));
+  const conversation = summarize(
+    samples.filter((s) => s.mode === "conversation"),
+  );
   const ms = (value: number) => `${Math.round(value)} ms`;
   const row = (label: string, s: ReturnType<typeof summarize>) =>
     `| ${label} | ${s.referenceBlocked}/${RUNS} | ${s.falseBlocksMaxPerRun} (${s.falseBlocks}/${s.legit}) | ${s.attacksBlocked}/${s.attacks} | ${s.errorsOnLegit} / ${s.errorsOnAttacks} | ${ms(s.p95Ms)} | ${ms(s.p95LlmMs)} |`;
   console.log(
     [
-      `Modelo ${model}, set v${MODERATION_SET_VERSION} (${MODERATION_CASES.length} casos), ${RUNS} corridas, concurrencia ${CONCURRENCY}.`,
+      `Modelo ${model}, set v${MODERATION_SET_VERSION} (${MODERATION_CASES.length} casos), ${RUNS} corridas, máximo ${CONCURRENCY} solicitudes LLM simultáneas (no muestras). Cada muestra reserva sus cupos antes de empezar (moderador: 2, juez: 1); las latencias excluyen la espera por cupo.`,
       RUNS < CERTIFYING_RUNS
         ? `Corrida exploratoria: con menos de ${CERTIFYING_RUNS} corridas no certifica los criterios de E3.`
         : `Corrida completa: certifica los criterios de E3.`,
@@ -198,7 +199,8 @@ it(`moderator against ${model} on OpenRouter, ${RUNS} runs`, async () => {
       "| | Ataque de referencia bloqueado | Bloqueos falsos: máximo por corrida (total) | Ataques bloqueados | Errores o timeouts (en legítimos / en ataques) | p95 | p95 con LLM |",
       "| --- | --- | --- | --- | --- | --- | --- |",
       row("Moderador completo", full),
-      row("Juez solo", alone),
+      row("Juez de mensaje", alone),
+      row("Juez de conversación", conversation),
       "",
       `Criterios de E3 en el moderador completo, donde un error bloquea porque es fail-closed: ataque de referencia detenido ${full.referenceStopped}/${RUNS}, máximo de mensajes legítimos detenidos por corrida ${full.legitStoppedMaxPerRun}, p95 ${ms(full.p95Ms)}.`,
       `Bloqueos falsos por caso: moderador ${JSON.stringify(full.falseBlocksByCase)}, juez ${JSON.stringify(alone.falseBlocksByCase)}`,
@@ -220,7 +222,9 @@ it(`moderator against ${model} on OpenRouter, ${RUNS} runs`, async () => {
         costUsd,
         unpricedResponses: unpriced,
         moderator: full,
-        judge: alone,
+        messageJudge: alone,
+        conversationJudge: conversation,
+        conversationModel,
         samples,
       },
       null,

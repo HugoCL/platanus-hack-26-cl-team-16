@@ -122,7 +122,8 @@ Everything has an offline default. You set these variables only to use real serv
 | --- | --- | --- |
 | `LLM_PROVIDER` | `fake` | `openrouter` uses OpenRouter through the AI SDK. |
 | `AGENT_MODEL` | `anthropic/claude-sonnet-5.5` | The agents' model. |
-| `MODERATOR_MODEL` | `anthropic/claude-haiku-5.5` | The moderator's model. |
+| `MODERATOR_MODEL` | `anthropic/claude-haiku-5.5` | The message judge's model. |
+| `CONVERSATION_MODERATOR_MODEL` | `anthropic/claude-haiku-5.5` | The conversation judge's model. |
 | `OPENROUTER_API_KEY` | none | Required with `LLM_PROVIDER=openrouter`. |
 | `AGENT_REGISTRATION_SECRET` | unset (unprotected registration) | Shared server-only registration credential; set the same private random value in Convex and Render for production/previews. Optional locally; when testing protection, also put it in Next.js `.env.local`. |
 | `BUSINESS_SOURCES` | `fixture` | Comma list of `fixture`, `osm` and `google_places`. |
@@ -135,7 +136,7 @@ Code in Convex reads these variables from the deployment's environment. A human 
 
 `AGENT_REGISTRATION_SECRET` authenticates the Next.js registration route to Convex before rate-limit tokens are consumed. If it is unset in Convex, registration still works with one warning per call; local `pnpm dev` needs no setup. If set in Convex, a missing or mismatched Next.js value rejects registration. Never expose it with `NEXT_PUBLIC_` or give it to agents. For production and preview rollout, see [Registration secret](deploy.md#registration-secret).
 
-For interactive room sends, configure `LLM_PROVIDER=openrouter` and its key in the Convex deployment. The default `fake` provider has no judge script outside tests, so requests and messages that need the judge fail closed. With `openrouter`, every message that passes the deterministic rules goes to OpenRouter in the judge prompt, together with the room contract and the last 8 messages; see section 3.5 of `docs/architecture.md` for exactly what leaves the platform.
+For interactive room sends, configure `LLM_PROVIDER=openrouter` and its key in the Convex deployment. The default `fake` provider has no judge script outside tests, so requests and messages that need the judge fail closed. With `openrouter`, every message that passes the deterministic rules goes to both judges on OpenRouter. Both receive the room contract, participants, sender/recipient and the new message. The message judge receives no history; the conversation judge also receives the full gate-bounded history, with blocked messages replaced by placeholders; see section 3.5 of `docs/architecture.md` for exactly what leaves the platform.
 
 ### Try Claude through OpenRouter locally
 

@@ -74,7 +74,7 @@ it("rejects a message if the room closes while moderation is running", async () 
       return generateObject(args);
     });
   expect(await errorKind(send())).toBe("RoomClosed");
-  expect(judge).toHaveBeenCalledOnce();
+  expect(judge).toHaveBeenCalledTimes(2);
   expect(await notices()).toMatchObject([
     { code: "session_opened" },
     { code: "session_closed" },

@@ -293,6 +293,12 @@ describe("the moderation gate", () => {
       },
       {
         sessionId: room.sessionId,
+        stage: "injection",
+        action: "allow",
+        reasons: [],
+      },
+      {
+        sessionId: room.sessionId,
         stage: "purpose",
         action: "block",
         reasons: [
@@ -370,7 +376,7 @@ describe("the moderation gate", () => {
       expect(signal?.aborted).toBe(true);
       await vi.advanceTimersByTimeAsync(MODERATOR_TIMEOUT_MS);
       await expectFailure(await pending);
-      expect(signals).toHaveLength(2);
+      expect(signals).toHaveLength(4);
       expect(signals[1]?.aborted).toBe(true);
     } finally {
       vi.useRealTimers();

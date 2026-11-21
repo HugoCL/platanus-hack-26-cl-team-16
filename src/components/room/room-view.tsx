@@ -404,7 +404,7 @@ function Avatar({
     <span
       aria-hidden="true"
       style={{ width: size, height: size }}
-      className={`grid shrink-0 place-items-center rounded-full text-[11px] font-semibold ring-2 ring-background ${
+      className={`grid shrink-0 place-items-center rounded-full text-micro font-semibold ring-2 ring-background ${
         participant?.side === "self"
           ? "bg-primary text-primary-foreground"
           : "bg-muted text-foreground"
@@ -758,7 +758,7 @@ function Composer({
           ) : null}
         </div>
         {control ? (
-          <div className="mx-auto flex w-full max-w-3xl justify-between text-[11px] text-subtle-foreground">
+          <div className="mx-auto flex w-full max-w-3xl justify-between text-micro text-subtle-foreground">
             <span>Tus mensajes también pasan por el moderador</span>
             <span className="tabular-nums">
               {text.length} / {MAX_TEXT_LENGTH}
@@ -994,7 +994,7 @@ function AuditView({
           ],
         ].map(([label, value]) => (
           <div key={label} className="flex flex-col py-1.5">
-            <dt className="text-[11px] text-subtle-foreground">{label}</dt>
+            <dt className="text-micro text-subtle-foreground">{label}</dt>
             <dd className="m-0 text-base font-semibold tabular-nums">
               {value}
             </dd>

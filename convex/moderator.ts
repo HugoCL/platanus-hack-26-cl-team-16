@@ -35,15 +35,15 @@ const MODERATOR_FAILED: ModerationOutcome = {
 export const judgeRateLimiter = new RateLimiter(components.rateLimiter, {
   roomJudgeSender: {
     kind: "token bucket",
-    rate: 10,
-    period: MINUTE,
-    capacity: 10,
-  },
-  roomJudgeRoom: {
-    kind: "token bucket",
     rate: 20,
     period: MINUTE,
     capacity: 20,
+  },
+  roomJudgeRoom: {
+    kind: "token bucket",
+    rate: 40,
+    period: MINUTE,
+    capacity: 40,
   },
 });
 
@@ -51,16 +51,18 @@ const judgeBuckets = { sender: v.string(), room: v.string() };
 export type JudgeBuckets = ObjectType<typeof judgeBuckets>;
 
 export const takeJudgeTokens = internalMutation({
-  args: { ...judgeBuckets, sender: v.optional(v.string()) },
-  handler: async (ctx, { sender, room }) => {
+  args: { ...judgeBuckets, sender: v.optional(v.string()), count: v.number() },
+  handler: async (ctx, { sender, room, count }) => {
     if (sender !== undefined) {
       await judgeRateLimiter.limit(ctx, "roomJudgeSender", {
         key: sender,
+        count,
         throws: true,
       });
     }
     await judgeRateLimiter.limit(ctx, "roomJudgeRoom", {
       key: room,
+      count,
       throws: true,
     });
   },
@@ -70,6 +72,7 @@ export const takeOpenerToken = internalMutation({
   args: { opener: v.string() },
   handler: async (ctx, { opener }) => {
     await judgeRateLimiter.limit(ctx, "roomJudgeSender", {
+      count: 2,
       key: opener,
       throws: true,
     });
@@ -81,8 +84,11 @@ export async function judgeRetryAfter(
   { sender, room }: JudgeBuckets,
 ): Promise<number | undefined> {
   const statuses = [
-    await judgeRateLimiter.check(ctx, "roomJudgeSender", { key: sender }),
-    await judgeRateLimiter.check(ctx, "roomJudgeRoom", { key: room }),
+    await judgeRateLimiter.check(ctx, "roomJudgeSender", {
+      key: sender,
+      count: 2,
+    }),
+    await judgeRateLimiter.check(ctx, "roomJudgeRoom", { key: room, count: 2 }),
   ];
   const waits = statuses.flatMap((status) =>
     status.ok ? [] : [status.retryAfter],
@@ -100,8 +106,13 @@ export async function moderate(
     return await createModerator({
       llm,
       model: llm.name === "fake" ? "fake" : modelFor("moderator"),
-      beforeJudge: async () => {
-        await ctx.runMutation(internal.moderator.takeJudgeTokens, buckets);
+      conversationModel:
+        llm.name === "fake" ? "fake" : modelFor("conversation_moderator"),
+      beforeJudge: async (count) => {
+        await ctx.runMutation(internal.moderator.takeJudgeTokens, {
+          ...buckets,
+          count,
+        });
       },
     }).moderate(input);
   } catch (error) {

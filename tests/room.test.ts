@@ -225,6 +225,32 @@ describe("moderation summary", () => {
     expect(primaryReason(blocked?.reasons)?.code).toBe("prompt_injection");
   });
 
+  it("prefers confirmed violations over moderator errors, then orders by score", () => {
+    const error = {
+      code: "moderator_error",
+      stage: "injection",
+      detail: "Falló la verificación.",
+      score: 1,
+    } as const;
+    const leak = {
+      code: "data_leak",
+      stage: "purpose",
+      detail: "Datos no permitidos.",
+    } as const;
+    const purpose = {
+      code: "off_purpose",
+      stage: "purpose",
+      detail: "Fuera de propósito.",
+      score: 0.8,
+    } as const;
+    expect(primaryReason([error, leak])).toBe(leak);
+    expect(primaryReason([leak, error])).toBe(leak);
+    expect(primaryReason([error, leak, purpose])).toBe(purpose);
+    expect(primaryReason([error])).toBe(error);
+    expect(primaryReason([])).toBeUndefined();
+    expect(primaryReason()).toBeUndefined();
+  });
+
   it("counts reviewed messages and interventions", () => {
     const metrics = auditMetrics(messages);
     expect(metrics.reviewed).toBe(8);

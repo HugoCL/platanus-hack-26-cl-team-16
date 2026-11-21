@@ -84,10 +84,11 @@ it("does not deliver a blocked agent reply to the other agent", async () => {
 
 it("persists a hosted reply blocked by timeout when retry quota is unavailable", async () => {
   const room = await setup();
+  vi.spyOn(Date, "now").mockReturnValue(Date.now());
   await room.t.run((ctx) =>
     judgeRateLimiter.limit(ctx, "roomJudgeSender", {
       key: `participant:${room.provider}`,
-      count: 9,
+      count: 18,
       throws: true,
     }),
   );
@@ -95,7 +96,12 @@ it("persists a hosted reply blocked by timeout when retry quota is unavailable",
   const moderate = vi.spyOn(room.llm, "generateObject");
   const sent = await room.send();
   moderate.mockClear();
-  moderate.mockImplementationOnce(() => new Promise(() => {}));
+  moderate
+    .mockImplementationOnce(async () => ({
+      decision: "allow",
+      rule: "purpose",
+    }))
+    .mockImplementationOnce(() => new Promise(() => {}));
 
   const jobs = () =>
     room.t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
@@ -103,8 +109,8 @@ it("persists a hosted reply blocked by timeout when retry quota is unavailable",
   await room.finishReplies();
 
   expect(agent).toHaveBeenCalledTimes(1);
-  expect(moderate).toHaveBeenCalledTimes(1);
-  expect(moderate.mock.calls[0][0].abortSignal?.aborted).toBe(true);
+  expect(moderate).toHaveBeenCalledTimes(2);
+  expect(moderate.mock.calls[1][0].abortSignal?.aborted).toBe(true);
   const [blocked, alert] = (await room.history(room.provider)).slice(2);
   expect(blocked).toMatchObject({
     status: "blocked",

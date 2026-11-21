@@ -434,7 +434,7 @@ function ConfirmationBlock({
       {result === null ? (
         <div className="flex flex-wrap gap-2">
           <Button
-            data-variant="solid"
+            data-variant="brand"
             disabled={disabled}
             onClick={() => respond(true)}
           >
@@ -445,7 +445,11 @@ function ConfirmationBlock({
           </Button>
         </div>
       ) : (
-        <p className="m-0 inline-flex items-center gap-1.5 text-sm font-medium">
+        <p
+          className={`m-0 inline-flex items-center gap-1.5 self-start rounded-lg px-2.5 py-1 text-sm font-medium ${
+            result ? "bg-brand text-brand-ink" : "bg-muted"
+          }`}
+        >
           <CheckIcon size={14} />
           {result ? spec.confirmLabel : spec.cancelLabel}
         </p>

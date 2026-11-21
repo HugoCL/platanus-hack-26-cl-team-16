@@ -163,7 +163,7 @@ function Bubble({
         className={`room-bubble flex max-w-[min(560px,92%)] flex-col gap-2 ${
           isUi && visible && status !== "blocked"
             ? "w-full"
-            : `rounded-3xl px-4 py-2.5 ${compact ? "text-sm" : ""} ${
+            : `rounded-4xl px-4 py-2.5 ${compact ? "text-sm" : ""} ${
                 self
                   ? "bg-primary text-primary-foreground"
                   : "bg-card shadow-card"
@@ -180,7 +180,7 @@ function Bubble({
         </p>
       ) : null}
       {status === "redacted" && reason ? (
-        <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 py-0.5 text-xs">
+        <span className="inline-flex items-center gap-1 rounded-lg bg-warning/15 px-2 py-0.5 text-xs">
           Se ocultó: {REASON_LABELS[reason.code]}
           {reason.detail ? ` · ${reason.detail}` : ""}
         </span>
@@ -338,7 +338,7 @@ export function SystemNotice({
       id={`msg-${id}`}
       data-testid="system-notice"
       data-code={code}
-      className={`mx-auto my-1 inline-flex max-w-[90%] items-center gap-1.5 self-center rounded-full px-3 py-1 text-center text-xs ${
+      className={`mx-auto my-1 inline-flex max-w-[90%] items-center gap-1.5 self-center rounded-lg px-3 py-1 text-center font-mono text-micro tracking-wider uppercase ${
         strong ? "font-medium" : ""
       } ${
         code === "session_terminated"

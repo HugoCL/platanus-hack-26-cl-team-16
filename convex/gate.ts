@@ -288,8 +288,10 @@ export const commit = internalMutation({
     let terminated = false;
     if (
       verdict.decision === "block" &&
-      !args.events.some((event) =>
-        event.reasons.some((reason) => reason.code === "moderator_error"),
+      args.events.some(
+        (event) =>
+          event.action === "block" &&
+          !event.reasons.some((reason) => reason.code === "moderator_error"),
       )
     ) {
       const stored = await ctx.db.get("sessions", args.sessionId);

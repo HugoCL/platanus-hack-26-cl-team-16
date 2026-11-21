@@ -7,40 +7,38 @@
  * Text on yellow is always ink.
  */
 .landing {
-  --landing-ink: oklch(0.13 0.004 49);
-  --landing-bg: light-dark(oklch(0.985 0.008 95), oklch(0.13 0.004 49));
-  --landing-alt: light-dark(oklch(0.955 0.07 100), oklch(0.175 0.006 60));
-  --landing-panel: light-dark(oklch(1 0 0), oklch(0.17 0.005 49));
+  --landing-ink: var(--brand-ink);
+  --landing-bg: var(--ui-background);
+  --landing-alt: var(--sm-paper);
+  --landing-panel: var(--sm-card);
   --landing-bubble: light-dark(oklch(0.94 0.006 90), oklch(0.25 0.006 49));
-  --landing-fg: light-dark(oklch(0.13 0.004 49), oklch(0.985 0.001 106));
-  --landing-muted: light-dark(oklch(0.13 0.004 49 / 0.58), oklch(0.7 0.01 70));
+  --landing-fg: var(--ui-foreground);
+  --landing-muted: var(--sm-headline-muted);
   --landing-subtle: light-dark(
     oklch(0.13 0.004 49 / 0.72),
     oklch(0.8 0.008 56)
   );
-  --landing-line: light-dark(oklch(0.13 0.004 49 / 0.14), oklch(1 0 0 / 0.1));
+  --landing-line: var(--ui-border);
+  /* Wall colors at full strength: the spotlight mask dims them to ~40% away from the pointer. */
   --landing-wall-text: light-dark(
-    oklch(0.13 0.004 49 / 0.17),
-    oklch(1 0 0 / 0.11)
+    oklch(0.13 0.004 49 / 0.42),
+    oklch(1 0 0 / 0.28)
   );
   --landing-wall-bright: light-dark(
-    oklch(0.13 0.004 49 / 0.45),
-    oklch(1 0 0 / 0.32)
+    oklch(0.13 0.004 49 / 0.95),
+    oklch(1 0 0 / 0.8)
   );
   --landing-wall-rule: light-dark(
-    oklch(0.13 0.004 49 / 0.08),
-    oklch(1 0 0 / 0.06)
+    oklch(0.13 0.004 49 / 0.2),
+    oklch(1 0 0 / 0.15)
   );
   --landing-wall-mark-bg: light-dark(
-    color-mix(in oklch, var(--brand-yellow) 70%, transparent),
-    color-mix(in oklch, var(--brand-yellow) 16%, transparent)
+    var(--brand-yellow),
+    color-mix(in oklch, var(--brand-yellow) 40%, transparent)
   );
-  --landing-wall-mark-fg: light-dark(
-    oklch(0.13 0.004 49 / 0.75),
-    color-mix(in oklch, var(--brand-yellow) 85%, transparent)
-  );
+  --landing-wall-mark-fg: light-dark(var(--brand-ink), var(--brand-yellow));
   --landing-pad: clamp(1.25rem, 6vw, 6rem);
-  --landing-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --landing-ease-out: var(--ease-out);
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
@@ -76,7 +74,7 @@
     justify-content: center;
   }
 
-  .landing-footer {
+  .landing .site-footer {
     scroll-snap-align: end;
   }
 }
@@ -100,25 +98,63 @@
  * The wall is one canvas (listing-wall.tsx) under the hero. It fades in once drawn and fades out
  * at the top and bottom edges, so the header and the trust row sit on clean background.
  */
-.landing-wall {
+.landing-spotlight {
+  --x: 72%;
+  --y: 38%;
   position: absolute;
   inset: 0;
   z-index: -2;
-  width: 100%;
+  overflow: hidden;
+  mask-image:
+    radial-gradient(
+      circle 16rem at var(--x) var(--y),
+      black,
+      rgb(0 0 0 / 0.4) 100%
+    ),
+    linear-gradient(to bottom, transparent, black 10%, black 78%, transparent);
+  mask-composite: intersect;
+
+  @media (max-width: 40rem) {
+    --x: 90%;
+    --y: 10%;
+  }
+}
+
+.landing-wall {
+  display: flex;
   height: 100%;
+  padding-inline-start: 2px;
   opacity: 0;
   transition: opacity 600ms var(--landing-ease-out);
-  mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    black 10%,
-    black 78%,
-    transparent
-  );
 
   &[data-ready] {
     opacity: 1;
   }
+}
+
+/* Each track shows its column twice and slides by one copy, so the loop is seamless. */
+@keyframes landing-scroll {
+  to {
+    transform: translateY(-50%);
+  }
+}
+
+.landing-track {
+  flex: none;
+  animation: landing-scroll 140s linear infinite;
+  will-change: transform;
+
+  &[data-direction="down"] {
+    animation-direction: reverse;
+  }
+
+  & img {
+    display: block;
+  }
+}
+
+.landing-spotlight[data-paused] .landing-track {
+  animation-play-state: paused;
 }
 
 /*
@@ -198,35 +234,6 @@
     line-height: 1.55;
     text-wrap: pretty;
   }
-}
-
-.landing-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin: 0 0 0.5rem;
-  padding: 0;
-  list-style: none;
-
-  & li {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45em;
-    padding: 0.3rem 0.6rem;
-    border: 1px solid var(--landing-line);
-    border-radius: 0.375rem;
-    background: color-mix(in oklch, var(--landing-bg) 80%, transparent);
-    color: var(--landing-subtle);
-    font: 500 0.75rem / 1.2 var(--ui-font-sans);
-  }
-}
-
-.landing-badge-dot {
-  width: 0.4rem;
-  height: 0.4rem;
-  border-radius: 50%;
-  background: var(--brand-yellow);
-  box-shadow: 0 0 0 1px light-dark(var(--landing-ink), transparent);
 }
 
 .landing-actions {
@@ -698,34 +705,6 @@
   }
 }
 
-.landing-footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem 2rem;
-  padding: 1.5rem var(--landing-pad);
-  background: var(--brand-yellow);
-  color: var(--landing-ink);
-  font: 500 0.75rem / 1.4 var(--ui-font-mono);
-
-  & nav {
-    display: flex;
-    align-items: center;
-    gap: 1.25rem;
-  }
-
-  & a {
-    color: inherit;
-    text-decoration: underline;
-    text-underline-offset: 0.25em;
-  }
-}
-
-.landing-footer-logo {
-  font: 600 1.25rem / 1 var(--font-logo);
-}
-
 /* Scroll reveal: elements marked data-reveal fade in from a blur as they first enter the
    viewport, staggered by --reveal-i, and stay revealed: scrolling back does not replay them.
    Hidden only when scripts run. Reduced motion keeps the fade and drops the blur and the rise. */
@@ -761,6 +740,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .landing-track {
+    animation: none;
+  }
+
   .landing-cta:hover span + span {
     transform: none;
   }

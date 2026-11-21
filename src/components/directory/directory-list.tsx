@@ -115,7 +115,7 @@ function AgentResult({
             ) : null}
           </h2>
           {meta.length > 0 ? (
-            <p className="m-0 text-[13px] text-subtle-foreground tabular-nums">
+            <p className="m-0 text-caption text-subtle-foreground tabular-nums">
               {meta.join(" · ")}
             </p>
           ) : null}
@@ -138,7 +138,7 @@ function AgentResult({
             <li
               key={intent}
               title={intentLabel(intent)}
-              className="h-6 max-w-full truncate rounded-full border border-input px-2.5 text-xs leading-[22px]"
+              className="h-6 max-w-full truncate rounded-lg border border-input px-2.5 text-xs leading-[22px]"
             >
               {intentLabel(intent)}
             </li>
@@ -163,7 +163,7 @@ function AgentResult({
         )}
         <Link
           href={href}
-          className="press inline-flex h-9 flex-1 items-center justify-center rounded-full border border-input bg-card text-sm font-medium text-foreground no-underline hover:bg-muted"
+          className="press inline-flex h-9 flex-1 items-center justify-center rounded-2xl border border-input bg-card text-sm font-medium text-foreground no-underline hover:bg-muted"
         >
           Ver ficha
           <span className="sr-only"> de {card.name}</span>

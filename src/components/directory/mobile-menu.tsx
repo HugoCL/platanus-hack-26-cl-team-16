@@ -54,7 +54,7 @@ export function MobileMenu({
               href={item.href}
               onClick={close}
               aria-current={item.key === current ? "page" : undefined}
-              className={`press flex h-11 items-center rounded-2xl px-3 text-[15px] text-foreground no-underline ${
+              className={`press flex h-11 items-center rounded-2xl px-3 text-lead text-foreground no-underline ${
                 item.key === current ? "bg-muted font-medium" : "hover:bg-muted"
               }`}
             >
@@ -64,7 +64,7 @@ export function MobileMenu({
         </nav>
         {themeToggle ? (
           <div className="mx-3 flex items-center justify-between border-t border-border px-3 pt-3">
-            <span className="text-[15px]">Tema</span>
+            <span className="text-lead">Tema</span>
             <ThemeToggle />
           </div>
         ) : null}

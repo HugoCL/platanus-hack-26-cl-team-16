@@ -148,6 +148,7 @@ it.each(["reference", "external"] as const)(
       ),
     ).toMatchObject([
       { stage: "deterministic", action: "allow" },
+      { stage: "injection", action: "allow" },
       { stage: "purpose", action: "block", reasons: [{ code: "off_purpose" }] },
     ]);
     expect((await history(provider)).map((m) => m.messageId)).not.toContain(

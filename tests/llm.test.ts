@@ -79,6 +79,7 @@ describe("LLM provider", () => {
 
   it.each([
     ["moderator", 1],
+    ["conversation_moderator", 1],
     ["agent", 3],
   ] as const)(
     "structured %s makes %i HTTP attempts on retryable errors",
@@ -181,6 +182,14 @@ describe("LLM provider", () => {
   });
 
   it("models come from the environment, with defaults", () => {
+    expect(modelFor("conversation_moderator", {})).toBe(
+      DEFAULT_MODELS.conversation_moderator,
+    );
+    expect(
+      modelFor("conversation_moderator", {
+        CONVERSATION_MODERATOR_MODEL: "custom/conversation",
+      }),
+    ).toBe("custom/conversation");
     expect(modelFor("agent", {})).toBe(DEFAULT_MODELS.agent);
     expect(modelFor("moderator", {})).toBe(DEFAULT_MODELS.moderator);
     expect(modelFor("agent", { AGENT_MODEL: "openai/gpt-x" })).toBe(
