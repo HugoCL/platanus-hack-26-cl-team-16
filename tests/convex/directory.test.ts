@@ -5,7 +5,13 @@ import { convexTest } from "convex-test";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
 import type { Doc } from "../../convex/_generated/dataModel";
-import { SCAN_BUDGET, toDirectoryCard } from "../../convex/directory";
+import {
+  CATEGORY_LIMIT,
+  listedCard,
+  MAX_LIMIT,
+  SCAN_ROW_BUDGET,
+  toDirectoryCard,
+} from "../../convex/directory";
 import schema from "../../convex/schema";
 import { AgentDetail, AgentSummary } from "../../shared/mcp";
 import { CLINIC_AGENT_SLUG } from "../../shared/seedData";
@@ -153,7 +159,9 @@ describe("directory search", () => {
       const doc = await ctx.db.get(clinic.agentId);
       if (!doc) throw new Error("missing clinic");
       const withSecret = { ...doc, apiSecret: "x" };
-      return toDirectoryCard(ctx, withSecret);
+      const listed = listedCard(withSecret);
+      if (!listed) throw new Error("clinic should be listed");
+      return toDirectoryCard(ctx, listed);
     });
     expect(withFutureField).not.toHaveProperty("apiSecret");
   });
@@ -173,14 +181,12 @@ describe("directory search", () => {
       comuna: "Providencia",
       limit: 1,
     });
-    expect(result).toMatchObject({
-      truncated: false,
-      agents: [{ slug: "aaa-hotel-verificado" }],
-    });
+    expect(result.agents.map((c) => c.slug)).toEqual(["aaa-hotel-verificado"]);
+    expect(result.truncated).toBe(true);
   });
 
   it("reports truncation when the scan budget runs out", async () => {
-    await insertCopies("hotel-providencia-suites", SCAN_BUDGET, (i) => ({
+    await insertCopies("hotel-providencia-suites", SCAN_ROW_BUDGET, (i) => ({
       slug: `hotel-relleno-${i}`,
       name: `Hotel relleno ${i}`,
       verified: false,
@@ -199,12 +205,24 @@ describe("directory search", () => {
       "cardiólogo en Narnia",
       "me duele el pecho en Providencia",
       "abogado en Santiago de Compostela",
+      "abogado Santiago de Compostela",
+      "cardiólogo en Providencias",
     ]) {
       const result = await t.action(api.directory.searchText, { query });
       expect(result.interpretation.unresolved).toHaveLength(1);
       expect(result.agents).toEqual([]);
     }
     warn.mockRestore();
+  });
+
+  it("keeps a found comuna when ordinary words follow it", async () => {
+    for (const [query, slug] of [
+      ["cardiólogo en Providencia este sábado", CLINIC_AGENT_SLUG],
+      ["dentista en Ñuñoa barato", "dental-nunoa"],
+    ]) {
+      const result = await t.action(api.directory.searchText, { query });
+      expect(result.agents.map((c) => c.slug)).toEqual([slug]);
+    }
   });
 
   it("caps the free-text length and rate-limits only the LLM fallback", async () => {
@@ -214,24 +232,120 @@ describe("directory search", () => {
 
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     for (let i = 0; i < 10; i++) {
-      await t.action(api.directory.searchText, {
+      const result = await t.action(api.directory.searchText, {
         query: "me duele el pecho secreto-123",
       });
+      expect(result.interpretation.diagnostic).toBe("llm_unavailable");
     }
     await expect(
       t.action(api.directory.searchText, { query: "me duele el pecho" }),
     ).rejects.toThrow(/RateLimited/);
-    const parsed = await t.action(api.directory.searchText, {
-      query: "cardiólogo en Providencia",
-    });
-    expect(parsed.agents[0]?.slug).toBe(CLINIC_AGENT_SLUG);
-
-    expect(warn).toHaveBeenCalledWith(
-      "directory: LLM fallback failed:",
-      "Error",
-    );
+    for (const query of ["cardiólogo en Providencia", "gimnasio en Pirque"]) {
+      const result = await t.action(api.directory.searchText, { query });
+      expect(result.interpretation.unresolved).toEqual([]);
+    }
     expect(JSON.stringify(warn.mock.calls)).not.toContain("secreto-123");
     warn.mockRestore();
+  });
+
+  it("returns unresolved with a fixed diagnostic when the provider cannot start", async () => {
+    vi.stubEnv("LLM_PROVIDER", "gateway");
+    vi.stubEnv("AI_GATEWAY_API_KEY", "");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const result = await t.action(api.directory.searchText, {
+        query: "me duele el pecho en Providencia",
+      });
+      expect(result).toMatchObject({
+        agents: [],
+        interpretation: {
+          unresolved: ["category"],
+          diagnostic: "llm_unavailable",
+        },
+      });
+      expect(warn.mock.calls).toEqual([
+        ["directory: LLM fallback unavailable"],
+      ]);
+    } finally {
+      warn.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("bounds the bytes it scans and returns, and says so", async () => {
+    await insertCopies("hotel-providencia-suites", 90, (i) => ({
+      slug: `hotel-pesado-${i}`,
+      name: `Hotel pesado ${i}`,
+      verified: false,
+      publicKey: "k".repeat(100_000),
+    }));
+    const scan = await t.query(api.directory.search, { comuna: "Providencia" });
+    expect(scan.truncated).toBe(true);
+    const text = await t.action(api.directory.searchText, {
+      query: "hotel en Providencia",
+    });
+    expect(text.truncated).toBe(true);
+    expect(text.agents[0]?.slug).toBe("hotel-providencia-suites");
+  });
+
+  it("cuts the response before it grows too large", async () => {
+    await insertCopies("hotel-providencia-suites", 25, (i) => ({
+      slug: `hotel-grande-${i}`,
+      name: `Hotel grande ${i}`,
+      verified: false,
+      publicKey: "k".repeat(300_000),
+    }));
+    const result = await t.query(api.directory.search, {
+      comuna: "Providencia",
+    });
+    expect(result.truncated).toBe(true);
+    expect(result.agents.length).toBeLessThan(MAX_LIMIT);
+    expect(JSON.stringify(result.agents).length).toBeLessThan(4 * 1024 * 1024);
+  });
+
+  it("defaults to one page of results and marks the rest as partial", async () => {
+    expect(await t.query(api.directory.search, {})).toMatchObject({
+      truncated: false,
+    });
+    await insertCopies("hotel-providencia-suites", 10, (i) => ({
+      slug: `hotel-extra-${i}`,
+      name: `Hotel extra ${i}`,
+      verified: false,
+    }));
+    const result = await t.query(api.directory.search, {});
+    expect(result.agents).toHaveLength(MAX_LIMIT);
+    expect(result.truncated).toBe(true);
+  });
+
+  it("resolves exact category slugs through the index, beyond the taxonomy page", async () => {
+    await t.run(async (ctx) => {
+      for (let i = 0; i < CATEGORY_LIMIT + 10; i++) {
+        await ctx.db.insert("categories", {
+          slug: `zz_extra_${i}`,
+          parent: null,
+          label: `Extra ${i}`,
+          attributeSchema: [],
+        });
+      }
+    });
+    const lastSlug = `zz_extra_${CATEGORY_LIMIT + 9}`;
+    await insertCopies("veterinaria-la-reina", 1, () => ({
+      slug: "vet-extra",
+      name: "Vet extra",
+      categories: [lastSlug],
+      primaryCategory: lastSlug,
+    }));
+    expect(await t.query(api.directory.search, { category: lastSlug })).toEqual(
+      {
+        agents: [expect.objectContaining({ slug: "vet-extra" })],
+        truncated: false,
+      },
+    );
+    expect(
+      await t.query(api.directory.search, {
+        category: `Extra ${CATEGORY_LIMIT + 9}`,
+      }),
+    ).toEqual({ agents: [], truncated: true });
   });
 
   it("rejects a limit that is not an integer from 1 to 20", async () => {

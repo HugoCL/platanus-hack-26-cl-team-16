@@ -42,7 +42,16 @@ STAMP = VENV / ".smoke-ready"
 ARTIFACTS = ROOT / "artifacts"
 PORT = int(os.environ.get("PORT", "3000"))
 URL = f"http://localhost:{PORT}"
-SEED_CARDS = 15
+DIRECTORY_PAGE_SIZE = 20
+SEED_COUNT_SCRIPT = """
+import { register } from "node:module";
+register("data:text/javascript," + encodeURIComponent(
+  "export async function resolve(s, c, next) { try { return await next(s, c); }"
+  + " catch (e) { if (s.startsWith('.') && !s.endsWith('.ts')) return next(s + '.ts', c); throw e; } }"
+));
+const { SEED_AGENTS } = await import("./shared/seedData.ts");
+console.log(SEED_AGENTS.filter(({ card }) => card.status !== "draft").length);
+"""
 
 
 def port_open(port):
@@ -106,17 +115,29 @@ def add_number(page):
     return count, int(numbers.get_attribute("data-count")), numbers.inner_text()
 
 
+def listed_seed_cards():
+    """Count the non-draft cards in SEED_AGENTS (shared/seedData.ts), read with Node's type
+    stripping so the number never drifts from the seed."""
+    out = subprocess.run(
+        ["node", "--no-warnings", "--input-type=module", "-e", SEED_COUNT_SCRIPT],
+        cwd=ROOT, check=True, capture_output=True, text=True,
+    )
+    return int(out.stdout.strip())
+
+
 def directory(page):
-    """Open /directorio and wait until it lists every seed card (len(SEED_AGENTS) in
-    shared/seedData.ts). Returns the number of cards shown."""
+    """Open /directorio and wait until it lists every listed seed card, up to one page.
+    Returns the number of cards shown."""
     from playwright.sync_api import expect
+
+    expected = min(listed_seed_cards(), DIRECTORY_PAGE_SIZE)
 
     page.goto(f"{URL}/directorio", wait_until="networkidle", timeout=120_000)
     cards = page.get_by_test_id("agent-card")
     try:
-        expect(cards).to_have_count(SEED_CARDS, timeout=30_000)
+        expect(cards).to_have_count(expected, timeout=30_000)
     except AssertionError:
-        raise AssertionError(f"/directorio shows {cards.count()} cards, expected {SEED_CARDS}")
+        raise AssertionError(f"/directorio shows {cards.count()} cards, expected {expected}")
     return cards.count()
 
 

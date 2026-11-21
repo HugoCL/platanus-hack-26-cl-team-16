@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   canonicalComuna,
   interpretDirectoryText,
+  type LlmFallback,
   parseDirectoryText,
 } from "../lib/directory";
 import {
@@ -12,8 +13,15 @@ import { SEED_CATEGORIES } from "../shared/seedData";
 
 const parse = (text: string) => parseDirectoryText(text, SEED_CATEGORIES);
 
-const noLlm = async (): Promise<LlmProvider> => {
+const fallback = (createLlm: () => LlmProvider): LlmFallback => ({
+  acquire: async () => {},
+  createLlm,
+});
+const noLlm = fallback(() => {
   throw new Error("the LLM must not be created");
+});
+noLlm.acquire = async () => {
+  throw new Error("the LLM must not be requested");
 };
 
 describe("free-text parser", () => {
@@ -27,43 +35,36 @@ describe("free-text parser", () => {
     ["un café en Las Condes", "cafeteria", "Las Condes"],
     ["gasfiter Maipu urgente", "gasfiteria", "Maipú"],
     ["abogado en Santiago Centro", "abogados", "Santiago"],
+    ["abogado en Santiago de Chile", "abogados", "Santiago"],
     ["dentista barato", "odontologia", null],
     ["algo en Estación Central", null, "Estación Central"],
+    ["cardiólogo en Providencia este sábado", "cardiologia", "Providencia"],
+    ["dentista en Ñuñoa barato", "odontologia", "Ñuñoa"],
+    ["cardiólogo en Providencia en la tarde", "cardiologia", "Providencia"],
+    ["dentista en Ñuñoa cerca del metro", "odontologia", "Ñuñoa"],
     ["hola", null, null],
   ])("%s", (text, category, comuna) => {
     expect(parse(text)).toEqual({ category, comuna, unresolved: [] });
   });
 
-  it("flags the half it could not resolve", () => {
-    expect(parse("cardiólogo en Narnia")).toEqual({
-      category: "cardiologia",
-      comuna: null,
-      unresolved: ["comuna"],
-    });
-    expect(parse("me duele el pecho en Providencia")).toEqual({
-      category: null,
-      comuna: "Providencia",
-      unresolved: ["category"],
-    });
-    expect(parse("xyzzy qwerty").unresolved).toEqual(["category"]);
-    expect(parse("abogado en Santiago de Compostela")).toEqual({
-      category: "abogados",
-      comuna: null,
-      unresolved: ["comuna"],
-    });
-  });
+  it.each([
+    ["cardiólogo en Narnia", "cardiologia", null, ["comuna"]],
+    ["cardiólogo en Providencias", "cardiologia", null, ["comuna"]],
+    ["abogado en Santiago de Compostela", "abogados", null, ["comuna"]],
+    ["abogado Santiago de Compostela", "abogados", null, ["comuna"]],
+    ["me duele el pecho en Providencia", null, "Providencia", ["category"]],
+    ["xyzzy qwerty", null, null, ["category"]],
+  ])(
+    "flags what it could not resolve: %s",
+    (text, category, comuna, unresolved) => {
+      expect(parse(text)).toEqual({ category, comuna, unresolved });
+    },
+  );
 
-  it("accepts a comuna followed by another place or a time", () => {
-    expect(parse("cardiólogo en Providencia en la tarde")).toEqual({
-      category: "cardiologia",
-      comuna: "Providencia",
-      unresolved: [],
-    });
-    expect(parse("dentista en Ñuñoa cerca del metro")).toEqual({
-      category: "odontologia",
-      comuna: "Ñuñoa",
-      unresolved: [],
-    });
+  it("canonicalizes comunas", () => {
+    expect(canonicalComuna("las condes")).toBe("Las Condes");
+    expect(canonicalComuna("Providencias")).toBeNull();
+    expect(canonicalComuna("Narnia")).toBeNull();
   });
 
   it("ignores inherited object properties in its dictionaries", () => {
@@ -82,15 +83,10 @@ describe("free-text parser", () => {
       ).toMatchObject({ comuna: null });
     }
   });
-
-  it("canonicalizes comunas", () => {
-    expect(canonicalComuna("las condes")).toBe("Las Condes");
-    expect(canonicalComuna("Narnia")).toBeNull();
-  });
 });
 
 describe("LLM fallback", () => {
-  it("is not created when the parser resolves everything", async () => {
+  it("is not requested when the parser resolves everything", async () => {
     await expect(
       interpretDirectoryText(
         "cardiólogo en Providencia",
@@ -121,7 +117,7 @@ describe("LLM fallback", () => {
       interpretDirectoryText(
         "me duele el pecho en Providencia",
         SEED_CATEGORIES,
-        async () => llm,
+        fallback(() => llm),
       ),
     ).resolves.toEqual({
       category: "cardiologia",
@@ -139,7 +135,7 @@ describe("LLM fallback", () => {
       interpretDirectoryText(
         "cardiólogo en Narnia",
         SEED_CATEGORIES,
-        async () => llm,
+        fallback(() => llm),
       ),
     ).resolves.toEqual({
       category: "cardiologia",
@@ -149,24 +145,47 @@ describe("LLM fallback", () => {
     });
   });
 
-  it("ignores answers outside the known categories and comunas", async () => {
+  it("reports an unavailable LLM with a fixed diagnostic", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const llm = createFakeLlmProvider({
-      object: () => ({ category: "astrologia", comuna: "Narnia" }),
-    });
-    await expect(
-      interpretDirectoryText(
-        "lectura de tarot",
-        SEED_CATEGORIES,
-        async () => llm,
-      ),
-    ).resolves.toEqual({
-      category: null,
-      comuna: null,
-      unresolved: ["category"],
-      source: "none",
-    });
-    expect(warn).toHaveBeenCalledOnce();
+    const failures: Array<() => LlmProvider> = [
+      () => {
+        throw new Error("AI_GATEWAY_API_KEY is not set");
+      },
+      () =>
+        createFakeLlmProvider({
+          object: () => ({ category: "astrologia", comuna: "Narnia" }),
+        }),
+    ];
+    for (const createLlm of failures) {
+      await expect(
+        interpretDirectoryText(
+          "lectura de tarot",
+          SEED_CATEGORIES,
+          fallback(createLlm),
+        ),
+      ).resolves.toEqual({
+        category: null,
+        comuna: null,
+        unresolved: ["category"],
+        source: "none",
+        diagnostic: "llm_unavailable",
+      });
+    }
+    expect(warn.mock.calls).toEqual([
+      ["directory: LLM fallback unavailable"],
+      ["directory: LLM fallback unavailable"],
+    ]);
     warn.mockRestore();
+  });
+
+  it("lets a refused rate-limit token reach the caller", async () => {
+    await expect(
+      interpretDirectoryText("me duele el pecho", SEED_CATEGORIES, {
+        acquire: async () => {
+          throw new Error("RateLimited");
+        },
+        createLlm: () => createFakeLlmProvider(),
+      }),
+    ).rejects.toThrow("RateLimited");
   });
 });

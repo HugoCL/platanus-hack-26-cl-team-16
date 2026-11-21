@@ -61,6 +61,7 @@ export const MAX_QUERY_LENGTH = 300;
 
 const COMUNA_ALIASES = new Map<string, (typeof COMUNAS)[number]>([
   ["santiago centro", "Santiago"],
+  ["santiago de chile", "Santiago"],
   ["til til", "Tiltil"],
 ]);
 
@@ -106,58 +107,27 @@ export type ParsedText = {
 
 export type TextInterpretation = ParsedText & {
   source: "parser" | "llm" | "none";
+  diagnostic?: "llm_unavailable";
 };
 
-const STOPWORDS = new Set([
-  "a",
-  "agente",
-  "agentes",
-  "al",
-  "algo",
-  "alguien",
-  "alguna",
-  "alguno",
-  "busco",
-  "buscar",
-  "cerca",
-  "comuna",
-  "con",
-  "de",
-  "del",
-  "el",
-  "en",
-  "favor",
-  "hoy",
-  "hay",
-  "hola",
-  "la",
-  "las",
-  "lo",
-  "los",
-  "manana",
-  "me",
-  "mi",
-  "necesito",
-  "noche",
-  "o",
-  "para",
-  "por",
-  "pronto",
-  "que",
-  "quiero",
-  "tarde",
-  "un",
-  "una",
-  "unas",
-  "unos",
-  "urgente",
-  "y",
-]);
+export type LlmFallback = {
+  acquire: () => Promise<void>;
+  createLlm: () => LlmProvider;
+};
 
-const PLACE_MARKER =
-  /(?<![a-z0-9])(cerca de|cerca|comuna de|comuna|en)(?![a-z0-9])/g;
+const STOPWORDS = new Set(
+  `a agente agentes al algo alguien alguna alguno busco buscar con de del el
+  ella en esta este favor hay hola hoy la las lo los manana me mi necesito noche
+  o para por pronto proxima proximo que quiero semana tarde un una unas unos
+  urgente y lunes martes miercoles jueves viernes sabado domingo`.split(/\s+/),
+);
+const PLACE_MARKERS = new Set(["en", "cerca", "comuna"]);
+const NAME_CONNECTORS = new Set(["de", "del"]);
+const ARTICLES = new Set(["el", "la", "los", "las"]);
 
-type Span = { start: number; end: number };
+type Phrase = { words: string[]; plural: boolean };
+type Match = { start: number; end: number };
+type Role = "category" | "comuna" | "marker" | "stop" | "other";
 
 export function normalize(text: string): string {
   return text
@@ -177,10 +147,10 @@ export function canonicalComuna(input: string): string | null {
   );
 }
 
-export function resolveCategory(
+export function resolveCategory<C extends Pick<Category, "slug" | "label">>(
   input: string,
-  categories: readonly Category[],
-): Category | null {
+  categories: readonly C[],
+): C | null {
   const key = normalize(input);
   return (
     categories.find((c) => c.slug === input) ??
@@ -209,24 +179,45 @@ export function categoryWithDescendants(
   return found;
 }
 
-function firstMatch(text: string, phrases: readonly string[]): Span | null {
-  let best: Span | null = null;
+function wordMatches(word: string, target: string, plural: boolean) {
+  return (
+    word === target ||
+    (plural && (word === `${target}s` || word === `${target}es`))
+  );
+}
+
+function firstMatch(words: string[], phrases: Phrase[]): Match | null {
+  let best: Match | null = null;
   for (const phrase of phrases) {
-    const found = new RegExp(
-      `(?<![a-z0-9])${phrase.replace(/ /g, "\\s+")}(?:s|es)?(?![a-z0-9])`,
-    ).exec(text);
-    if (!found) continue;
-    const span = { start: found.index, end: found.index + found[0].length };
-    if (
-      !best ||
-      span.start < best.start ||
-      (span.start === best.start && span.end > best.end)
-    ) {
-      best = span;
+    for (let start = 0; start + phrase.words.length <= words.length; start++) {
+      const hit = phrase.words.every((target, k) =>
+        wordMatches(
+          words[start + k],
+          target,
+          phrase.plural && k === phrase.words.length - 1,
+        ),
+      );
+      if (!hit) continue;
+      const end = start + phrase.words.length;
+      if (
+        !best ||
+        start < best.start ||
+        (start === best.start && end > best.end)
+      ) {
+        best = { start, end };
+      }
+      break;
     }
   }
   return best;
 }
+
+const phrase = (text: string, plural: boolean): Phrase => ({
+  words: normalize(text).split(" "),
+  plural,
+});
+
+const inside = (i: number, match: Match) => i >= match.start && i < match.end;
 
 function isAncestor(
   ancestor: string,
@@ -238,37 +229,26 @@ function isAncestor(
   );
 }
 
-function contentWords(text: string): string[] {
-  return text.split(/[\s|#]+/).filter((w) => w && !STOPWORDS.has(w));
-}
-
-function splitPlaces(masked: string) {
-  const markers = [...masked.matchAll(PLACE_MARKER)];
-  const places: string[] = [];
-  let need = masked.slice(0, markers[0]?.index ?? masked.length);
-  markers.forEach((marker, i) => {
-    const start = marker.index + marker[0].length;
-    const segment = masked.slice(start, markers[i + 1]?.index ?? masked.length);
-    const cut = segment.indexOf("|");
-    places.push(cut === -1 ? segment : segment.slice(0, cut));
-    if (cut !== -1) need += ` ${segment.slice(cut)}`;
-  });
-  return { need: contentWords(need), places };
+function extendsPlaceName(words: string[], roles: Role[], end: number) {
+  if (!NAME_CONNECTORS.has(words[end] ?? "")) return false;
+  let next = end + 1;
+  while (ARTICLES.has(words[next] ?? "")) next++;
+  return roles[next] === "other";
 }
 
 export function parseDirectoryText(
   text: string,
   categories: readonly Category[],
 ): ParsedText {
-  const normalized = normalize(text);
+  const words = normalize(text).split(" ").filter(Boolean);
 
   const categoryHits = categories.flatMap((c) => {
-    const span = firstMatch(normalized, [
-      normalize(c.slug),
-      normalize(c.label),
-      ...(CATEGORY_SYNONYMS.get(c.slug) ?? []),
+    const match = firstMatch(words, [
+      phrase(c.slug, true),
+      phrase(c.label, true),
+      ...(CATEGORY_SYNONYMS.get(c.slug) ?? []).map((p) => phrase(p, true)),
     ]);
-    return span ? [{ slug: c.slug, span }] : [];
+    return match ? [{ slug: c.slug, match }] : [];
   });
   const category =
     categoryHits
@@ -278,48 +258,62 @@ export function parseDirectoryText(
             isAncestor(hit.slug, other.slug, categories),
           ),
       )
-      .sort((a, b) => a.span.start - b.span.start)[0]?.slug ?? null;
+      .sort((a, b) => a.match.start - b.match.start)[0]?.slug ?? null;
 
   const comunaHit = [
-    ...COMUNAS.map((comuna) => ({ comuna, phrase: normalize(comuna) })),
-    ...[...COMUNA_ALIASES].map(([phrase, comuna]) => ({ comuna, phrase })),
+    ...COMUNAS.map((comuna) => ({ comuna, phrase: phrase(comuna, false) })),
+    ...[...COMUNA_ALIASES].map(([alias, comuna]) => ({
+      comuna,
+      phrase: phrase(alias, false),
+    })),
   ]
     .flatMap((hit) => {
-      const span = firstMatch(normalized, [hit.phrase]);
-      return span ? [{ comuna: hit.comuna, span }] : [];
+      const match = firstMatch(words, [hit.phrase]);
+      return match ? [{ comuna: hit.comuna, match }] : [];
     })
-    .sort((a, b) => a.span.start - b.span.start || b.span.end - a.span.end)[0];
+    .sort(
+      (a, b) => a.match.start - b.match.start || b.match.end - a.match.end,
+    )[0];
 
-  const inside = (i: number, span: Span) => i >= span.start && i < span.end;
-  const masked = [...normalized]
-    .map((char, i) =>
-      categoryHits.some((hit) => inside(i, hit.span))
-        ? "|"
-        : comunaHit && inside(i, comunaHit.span)
-          ? "#"
-          : char,
-    )
-    .join("");
-  const { need, places } = splitPlaces(masked);
-  const comunaPlace = places.find((place) => place.includes("#"));
-  const comuna =
-    comunaHit && !(comunaPlace && contentWords(comunaPlace).length > 0)
-      ? comunaHit.comuna
-      : null;
+  const roles: Role[] = words.map((word, i) =>
+    categoryHits.some((hit) => inside(i, hit.match))
+      ? "category"
+      : comunaHit && inside(i, comunaHit.match)
+        ? "comuna"
+        : PLACE_MARKERS.has(word)
+          ? "marker"
+          : STOPWORDS.has(word)
+            ? "stop"
+            : "other",
+  );
+
+  const needWords: string[] = [];
+  const placeWords: string[] = [];
+  let inPlace = false;
+  roles.forEach((role, i) => {
+    if (role === "marker") inPlace = true;
+    else if (role === "category" || role === "comuna") inPlace = false;
+    else if (role === "other")
+      (inPlace ? placeWords : needWords).push(words[i]);
+  });
+
+  const extended =
+    comunaHit !== undefined &&
+    extendsPlaceName(words, roles, comunaHit.match.end);
+  const comuna = comunaHit && !extended ? comunaHit.comuna : null;
 
   const unresolved: DirectoryField[] = [];
-  if (!category && need.length > 0) unresolved.push("category");
-  if (!comuna && (comunaHit || places.some((p) => contentWords(p).length > 0)))
-    unresolved.push("comuna");
+  if (!category && needWords.length > 0) unresolved.push("category");
+  if (!comuna && (extended || placeWords.length > 0)) unresolved.push("comuna");
   return { category, comuna, unresolved };
 }
 
 async function askLlm(
   text: string,
   categories: readonly Category[],
-  getLlm: () => Promise<LlmProvider>,
+  fallback: LlmFallback,
 ) {
-  const llm = await getLlm();
+  await fallback.acquire();
   const schema = z.object({
     category: z
       .enum(categories.map((c) => c.slug) as [string, ...string[]])
@@ -327,7 +321,7 @@ async function askLlm(
     comuna: z.enum(COMUNAS).nullable(),
   });
   try {
-    return await llm.generateObject({
+    return await fallback.createLlm().generateObject({
       role: "agent",
       system:
         "Traduce una búsqueda del directorio de agentes a una categoría y una comuna. Responde null en lo que la búsqueda no diga o no esté en las listas.",
@@ -338,11 +332,8 @@ async function askLlm(
       ].join("\n"),
       schema,
     });
-  } catch (error) {
-    console.warn(
-      "directory: LLM fallback failed:",
-      error instanceof Error ? error.name : typeof error,
-    );
+  } catch {
+    console.warn("directory: LLM fallback unavailable");
     return null;
   }
 }
@@ -350,13 +341,11 @@ async function askLlm(
 export async function interpretDirectoryText(
   text: string,
   categories: readonly Category[],
-  getLlm: () => Promise<LlmProvider>,
+  fallback: LlmFallback,
 ): Promise<TextInterpretation> {
   const parsed = parseDirectoryText(text, categories);
-  const answer =
-    parsed.unresolved.length > 0 && categories.length > 0
-      ? await askLlm(text, categories, getLlm)
-      : null;
+  const asked = parsed.unresolved.length > 0 && categories.length > 0;
+  const answer = asked ? await askLlm(text, categories, fallback) : null;
   const fromLlm = {
     category: parsed.unresolved.includes("category")
       ? (answer?.category ?? null)
@@ -379,5 +368,8 @@ export async function interpretDirectoryText(
         : category || comuna
           ? "parser"
           : "none",
+    ...(asked && answer === null
+      ? { diagnostic: "llm_unavailable" as const }
+      : {}),
   };
 }

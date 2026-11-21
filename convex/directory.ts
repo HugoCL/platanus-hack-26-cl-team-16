@@ -2,7 +2,6 @@ import { MINUTE, RateLimiter } from "@convex-dev/rate-limiter";
 import { ConvexError, v } from "convex/values";
 import {
   canonicalComuna,
-  categoryWithDescendants,
   interpretDirectoryText,
   MAX_QUERY_LENGTH,
   resolveCategory,
@@ -25,9 +24,13 @@ export type DirectorySearchResult = {
   truncated: boolean;
 };
 
+type ListedCard = { agent: Doc<"agents">; card: AgentCard };
+
 const LISTED_STATUSES: AgentStatus[] = ["active", "prospect"];
-const CATEGORY_LIMIT = 200;
-export const SCAN_BUDGET = 1000;
+export const CATEGORY_LIMIT = 200;
+export const SCAN_ROW_BUDGET = 1000;
+export const SCAN_BYTE_BUDGET = 8 * 1024 * 1024;
+export const RESPONSE_BYTE_BUDGET = 4 * 1024 * 1024;
 export const MAX_LIMIT = 20;
 
 const rateLimiter = new RateLimiter(components.rateLimiter, {
@@ -38,6 +41,10 @@ const rateLimiter = new RateLimiter(components.rateLimiter, {
     capacity: 10,
   },
 });
+
+const encoder = new TextEncoder();
+const byteSize = (value: unknown) =>
+  encoder.encode(JSON.stringify(value)).length;
 
 function invalidArgument(message: string): never {
   throw new ConvexError({ kind: "InvalidArgument", message });
@@ -62,11 +69,45 @@ async function loadCategories(ctx: QueryCtx): Promise<Category[]> {
   }));
 }
 
-function rank(a: Doc<"agents">, b: Doc<"agents">) {
+async function resolveCategorySlugs(ctx: QueryCtx, input: string) {
+  let complete = true;
+  let root = await ctx.db
+    .query("categories")
+    .withIndex("by_slug", (q) => q.eq("slug", input))
+    .unique();
+  if (!root) {
+    const page = await ctx.db.query("categories").take(CATEGORY_LIMIT + 1);
+    complete = page.length <= CATEGORY_LIMIT;
+    root = resolveCategory(input, page.slice(0, CATEGORY_LIMIT));
+  }
+  if (!root) return { slugs: null, complete };
+
+  const slugs = new Set([root.slug]);
+  const queue = [root.slug];
+  for (let parent = queue.shift(); parent; parent = queue.shift()) {
+    const children = await ctx.db
+      .query("categories")
+      .withIndex("by_parent", (q) => q.eq("parent", parent))
+      .take(CATEGORY_LIMIT);
+    if (children.length === CATEGORY_LIMIT) complete = false;
+    for (const child of children) {
+      if (slugs.size >= CATEGORY_LIMIT) {
+        complete = false;
+        break;
+      }
+      if (slugs.has(child.slug)) continue;
+      slugs.add(child.slug);
+      queue.push(child.slug);
+    }
+  }
+  return { slugs, complete };
+}
+
+function rank(a: ListedCard, b: ListedCard) {
   return (
-    Number(b.verified) - Number(a.verified) ||
-    Number(b.status === "active") - Number(a.status === "active") ||
-    a.name.localeCompare(b.name, "es")
+    Number(b.card.verified) - Number(a.card.verified) ||
+    Number(b.card.status === "active") - Number(a.card.status === "active") ||
+    a.card.name.localeCompare(b.card.name, "es")
   );
 }
 
@@ -88,18 +129,16 @@ function cardFields(agent: Doc<"agents">): AgentCard {
   };
 }
 
-function isListed(agent: Doc<"agents">) {
-  return (
-    LISTED_STATUSES.includes(agent.status) &&
-    AgentCard.safeParse(cardFields(agent)).success
-  );
+export function listedCard(agent: Doc<"agents">): ListedCard | null {
+  if (!LISTED_STATUSES.includes(agent.status)) return null;
+  const parsed = AgentCard.safeParse(cardFields(agent));
+  return parsed.success ? { agent, card: parsed.data } : null;
 }
 
 export async function toDirectoryCard(
   ctx: QueryCtx,
-  agent: Doc<"agents">,
+  { agent, card }: ListedCard,
 ): Promise<DirectoryCard> {
-  const card = cardFields(agent);
   const entity = agent.entityId ? await ctx.db.get(agent.entityId) : null;
   return {
     ...card,
@@ -123,27 +162,30 @@ export const search = query({
   },
   handler: async (ctx, args): Promise<DirectorySearchResult> => {
     checkLimit(args.limit);
-    const none = { agents: [], truncated: false };
-    const categories = await loadCategories(ctx);
+    const limit = args.limit ?? MAX_LIMIT;
+    let truncated = false;
+
     let wanted: Set<string> | undefined;
     if (args.category !== undefined) {
-      const category = resolveCategory(args.category, categories);
-      if (!category) return none;
-      wanted = categoryWithDescendants(category.slug, categories);
+      const resolved = await resolveCategorySlugs(ctx, args.category);
+      truncated ||= !resolved.complete;
+      if (!resolved.slugs) return { agents: [], truncated };
+      wanted = resolved.slugs;
     }
     let comuna: string | undefined;
     if (args.comuna !== undefined) {
       const canonical = canonicalComuna(args.comuna);
-      if (!canonical) return none;
+      if (!canonical) return { agents: [], truncated };
       comuna = canonical;
     }
 
-    const matches: Doc<"agents">[] = [];
-    let scanned = 0;
-    let truncated = false;
+    const matches: ListedCard[] = [];
+    let rows = 0;
+    let bytes = 0;
+    let scanStopped = false;
     for (const status of LISTED_STATUSES) {
-      if (truncated) break;
-      const rows = comuna
+      if (scanStopped) break;
+      const range = comuna
         ? ctx.db
             .query("agents")
             .withIndex("by_status_and_location_comuna", (q) =>
@@ -154,22 +196,31 @@ export const search = query({
             .withIndex("by_status_and_primaryCategory", (q) =>
               q.eq("status", status),
             );
-      for await (const agent of rows) {
-        if (scanned === SCAN_BUDGET) {
-          truncated = true;
+      for await (const agent of range) {
+        if (rows === SCAN_ROW_BUDGET || bytes >= SCAN_BYTE_BUDGET) {
+          scanStopped = true;
           break;
         }
-        scanned += 1;
+        rows += 1;
+        bytes += byteSize(agent);
         if (wanted && !agent.categories.some((c) => wanted.has(c))) continue;
-        if (isListed(agent)) matches.push(agent);
+        const listed = listedCard(agent);
+        if (listed) matches.push(listed);
       }
     }
-    const agents = await Promise.all(
-      matches
-        .sort(rank)
-        .slice(0, args.limit)
-        .map((agent) => toDirectoryCard(ctx, agent)),
-    );
+    truncated ||= scanStopped || matches.length > limit;
+
+    const agents: DirectoryCard[] = [];
+    let responseBytes = 0;
+    for (const match of matches.sort(rank).slice(0, limit)) {
+      const card = await toDirectoryCard(ctx, match);
+      responseBytes += byteSize(card);
+      if (responseBytes > RESPONSE_BYTE_BUDGET) {
+        truncated = true;
+        break;
+      }
+      agents.push(card);
+    }
     return { agents, truncated };
   },
 });
@@ -189,8 +240,8 @@ export const get = query({
           .query("agents")
           .withIndex("by_slug", (q) => q.eq("slug", slug as string))
           .unique();
-    if (!agent || !isListed(agent)) return null;
-    return toDirectoryCard(ctx, agent);
+    const listed = agent && listedCard(agent);
+    return listed ? toDirectoryCard(ctx, listed) : null;
   },
 });
 
@@ -210,14 +261,12 @@ export const searchText = action({
       api.directory.categories,
       {},
     );
-    const interpretation = await interpretDirectoryText(
-      query,
-      categories,
-      async () => {
+    const interpretation = await interpretDirectoryText(query, categories, {
+      acquire: async () => {
         await rateLimiter.limit(ctx, "directoryTextLlm", { throws: true });
-        return createLlmProvider();
       },
-    );
+      createLlm: () => createLlmProvider(),
+    });
     if (
       interpretation.unresolved.length > 0 ||
       (!interpretation.category && !interpretation.comuna)
