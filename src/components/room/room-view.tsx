@@ -223,6 +223,7 @@ export function RoomView({
               contract={contract}
               status={status}
               violations={violations}
+              panelOpen={panelOpen}
               onTogglePanel={() => {
                 if (window.matchMedia("(min-width: 64rem)").matches)
                   setPanelOpen((o) => !o);
@@ -479,6 +480,7 @@ function SessionHeader({
   contract,
   status,
   violations,
+  panelOpen,
   onTogglePanel,
 }: {
   self?: RoomParticipant;
@@ -486,6 +488,7 @@ function SessionHeader({
   contract: SessionContract;
   status: SessionStatus;
   violations: number;
+  panelOpen: boolean;
   onTogglePanel: () => void;
 }) {
   const tone = violationTone(violations, contract.maxViolations);
@@ -546,6 +549,18 @@ function SessionHeader({
           data-size="sm"
           data-variant="ghost"
           aria-label="Contrato y auditoría"
+          aria-expanded={panelOpen}
+          className="hidden lg:inline-flex"
+          onClick={onTogglePanel}
+        >
+          <PanelRightIcon size={16} />
+        </Button>
+        <Button
+          data-size="sm"
+          data-variant="ghost"
+          aria-label="Contrato y auditoría"
+          aria-haspopup="dialog"
+          className="lg:hidden"
           onClick={onTogglePanel}
         >
           <PanelRightIcon size={16} />
