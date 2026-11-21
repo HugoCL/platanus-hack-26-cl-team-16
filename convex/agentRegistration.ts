@@ -276,6 +276,9 @@ export const publish = mutation({
           : text(args.description, 1000),
       categories: [category.slug],
       primaryCategory: category.slug,
+      capabilities: agent.capabilities.includes("info")
+        ? agent.capabilities
+        : [...agent.capabilities, "info" as const],
       status: "active" as const,
     };
     await ctx.db.patch(agent._id, {

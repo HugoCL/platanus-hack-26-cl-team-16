@@ -198,6 +198,43 @@ describe("agent self-onboarding", () => {
     ).resolves.toMatchObject({ ok: true });
   });
 
+  it("allows another registered agent to open an information room with a published agent", async () => {
+    const provider = await register();
+    const initiator = await register();
+    await owner().mutation(api.agentRegistration.link, {
+      code: provider.linkCode,
+    });
+    const publication = {
+      agentId: provider.agentId,
+      purpose: "Responder consultas",
+      category: "asistente_personal",
+    };
+    await owner().mutation(api.agentRegistration.publish, publication);
+    await owner().mutation(api.agentRegistration.publish, publication);
+    expect(
+      await rooms.t.query(api.directory.get, { agentId: provider.agentId }),
+    ).toMatchObject({ capabilities: ["info"], allowedIntents: ["ask_info"] });
+    const room = await rooms.t.action(api.mcpRooms.open, {
+      apiKey: initiator.apiKey,
+      targetAgentId: provider.agentId,
+      intent: "ask_info",
+      request: "Necesito información sobre tu propósito",
+    });
+    expect(room.contract).toMatchObject({
+      capabilities: ["info"],
+      allowedIntents: ["ask_info"],
+      intent: { name: "ask_info" },
+    });
+    await expect(
+      rooms.t.action(api.mcpRooms.open, {
+        apiKey: initiator.apiKey,
+        targetAgentId: provider.agentId,
+        intent: "book",
+        request: REQUEST,
+      }),
+    ).rejects.toThrow(/not one the card allows/);
+  });
+
   it("rejects empty/oversized registration, invalid codes and expired codes", async () => {
     for (const input of [
       { name: "", description: "ok" },
