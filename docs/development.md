@@ -31,8 +31,8 @@ Each card is an `AgentDetail` (the full `AgentCard` with purpose and scope) plus
 
 | Function | Kind | What it does |
 | --- | --- | --- |
-| `freeSlots(ctx, agentId)` | helper | The provider's availability with `booked < capacity`, in start order (at most 200 rows scanned), so a taken slot is never offered again. |
-| `bookings.book` | internal mutation | Books one slot from an open room (`active`) where the agent is the provider. It creates a confirmed `booking` transaction and raises `booked` in the same mutation, never past `capacity`. Booking the same slot again from the same room returns the same booking; a full slot returns `{ status: "unavailable" }`. |
+| `freeSlots(ctx, agentId, now)` | helper | The provider's slots that start after `now` and have `booked < capacity`, in start order (at most 200 rows scanned), so a taken or past slot is never offered. Queries take `now` as an argument because they cannot read the clock. |
+| `bookings.book` | internal mutation | Books one slot for a room where the agent is the provider. A room holds one booking: when it has one, `book` returns it, whatever slot was asked and even after the room closed. Otherwise the room must be open (`active`) with a contract that allows booking, and the slot must belong to an active, bookable offering of the provider. It creates a confirmed `booking` transaction and raises `booked` in the same mutation, never past `capacity`. A full slot, or one that starts at or before `now`, returns `{ status: "unavailable" }`. The result type is `Booking` in `lib/agents/booking.ts`. |
 
 ## Test
 

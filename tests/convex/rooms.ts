@@ -8,6 +8,9 @@ import {
   type SessionStatus,
 } from "../../shared/session";
 
+// The seed's slots are fixed dates from 24 to 28 November 2026, so tests run at a fixed time.
+export const NOW = Date.parse("2026-11-21T12:00:00-03:00");
+
 export async function agentBySlug(ctx: MutationCtx, slug: string) {
   const agent = await ctx.db
     .query("agents")

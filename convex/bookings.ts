@@ -1,35 +1,45 @@
 import { ConvexError, v } from "convex/values";
-import { DEFAULT_CURRENCY, type Money } from "../shared/catalog";
+import type { Booking } from "../lib/agents/booking";
+import { DEFAULT_CURRENCY } from "../shared/catalog";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, type QueryCtx } from "./_generated/server";
 
-export const SLOT_SCAN_LIMIT = 200;
-const ROOM_BOOKING_LIMIT = 50;
-
-export type BookingResult =
-  | {
-      status: "booked";
-      transactionId: Id<"transactions">;
-      offeringName: string;
-      start: number;
-      end: number;
-      total: Money;
-    }
-  | { status: "unavailable" };
+const SLOT_SCAN_LIMIT = 200;
 
 function invalid(message: string): never {
   throw new ConvexError({ kind: "InvalidArgument", message });
 }
 
+// The provider's slots that start after `now` and have a seat left, in start order.
 export async function freeSlots(
   ctx: QueryCtx,
   agentId: Id<"agents">,
+  now: number,
 ): Promise<Doc<"availability">[]> {
   const slots = await ctx.db
     .query("availability")
-    .withIndex("by_agentId_and_start", (q) => q.eq("agentId", agentId))
+    .withIndex("by_agentId_and_start", (q) =>
+      q.eq("agentId", agentId).gt("start", now),
+    )
     .take(SLOT_SCAN_LIMIT);
   return slots.filter((slot) => slot.booked < slot.capacity);
+}
+
+async function describe(
+  ctx: QueryCtx,
+  slot: Doc<"availability">,
+  total: Doc<"transactions">["total"],
+): Promise<Booking> {
+  const offering = await ctx.db.get("offerings", slot.offeringId);
+  if (!offering) invalid("the booked offering is missing");
+  return {
+    status: "booked",
+    offeringId: slot.offeringId,
+    offeringName: offering.name,
+    start: slot.start,
+    end: slot.end,
+    total,
+  };
 }
 
 export const book = internalMutation({
@@ -37,13 +47,12 @@ export const book = internalMutation({
     sessionId: v.id("sessions"),
     agentId: v.id("agents"),
     availabilityId: v.id("availability"),
+    now: v.number(),
   },
   handler: async (
     ctx,
-    { sessionId, agentId, availabilityId },
-  ): Promise<BookingResult> => {
-    const session = await ctx.db.get("sessions", sessionId);
-    if (session?.status !== "active") invalid("the room is not open");
+    { sessionId, agentId, availabilityId, now },
+  ): Promise<Booking> => {
     const member = await ctx.db
       .query("participants")
       .withIndex("by_agentId_and_sessionId", (q) =>
@@ -53,33 +62,42 @@ export const book = internalMutation({
     if (member?.kind !== "agent" || member.role !== "recipient") {
       invalid("the provider is not in this room");
     }
+
+    const existing = await ctx.db
+      .query("transactions")
+      .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+      .filter((q) => q.eq(q.field("status"), "confirmed"))
+      .first();
+    if (existing) {
+      const bookedSlotId = existing.lines[0]?.availabilityId;
+      const bookedSlot = bookedSlotId
+        ? await ctx.db.get("availability", bookedSlotId)
+        : null;
+      if (!bookedSlot) invalid("the room's booking has no slot");
+      return describe(ctx, bookedSlot, existing.total);
+    }
+
+    const session = await ctx.db.get("sessions", sessionId);
+    if (session?.status !== "active") invalid("the room is not open");
+    if (!session.contract?.capabilities.includes("booking")) {
+      invalid("the room's contract does not allow booking");
+    }
     const slot = await ctx.db.get("availability", availabilityId);
     if (slot?.agentId !== agentId) invalid("the slot is not this provider's");
     const offering = await ctx.db.get("offerings", slot.offeringId);
-    if (!offering) invalid("the slot's offering is missing");
-
-    const booked = (transactionId: Id<"transactions">, total: Money) => ({
-      status: "booked" as const,
-      transactionId,
-      offeringName: offering.name,
-      start: slot.start,
-      end: slot.end,
-      total,
-    });
-    const roomBookings = await ctx.db
-      .query("transactions")
-      .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
-      .take(ROOM_BOOKING_LIMIT);
-    const existing = roomBookings.find(
-      (tx) =>
-        tx.status === "confirmed" &&
-        tx.lines.some((line) => line.availabilityId === availabilityId),
-    );
-    if (existing) return booked(existing._id, existing.total);
-    if (slot.booked >= slot.capacity) return { status: "unavailable" };
+    if (
+      offering?.agentId !== agentId ||
+      !offering.active ||
+      offering.kind !== "bookable"
+    ) {
+      invalid("the slot's offering is not bookable");
+    }
+    if (slot.start <= now || slot.booked >= slot.capacity) {
+      return { status: "unavailable", offeringId: slot.offeringId };
+    }
 
     const total = offering.price ?? { amount: 0, currency: DEFAULT_CURRENCY };
-    const transactionId = await ctx.db.insert("transactions", {
+    await ctx.db.insert("transactions", {
       sessionId,
       agentId,
       kind: "booking",
@@ -97,6 +115,6 @@ export const book = internalMutation({
     await ctx.db.patch("availability", availabilityId, {
       booked: slot.booked + 1,
     });
-    return booked(transactionId, total);
+    return describe(ctx, slot, total);
   },
 });
