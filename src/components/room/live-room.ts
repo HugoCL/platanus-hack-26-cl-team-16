@@ -7,6 +7,12 @@ import {
   type Viewer,
 } from "./room-format";
 
+export function agentTurnsExhausted(session: Session) {
+  return (
+    session.contract !== null && session.turnCount >= session.contract.maxTurns
+  );
+}
+
 export function mapLiveRoom(
   session: Session,
   names: { participantId: string; name: string; slug?: string }[],
@@ -40,6 +46,7 @@ export function mapLiveRoom(
     viewer,
     contract: session.contract,
     status: session.status,
+    answersReadOnly: agentTurnsExhausted(session),
   };
 }
 

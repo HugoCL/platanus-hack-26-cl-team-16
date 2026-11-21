@@ -97,7 +97,8 @@ function ConnectedRoom({ sessionId }: { sessionId: Id<"sessions"> }) {
     content: SendableContent,
     recipient: "all" | Id<"participants">,
   ) {
-    if (!view || sending.current || view.session.status !== "active") return false;
+    if (!view || sending.current || view.session.status !== "active")
+      return false;
     sending.current = true;
     setError(undefined);
     setPending({

@@ -124,6 +124,7 @@ export function RoomView({
   error,
   sessions,
   sending = false,
+  answersReadOnly = false,
 }: {
   participants: RoomParticipant[];
   viewer: Viewer;
@@ -140,6 +141,7 @@ export function RoomView({
   toolbar?: ReactNode;
   error?: string;
   sending?: boolean;
+  answersReadOnly?: boolean;
 }) {
   const role = viewer.role;
   const [panelOpen, setPanelOpen] = useState(true);
@@ -226,7 +228,7 @@ export function RoomView({
                 }
                 viewer={viewer}
                 answers={answers}
-                readOnly={readOnly || sending}
+                readOnly={readOnly || sending || answersReadOnly}
                 uiSpecsByMessage={uiSpecsByMessage}
                 highlighted={highlighted === message.messageId}
                 onRespond={(response) => onRespond(response, message.messageId)}
