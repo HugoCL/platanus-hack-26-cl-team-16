@@ -28,9 +28,9 @@ import { Tabs, TabsList, TabsPanel, TabsTab } from "@ui-sdk/react/tabs";
 import { Textarea } from "@ui-sdk/react/textarea";
 import {
   ArrowDownIcon,
-  ArrowUpIcon,
   BotIcon,
   PanelRightIcon,
+  SendHorizontalIcon,
   ShieldCheckIcon,
   UserIcon,
 } from "lucide-react";
@@ -669,6 +669,11 @@ function Composer({
   onRestart?: () => void;
 }) {
   const [text, setText] = useState("");
+  const input = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (control) input.current?.focus();
+  }, [control]);
 
   if (readOnly) {
     return (
@@ -683,25 +688,6 @@ function Composer({
     );
   }
 
-  if (!control) {
-    return (
-      <div className="border-t border-border px-4 py-3">
-        <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center gap-3">
-          <p className="m-0 flex-1 text-sm text-subtle-foreground">
-            {canControl
-              ? "Tu agente está conversando. Toma el control para escribir."
-              : "Estás observando. Solo el dueño o un operador puede escribir."}
-          </p>
-          {canControl ? (
-            <Button data-variant="solid" onClick={onTakeControl}>
-              Tomar control
-            </Button>
-          ) : null}
-        </div>
-      </div>
-    );
-  }
-
   const send = async () => {
     const value = text.trim();
     if (!value || sending) return;
@@ -711,16 +697,18 @@ function Composer({
 
   return (
     <div className="flex flex-col border-t border-border">
-      <div className="flex items-center gap-2 bg-primary px-4 py-1.5 text-xs text-primary-foreground">
-        <span className="flex-1">Estás hablando como {selfName}</span>
-        <Button
-          data-size="sm"
-          className="!h-6 !bg-transparent !text-primary-foreground !border-primary-foreground/40"
-          onClick={onReturnControl}
-        >
-          Devolver control
-        </Button>
-      </div>
+      {control ? (
+        <div className="flex items-center gap-2 bg-primary px-4 py-1.5 text-xs text-primary-foreground">
+          <span className="flex-1">Estás hablando como {selfName}</span>
+          <Button
+            data-size="sm"
+            className="!h-6 !bg-transparent !text-primary-foreground !border-primary-foreground/40"
+            onClick={onReturnControl}
+          >
+            Devolver control
+          </Button>
+        </div>
+      ) : null}
       <form
         className="flex flex-col gap-1 px-4 pt-3 pb-2"
         onSubmit={(e) => {
@@ -728,9 +716,10 @@ function Composer({
           send();
         }}
       >
-        <div className="flex items-end gap-2">
+        <div className="mx-auto flex w-full max-w-3xl items-end gap-2">
           <Textarea
-            disabled={sending}
+            ref={input}
+            disabled={!control || sending}
             aria-label="Mensaje"
             value={text}
             onValueChange={setText}
@@ -738,26 +727,43 @@ function Composer({
             autoResize
             onSubmit={send}
             rows={1}
-            placeholder="Escribe un mensaje"
-            className="flex-1"
+            placeholder={
+              control
+                ? "Escribe un mensaje"
+                : canControl
+                  ? "Toma el control para escribir"
+                  : "Solo el dueño o un operador puede escribir"
+            }
+            className="room-composer-input min-w-0 flex-1"
           />
-          <Button
-            type="submit"
-            data-variant="solid"
-            aria-label="Enviar"
-            disabled={sending || !text.trim()}
-            className="!w-10 !p-0"
-            data-size="lg"
-          >
-            <ArrowUpIcon size={16} />
-          </Button>
+          {canControl ? (
+            <Button
+              type={control ? "submit" : "button"}
+              data-variant="solid"
+              data-size="xl"
+              data-control={control ? "" : undefined}
+              aria-label={control ? "Enviar" : undefined}
+              disabled={control && (sending || !text.trim())}
+              onClick={control ? undefined : onTakeControl}
+              className="room-composer-action"
+            >
+              <span className="room-composer-label">Tomar control</span>
+              <SendHorizontalIcon
+                size={16}
+                aria-hidden="true"
+                className="room-composer-icon"
+              />
+            </Button>
+          ) : null}
         </div>
-        <div className="flex justify-between text-[11px] text-subtle-foreground">
-          <span>Tus mensajes también pasan por el moderador</span>
-          <span className="tabular-nums">
-            {text.length} / {MAX_TEXT_LENGTH}
-          </span>
-        </div>
+        {control ? (
+          <div className="mx-auto flex w-full max-w-3xl justify-between text-[11px] text-subtle-foreground">
+            <span>Tus mensajes también pasan por el moderador</span>
+            <span className="tabular-nums">
+              {text.length} / {MAX_TEXT_LENGTH}
+            </span>
+          </div>
+        ) : null}
       </form>
     </div>
   );

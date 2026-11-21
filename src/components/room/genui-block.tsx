@@ -111,12 +111,7 @@ export function GenUiBlock({
         <h3 className="m-0 line-clamp-2 min-w-0 flex-1 text-sm font-semibold">
           {title ?? meta.label}
         </h3>
-        {answer ? (
-          <span className="inline-flex items-center gap-1 text-xs text-subtle-foreground">
-            <CheckIcon size={13} />
-            Respondido {formatTime(answer.at)}
-          </span>
-        ) : showOwnerOnly ? (
+        {showOwnerOnly ? (
           <span className="text-xs text-subtle-foreground">
             Solo el dueño puede responder
           </span>
@@ -361,7 +356,15 @@ function SlotPickerBlock({
       <RadioGroup
         aria-label={spec.title}
         value={slotId}
-        onValueChange={setSlotId}
+        onValueChange={(next, details) => {
+          setSlotId(next);
+          if (next && details.reason === "item-press")
+            onRespond({
+              type: "slot_selected",
+              pickerId: spec.id,
+              slotId: next,
+            });
+        }}
         disabled={disabled}
         className="flex flex-col gap-3"
       >
@@ -400,19 +403,6 @@ function SlotPickerBlock({
           Ver {hiddenDays} {hiddenDays === 1 ? "día más" : "días más"}
         </Button>
       ) : null}
-      {answered ? null : (
-        <Button
-          data-variant="solid"
-          disabled={disabled || slotId === null}
-          className="self-start"
-          onClick={() => {
-            if (slotId)
-              onRespond({ type: "slot_selected", pickerId: spec.id, slotId });
-          }}
-        >
-          Elegir horario
-        </Button>
-      )}
     </div>
   );
 }
