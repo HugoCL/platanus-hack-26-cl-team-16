@@ -28,7 +28,7 @@ jobs:
     # Every commit is mirrored to platanus-hack/platanus-hack-26-cl-team-16. Run only on origin.
     if: github.repository == 'HugoCL/platanus-hack-26-cl-team-16'
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 10
     env:
       NEXT_TELEMETRY_DISABLED: "1"
     steps:
@@ -45,17 +45,5 @@ jobs:
       - run: pnpm test
       # `pnpm build` runs `pnpm typecheck` first, so there is no separate typecheck step.
       - run: pnpm build
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('requirements-dev.txt') }}
-      - name: Install Playwright Chromium and its system libraries
-        run: python3 scripts/smoke.py --bootstrap-only --with-deps
-      - run: pnpm smoke
-      - if: failure()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: smoke
-          path: artifacts/
-          retention-days: 3
-          if-no-files-found: ignore
+      # `pnpm smoke` is not here: Clerk does not create its keyless app on a CI runner, so
+      # `next dev` fails without real Clerk keys. See docs/deploy.md.

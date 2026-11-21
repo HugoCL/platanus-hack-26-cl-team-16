@@ -15,27 +15,26 @@ Nothing on Render exists until a person does the [one-time setup](#one-time-setu
 
 ## CI
 
-`.github/workflows/ci.yml` runs one job on every pull request and on every push to `main`: `pnpm lint`, `pnpm skills:check`, `pnpm test`, `pnpm build` (which runs `pnpm typecheck` first) and `pnpm smoke`. A run takes about 2 minutes.
+`.github/workflows/ci.yml` runs one job on every pull request and on every push to `main`: `pnpm lint`, `pnpm skills:check`, `pnpm test` and `pnpm build` (which runs `pnpm typecheck` first). A run takes under a minute. The repository is public, so GitHub does not bill the minutes.
 
 - **One job, one install.** The checks themselves take seconds, so separate jobs would spend more time on installs than on checks.
-- **Smoke runs on every pull request.** It is the only check that starts the app with a Convex backend and opens it in a browser, and it adds about a minute. The repository is public, so GitHub does not bill the minutes.
 - **A newer push cancels the run it supersedes**, per branch or pull request.
 - **Changes that only touch Markdown or `.scratch/` start no run.** The vendored skills and `docs/skills.md` are the exception, because `pnpm skills:check` verifies them.
-- **Caches:** the pnpm store, keyed by `pnpm-lock.yaml`, and Playwright's Chromium, keyed by `requirements-dev.txt`.
+- **Cache:** the pnpm store, keyed by `pnpm-lock.yaml`.
 - **Versions come from the repository:** pnpm from `packageManager` in `package.json`, Node from `.node-version`. Render reads the same two.
 - **The mirror does not run it.** Every commit is also pushed to `platanus-hack/platanus-hack-26-cl-team-16`. The job has an `if:` on the repository name, so on the mirror it is skipped and uses no minutes.
-- When smoke fails, the run keeps `artifacts/` (the screenshot and the dev server log) for 3 days.
+- **`pnpm smoke` is not in CI.** It starts `next dev`, which relies on Clerk keyless mode to create a temporary Clerk app. On a GitHub runner Clerk did not create one, and the page failed with `Missing publishableKey`. Smoke stays a check you run before opening a pull request, as `AGENTS.md` requires. To run it in CI, claim the Clerk app (step 5 below), add its two development keys as Actions secrets, and add a smoke step that reads them.
 
 ## Production
 
 `render.yaml` is a Render Blueprint with one web service on the Free instance type, linked to `main`.
 
 1. A commit lands on `main` and CI runs on it.
-2. Render waits for the commit's GitHub checks (`autoDeployTrigger: checksPass`). It deploys only when at least one check exists and all of them pass. A failed or cancelled run deploys nothing.
+2. Render waits for the commit's GitHub checks (`autoDeployTrigger: checksPass`) and deploys only when all of them pass: the `check` job and any other app's check, such as GitGuardian's. A failed or cancelled run deploys nothing.
 3. Render runs `scripts/render-build.sh`, which installs dependencies and runs `convex deploy --cmd 'pnpm build'`. That one command builds the Next.js app with `NEXT_PUBLIC_CONVEX_URL` set to the production Convex deployment, then pushes the Convex functions and schema to that same deployment. If the build or the push fails, the deploy fails and the previous version keeps serving.
 4. Render starts `next start` and switches traffic once `/` answers.
 
-Two filters keep deploys from spending build minutes on changes that cannot alter the app. A commit that only touches Markdown or `.scratch/` gets no CI run, so it has no checks and Render does not deploy it. The `buildFilter` in `render.yaml` also skips commits that only touch `.agents/`, `.capy/`, `.github/`, `licenses/` or `tests/`.
+The `buildFilter` in `render.yaml` keeps deploys from spending build minutes on changes that cannot alter the app: Render skips a commit that only touches Markdown, `.agents/`, `.capy/`, `.github/`, `.scratch/`, `licenses/` or `tests/`. Every commit that Render does build has had a CI run, because CI skips only Markdown and `.scratch/`.
 
 The Free instance stops after 15 minutes without traffic, and the next request waits about a minute while it starts. That is the price of $0. For a demo, change `plan` in `render.yaml` to `0.5c-512mb` (see [Costs](#costs)). Do not add a service that pings the app to keep it awake: it uses up the month's free instance hours, and when they run out Render suspends every Free service in the workspace.
 
@@ -65,7 +64,7 @@ Prices and limits come from Render's and Convex's pricing pages and docs, read o
 
 | Resource | Plan | Monthly cost at rest | Monthly cost in use | What spends |
 | --- | --- | --- | --- | --- |
-| GitHub Actions | Public repository, standard runner | $0 | $0 | Nothing is billed. Each run takes about 2 minutes. |
+| GitHub Actions | Public repository, standard runner | $0 | $0 | Nothing is billed. Each run takes under a minute. |
 | Render workspace | Hobby | $0 | $0 | Includes 500 build minutes, 750 Free instance hours and 5 GB of outbound bandwidth a month. |
 | Render web service (production) | Free: 0.1 CPU, 512 MB | $0 | $0 | Instance hours while it is awake. Build minutes for each deploy. |
 | Render PR preview (each) | Free, same as production | $0 | $0 | The same two budgets, only while the label is on and the instance is awake. |
@@ -119,7 +118,7 @@ Clerk keyless mode works only under `next dev`. A deployed build runs `next star
 ### GitHub
 
 12. Create the label once: `gh label create render-preview --repo HugoCL/platanus-hack-26-cl-team-16`.
-13. GitHub Actions needs no secrets. CI is offline and the deploy runs on Render.
+13. GitHub Actions needs no secrets. CI is offline and the deploy runs on Render. Only a future smoke step would need the Clerk development keys.
 14. Put the production URL in `deploy-url` in `platanus-hack-project.jsonc`.
 
 ## Not verified until the first deploy
@@ -129,3 +128,4 @@ These could not be tested without creating the service. Check them on the first 
 - How long a Render build takes, and so how many deploys fit in 500 minutes. If a build takes 4 minutes, about 125.
 - Which pnpm Render's Node runtime ships. `scripts/render-build.sh` installs the version pinned in `package.json` when the two differ.
 - That the health check on `/` passes with real Clerk keys.
+- That Render waits for the `check` job when another app's check, such as GitGuardian's, finishes first.
