@@ -37,6 +37,42 @@
       "computedHash": "59cd2dc82c5458f2819992fc3d27204ed16edfc9170870c6f8f04c44bac17772",
       "installMode": "copy"
     },
+    "animate": {
+      "source": "emilkowalski/skills",
+      "ref": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "commit": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "sourceType": "github",
+      "skillPath": "skills/animate/SKILL.md",
+      "computedHash": "c622e29fa956aea703dc4e2b8726d9a017d438beb284a60bc3fdb2540c602102",
+      "installMode": "copy"
+    },
+    "animation-performance": {
+      "source": "emilkowalski/skills",
+      "ref": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "commit": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "sourceType": "github",
+      "skillPath": "skills/animation-performance/SKILL.md",
+      "computedHash": "1ff92f577fc2b7781ed622fd4eb5e514c252cf5cb95c3661743cd127ee01290a",
+      "installMode": "copy"
+    },
+    "animation-vocabulary": {
+      "source": "emilkowalski/skills",
+      "ref": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "commit": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "sourceType": "github",
+      "skillPath": "skills/animation-vocabulary/SKILL.md",
+      "computedHash": "e1d19134dc63dfb09379f7b42557b63b6123becdd36d15bae991d0b6ca5b2110",
+      "installMode": "copy"
+    },
+    "apple-design": {
+      "source": "emilkowalski/skills",
+      "ref": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "commit": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "sourceType": "github",
+      "skillPath": "skills/apple-design/SKILL.md",
+      "computedHash": "163ba8b42c7d9d5ccb08674266d4727c9ec610b9d876c906b1f29ce5e0d933da",
+      "installMode": "copy"
+    },
     "architect": {
       "source": "cursor/plugins",
       "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
@@ -53,6 +89,15 @@
       "sourceType": "github",
       "skillPath": "harness/pstack/claude-code/skills/arena/SKILL.md",
       "computedHash": "63fe603dad8291d3d320cfa491a4cf7e1753903dbf599ca3146fcced96ce6ca0",
+      "installMode": "copy"
+    },
+    "ask-emil": {
+      "source": "emilkowalski/skills",
+      "ref": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "commit": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "sourceType": "github",
+      "skillPath": "skills/ask-emil/SKILL.md",
+      "computedHash": "e7a92fe034a4151a27fbe2fad8813ffd18a9c98d6db8689930a1fdb3a7d536f5",
       "installMode": "copy"
     },
     "automate-me": {
@@ -91,6 +136,15 @@
       "computedHash": "f9ec7353939c4449f2edb1cd195049f477b9ba6c0a869de75c7b440e27295f01",
       "installMode": "copy"
     },
+    "break-ui": {
+      "source": "emilkowalski/skills",
+      "ref": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "commit": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "sourceType": "github",
+      "skillPath": "skills/break-ui/SKILL.md",
+      "computedHash": "f089f3663e197fb4e106249df70e815a96e3236520a2e1c0919d1694816baca8",
+      "installMode": "copy"
+    },
     "bro": {
       "source": "cursor/plugins",
       "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
@@ -98,6 +152,15 @@
       "sourceType": "github",
       "skillPath": "harness/pstack/claude-code/skills/bro/SKILL.md",
       "computedHash": "f20a76d629ff552e85205507bcab051cc33667943f2c5bb5879b0475f26c7429",
+      "installMode": "copy"
+    },
+    "choreograph": {
+      "source": "emilkowalski/skills",
+      "ref": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "commit": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "sourceType": "github",
+      "skillPath": "skills/choreograph/SKILL.md",
+      "computedHash": "a33a7cf57eacff502f833778eed62244fb5a890bb25124dacde73bcf8716218c",
       "installMode": "copy"
     },
     "clerk": {
@@ -352,6 +415,15 @@
       "computedHash": "d799e464fdfb0edc80b3b7ad7cce03e64ee07fc5db231c988688a81438503659",
       "installMode": "copy"
     },
+    "emil-design-eng": {
+      "source": "emilkowalski/skills",
+      "ref": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "commit": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "sourceType": "github",
+      "skillPath": "skills/emil-design-eng/SKILL.md",
+      "computedHash": "e1b377ccde1d32743d1d3f7d8626629deb8055c9114d180c184697928cc66cc6",
+      "installMode": "copy"
+    },
     "figure-it-out": {
       "source": "cursor/plugins",
       "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
@@ -397,6 +469,15 @@
       "computedHash": "97cd08646e1f9bbb89bf18bf131982ee66df7834cce071bc5385e8fc4f5a60a9",
       "installMode": "copy"
     },
+    "gestures": {
+      "source": "emilkowalski/skills",
+      "ref": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "commit": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "sourceType": "github",
+      "skillPath": "skills/gestures/SKILL.md",
+      "computedHash": "f17aa90d244bed37d09a608f9b8f58cd7a8dd6b9ff1a06fe2217f6f242c624f7",
+      "installMode": "copy"
+    },
     "gstack": {
       "source": "garrytan/gstack",
       "ref": "bd0428974aaf2caa89e878e593c6505b35ad82ab",
@@ -413,6 +494,15 @@
       "sourceType": "github",
       "skillPath": "harness/pstack/claude-code/skills/how/SKILL.md",
       "computedHash": "fab130770d271c14ca5d47504b2083f7ab2d1f5c25540310db9b58eff81cd997",
+      "installMode": "copy"
+    },
+    "improve-animations": {
+      "source": "emilkowalski/skills",
+      "ref": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "commit": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "sourceType": "github",
+      "skillPath": "skills/improve-animations/SKILL.md",
+      "computedHash": "5c33add82a79754bec0d7ee3376525e24e77b34575d5ae29d0c204f730356eab",
       "installMode": "copy"
     },
     "in-your-own-words": {
@@ -449,6 +539,15 @@
       "sourceType": "github",
       "skillPath": "harness/pstack/claude-code/skills/ketchup-video/SKILL.md",
       "computedHash": "2cf5134c32cd8dd4d76f4c69bc0fc2036254cd77f6de1b6ec440ce8653fdd6be",
+      "installMode": "copy"
+    },
+    "learn-taste": {
+      "source": "emilkowalski/skills",
+      "ref": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "commit": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "sourceType": "github",
+      "skillPath": "skills/learn-taste/SKILL.md",
+      "computedHash": "edaec540d02abdad48727b7d769574d0ee42e79304826c899a7aba90ef0197c1",
       "installMode": "copy"
     },
     "leaving-pr-comments": {
@@ -494,6 +593,15 @@
       "sourceType": "github",
       "skillPath": "cursor-team-kit/skills/make-pr-easy-to-review/SKILL.md",
       "computedHash": "192b5123bc85091be3c195a53e4c9bacd2ccaf23e13e11cf697fb7e3be8c331d",
+      "installMode": "copy"
+    },
+    "mobile-native": {
+      "source": "emilkowalski/skills",
+      "ref": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "commit": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "sourceType": "github",
+      "skillPath": "skills/mobile-native/SKILL.md",
+      "computedHash": "2f55a258f185314d585cb6a3514a66c15e9cfc8cd45c936284c4fb7374603d7e",
       "installMode": "copy"
     },
     "modernize": {
@@ -802,6 +910,15 @@
       "computedHash": "f8182ea7c103809db288517b608c868dc304dd5ccc63c0bfb5fb9f7fd9632751",
       "installMode": "copy"
     },
+    "prototype": {
+      "source": "emilkowalski/skills",
+      "ref": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "commit": "64eb3deb9a5fbfa041faf783e0bc3fd635872e9c",
+      "sourceType": "github",
+      "skillPath": "skills/prototype/SKILL.md",
+      "computedHash": "00fb13a91dbb746e2be91ae4dd67c4cc1f9907351f2d404a0cc6c849be1ebd95",
+      "installMode": "copy"
+    },
     "recall": {
       "source": "cursor/plugins",
       "ref": "aaeb0ea3a0584995aa8f55ce44c6c5259414b896",
@@ -986,6 +1103,7 @@
     "clerk": "b36183cf0be2cbda03d80db9b96e5aacd2879462b15fc8e4f4e179a7c91f1ca7",
     "convex": "4458503dd48e88c4e0b945fb252a08b93c40ec757309b8ffa7c594dfa1e35104",
     "cursor-team-kit": "702f5f331b56aff0e33d8c7826df5202559f894145eb70355c6477b55b5bb8a0",
+    "emilkowalski-skills": "4ff5bdb7887ec1435c9cab0e8d1a7caee704d894d65c2a008ccc68b1cc2f260b",
     "gstack": "e56fbb5b3d95756f3fa1cfefa24732ec79f18ece1ad08a4e79e00df57e8b198c",
     "mattpocock-skills": "0e7ac423bf2c6e223b7c5b156f8cf72da49d748e56a1641402c31f22ad07dbb5",
     "ponytail": "fb1bc6909ac3ef82d5c22106e32ef682b0cff66788fa915fb9b53b15c9d2f3ab",

@@ -97,7 +97,8 @@ const CATEGORY_SYNONYMS = new Map<string, string[]>(
   }),
 );
 
-export type DirectoryField = "category" | "comuna";
+export const DIRECTORY_FIELDS = ["category", "comuna"] as const;
+export type DirectoryField = (typeof DIRECTORY_FIELDS)[number];
 
 export type ParsedText = {
   category: string | null;
@@ -338,28 +339,33 @@ async function askLlm(
   }
 }
 
+// A null `fallback` keeps the text on this server: what the parser cannot read stays unresolved.
+// `known` names the fields the caller already supplied. The text is not read for them, so they stay
+// null here, never count as unresolved and never make the parser ask the LLM.
 export async function interpretDirectoryText(
   text: string,
   categories: readonly Category[],
-  fallback: LlmFallback,
+  fallback: LlmFallback | null,
+  known: readonly DirectoryField[] = [],
 ): Promise<TextInterpretation> {
   const parsed = parseDirectoryText(text, categories);
-  const asked = parsed.unresolved.length > 0 && categories.length > 0;
+  const open = parsed.unresolved.filter((field) => !known.includes(field));
+  const asked = fallback !== null && open.length > 0 && categories.length > 0;
   const answer = asked ? await askLlm(text, categories, fallback) : null;
   const fromLlm = {
-    category: parsed.unresolved.includes("category")
-      ? (answer?.category ?? null)
-      : null,
-    comuna: parsed.unresolved.includes("comuna")
-      ? (answer?.comuna ?? null)
-      : null,
+    category: open.includes("category") ? (answer?.category ?? null) : null,
+    comuna: open.includes("comuna") ? (answer?.comuna ?? null) : null,
   };
-  const category = parsed.category ?? fromLlm.category;
-  const comuna = parsed.comuna ?? fromLlm.comuna;
+  const category = known.includes("category")
+    ? null
+    : (parsed.category ?? fromLlm.category);
+  const comuna = known.includes("comuna")
+    ? null
+    : (parsed.comuna ?? fromLlm.comuna);
   return {
     category,
     comuna,
-    unresolved: parsed.unresolved.filter((field) =>
+    unresolved: open.filter((field) =>
       field === "category" ? !category : !comuna,
     ),
     source:
