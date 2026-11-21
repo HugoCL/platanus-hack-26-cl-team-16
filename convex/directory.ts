@@ -2,6 +2,7 @@ import { MINUTE, RateLimiter } from "@convex-dev/rate-limiter";
 import { ConvexError, v } from "convex/values";
 import {
   canonicalComuna,
+  DIRECTORY_FIELDS,
   interpretDirectoryText,
   MAX_QUERY_LENGTH,
   resolveCategory,
@@ -227,29 +228,38 @@ export const search = query({
 
 export const get = query({
   args: {
-    agentId: v.optional(v.id("agents")),
+    agentId: v.optional(v.string()),
     slug: v.optional(v.string()),
   },
   handler: async (ctx, { agentId, slug }): Promise<DirectoryCard | null> => {
     if ((agentId === undefined) === (slug === undefined)) {
       invalidArgument("pass exactly one of agentId or slug");
     }
-    const agent = agentId
-      ? await ctx.db.get(agentId)
-      : await ctx.db
-          .query("agents")
-          .withIndex("by_slug", (q) => q.eq("slug", slug as string))
-          .unique();
+    const id =
+      agentId === undefined ? null : ctx.db.normalizeId("agents", agentId);
+    const agent =
+      slug === undefined
+        ? id && (await ctx.db.get(id))
+        : await ctx.db
+            .query("agents")
+            .withIndex("by_slug", (q) => q.eq("slug", slug))
+            .unique();
     const listed = agent && listedCard(agent);
     return listed ? toDirectoryCard(ctx, listed) : null;
   },
 });
 
+// An explicit category or comuna wins over what the text says about it.
 export const searchText = action({
-  args: { query: v.string(), limit: v.optional(v.number()) },
+  args: {
+    query: v.string(),
+    category: v.optional(v.string()),
+    comuna: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
   handler: async (
     ctx,
-    { query, limit },
+    { query, limit, ...given },
   ): Promise<
     DirectorySearchResult & { interpretation: TextInterpretation }
   > => {
@@ -261,25 +271,25 @@ export const searchText = action({
       api.directory.categories,
       {},
     );
-    const interpretation = await interpretDirectoryText(query, categories, {
-      acquire: async () => {
-        await rateLimiter.limit(ctx, "directoryTextLlm", { throws: true });
+    const interpretation = await interpretDirectoryText(
+      query,
+      categories,
+      {
+        acquire: async () => {
+          await rateLimiter.limit(ctx, "directoryTextLlm", { throws: true });
+        },
+        createLlm: () => createLlmProvider(),
       },
-      createLlm: () => createLlmProvider(),
-    });
-    if (
-      interpretation.unresolved.length > 0 ||
-      (!interpretation.category && !interpretation.comuna)
-    ) {
+      DIRECTORY_FIELDS.filter((field) => given[field] !== undefined),
+    );
+    const category = given.category ?? interpretation.category ?? undefined;
+    const comuna = given.comuna ?? interpretation.comuna ?? undefined;
+    if (interpretation.unresolved.length > 0 || (!category && !comuna)) {
       return { interpretation, agents: [], truncated: false };
     }
     const result: DirectorySearchResult = await ctx.runQuery(
       api.directory.search,
-      {
-        category: interpretation.category ?? undefined,
-        comuna: interpretation.comuna ?? undefined,
-        limit,
-      },
+      { category, comuna, limit },
     );
     return { interpretation, ...result };
   },

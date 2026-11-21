@@ -109,6 +109,32 @@ describe("LLM fallback", () => {
     });
   });
 
+  it("is not requested for a field the caller already supplied", async () => {
+    await expect(
+      interpretDirectoryText(
+        "cardiólogo en Valparaíso",
+        SEED_CATEGORIES,
+        noLlm,
+        ["comuna"],
+      ),
+    ).resolves.toEqual({
+      category: "cardiologia",
+      comuna: null,
+      unresolved: [],
+      source: "parser",
+    });
+    await expect(
+      interpretDirectoryText("algo rarísimo zzz", SEED_CATEGORIES, noLlm, [
+        "category",
+      ]),
+    ).resolves.toEqual({
+      category: null,
+      comuna: null,
+      unresolved: [],
+      source: "none",
+    });
+  });
+
   it("fills only the half the parser could not resolve", async () => {
     const llm = createFakeLlmProvider({
       object: () => ({ category: "cardiologia", comuna: "Las Condes" }),
