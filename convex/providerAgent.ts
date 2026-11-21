@@ -4,6 +4,7 @@ import { internalQuery } from "./_generated/server";
 import { freeSlots } from "./bookings";
 
 const OFFERING_LIMIT = 50;
+const CATEGORY_LIMIT = 200;
 
 // The provider agent's whole view of the world: its card, its active offerings and their free
 // slots that start after `now`. It reads no messages, bookings or people from any room, so
@@ -29,6 +30,15 @@ export const context = internalQuery({
       )
       .take(OFFERING_LIMIT);
     const active = new Set(offerings.map((o) => o._id));
+    const categories = await ctx.db
+      .query("categories")
+      .take(CATEGORY_LIMIT + 1);
+    if (categories.length > CATEGORY_LIMIT) {
+      throw new ConvexError({
+        kind: "InvalidArgument",
+        message: "too many categories to match the requested service",
+      });
+    }
     return {
       card: {
         name: agent.name,
@@ -39,8 +49,17 @@ export const context = internalQuery({
         location: agent.location,
       },
       instructions: config?.systemPrompt ?? null,
+      categories: categories.map(
+        ({ slug, parent, label, attributeSchema }) => ({
+          slug,
+          parent,
+          label,
+          attributeSchema,
+        }),
+      ),
       offerings: offerings.map((o) => ({
         id: o._id,
+        category: o.category,
         name: o.name,
         description: o.description,
         price: o.price,

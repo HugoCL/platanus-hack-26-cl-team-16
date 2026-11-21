@@ -14,6 +14,7 @@ import type { UiResponse, UiSpec } from "@/shared/genui";
 import { type GenUiAnswer, GenUiBlock } from "./genui-block";
 import { ModerationBadge, PendingStages } from "./moderation";
 import {
+  canAnswerUi,
   canSeeContent,
   describeUiResponse,
   formatScore,
@@ -111,7 +112,8 @@ function Bubble({
       <GenUiBlock
         spec={content.spec}
         answer={answers[content.spec.id]}
-        canInteract={canAct && status !== "pending"}
+        canInteract={canAnswerUi(viewer)}
+        readOnly={readOnly || status === "pending"}
         onRespond={onRespond}
       />
     );
