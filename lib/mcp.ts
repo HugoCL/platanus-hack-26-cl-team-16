@@ -114,7 +114,9 @@ function registerTool<N extends McpToolName>(
   );
 }
 
-// E1 has no distance search, so `near` is refused instead of ignored.
+// E1 has no distance search, so `near` is refused instead of ignored. The query text never leaves
+// this server: `llmFallback: false` keeps it from the LLM provider, so what the parser cannot read
+// comes back in `unresolved` for the client to pass as `category` or `comuna`.
 async function searchAgents(
   convex: ConvexCaller,
   { query, category, comuna, limit, near }: z.output<typeof SearchAgentsInput>,
@@ -122,13 +124,11 @@ async function searchAgents(
   if (near) {
     throw new Error("near is not supported yet: filter by comuna instead");
   }
-  const { agents } = await convex.action(api.directory.searchText, {
-    query,
-    category,
-    comuna,
-    limit,
-  });
-  return { agents };
+  const { agents, truncated, interpretation } = await convex.action(
+    api.directory.searchText,
+    { query, category, comuna, limit, llmFallback: false },
+  );
+  return { agents, truncated, unresolved: interpretation.unresolved };
 }
 
 async function getAgent(

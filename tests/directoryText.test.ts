@@ -86,6 +86,17 @@ describe("free-text parser", () => {
 });
 
 describe("LLM fallback", () => {
+  it("leaves what the parser cannot read unresolved when there is no fallback", async () => {
+    await expect(
+      interpretDirectoryText("me duele el pecho", SEED_CATEGORIES, null),
+    ).resolves.toEqual({
+      category: null,
+      comuna: null,
+      unresolved: ["category"],
+      source: "none",
+    });
+  });
+
   it("is not requested when the parser resolves everything", async () => {
     await expect(
       interpretDirectoryText(

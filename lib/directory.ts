@@ -339,17 +339,18 @@ async function askLlm(
   }
 }
 
+// A null `fallback` keeps the text on this server: what the parser cannot read stays unresolved.
 // `known` names the fields the caller already supplied. The text is not read for them, so they stay
 // null here, never count as unresolved and never make the parser ask the LLM.
 export async function interpretDirectoryText(
   text: string,
   categories: readonly Category[],
-  fallback: LlmFallback,
+  fallback: LlmFallback | null,
   known: readonly DirectoryField[] = [],
 ): Promise<TextInterpretation> {
   const parsed = parseDirectoryText(text, categories);
   const open = parsed.unresolved.filter((field) => !known.includes(field));
-  const asked = open.length > 0 && categories.length > 0;
+  const asked = fallback !== null && open.length > 0 && categories.length > 0;
   const answer = asked ? await askLlm(text, categories, fallback) : null;
   const fromLlm = {
     category: open.includes("category") ? (answer?.category ?? null) : null,

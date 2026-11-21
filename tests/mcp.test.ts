@@ -12,7 +12,7 @@ import { z } from "zod";
 import { internal } from "../convex/_generated/api";
 import schema from "../convex/schema";
 import { type ConvexCaller, createMcpEndpoint } from "../lib/mcp";
-import { AgentDetail, AgentSummary, MCP_TOOLS } from "../shared/mcp";
+import { AgentDetail, MCP_TOOLS, SearchAgentsOutput } from "../shared/mcp";
 import { CLINIC_AGENT_SLUG, CONSUMER_AGENT_SLUG } from "../shared/seedData";
 
 const modules = import.meta.glob("../convex/**/*.ts");
@@ -82,9 +82,7 @@ describe.each<[Negotiation, string]>([
   const searchSlugs = async (args: Record<string, unknown>) => {
     const result = await call("search_agents", args);
     expect(result.isError).toBeFalsy();
-    const { agents } = z
-      .object({ agents: z.array(AgentSummary) })
-      .parse(result.structuredContent);
+    const { agents } = SearchAgentsOutput.parse(result.structuredContent);
     return agents.map((agent) => agent.slug);
   };
 
@@ -132,10 +130,13 @@ describe.each<[Negotiation, string]>([
     const result = await call("search_agents", {
       query: "cardiólogo en Providencia",
     });
-    const { agents } = z
-      .object({ agents: z.array(AgentSummary) })
-      .strict()
-      .parse(result.structuredContent);
+    const { agents, truncated, unresolved } = SearchAgentsOutput.strict().parse(
+      result.structuredContent,
+    );
+    expect({ truncated, unresolved }).toEqual({
+      truncated: false,
+      unresolved: [],
+    });
     expect(agents[0]).toMatchObject({
       slug: CLINIC_AGENT_SLUG,
       comuna: "Providencia",
@@ -159,17 +160,64 @@ describe.each<[Negotiation, string]>([
     }
   });
 
-  it("search_agents returns an empty list when nothing matches or part of the text is not understood", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  const search = async (args: Record<string, unknown>) => {
+    const result = await call("search_agents", args);
+    expect(result.isError).toBeFalsy();
+    const { agents, truncated, unresolved } = SearchAgentsOutput.parse(
+      result.structuredContent,
+    );
+    return { slugs: agents.map((agent) => agent.slug), truncated, unresolved };
+  };
+
+  it("search_agents tells an empty result apart from text it could not read", async () => {
     for (const args of [
       { query: "gimnasio en Pirque" },
       { query: "cardiólogo", comuna: "Comuna Inventada" },
-      { query: "algo rarísimo zzz", comuna: "Providencia" },
-      { query: "cardiólogo en Narnialandia", category: "cardiologia" },
     ]) {
-      await expect(searchSlugs(args)).resolves.toEqual([]);
+      await expect(search(args)).resolves.toEqual({
+        slugs: [],
+        truncated: false,
+        unresolved: [],
+      });
     }
-    warn.mockRestore();
+    await expect(
+      search({ query: "algo rarísimo zzz", comuna: "Providencia" }),
+    ).resolves.toEqual({
+      slugs: [],
+      truncated: false,
+      unresolved: ["category"],
+    });
+    await expect(
+      search({ query: "cardiólogo en Narnialandia", category: "cardiologia" }),
+    ).resolves.toEqual({ slugs: [], truncated: false, unresolved: ["comuna"] });
+  });
+
+  it("search_agents says when the list was cut at the limit", async () => {
+    const { slugs, truncated } = await search({
+      query: "en Providencia",
+      limit: 1,
+    });
+    expect(slugs).toHaveLength(1);
+    expect(truncated).toBe(true);
+  });
+
+  it("search_agents never sends the query text to the LLM fallback", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      // More searches than the site-wide LLM bucket holds (10): none of them spends from it.
+      for (let i = 0; i < 12; i++) {
+        await expect(
+          search({ query: `me duele el pecho, soy Juan Pérez ${i}` }),
+        ).resolves.toEqual({
+          slugs: [],
+          truncated: false,
+          unresolved: ["category"],
+        });
+      }
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("search_agents refuses near, which the directory cannot search yet", async () => {
