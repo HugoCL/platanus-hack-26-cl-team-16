@@ -48,7 +48,7 @@ It acts only on a delivered message addressed to it (or to `all`). For a text, t
 
 A `slot_selected` answer, from the human its picker was sent to, books that slot through `bookings.book` without asking the model, once per picker. The `confirmation` card goes to the whole room (`"all"`): the human sees it and the consumer agent receives it as its signal that the booking is done. If another room took the slot meanwhile, the human gets a new picker with the same offering's other slots.
 
-The consumer (`lib/agents/consumer.ts`) starts from the human's request as written. `chooseProvider` searches with `directory.searchText`, takes the first card that allows any intent (verified cards rank first), and asks the model for the room's intent, which must be one the card allows, and its opening message. In the room, `consumerTurn` answers only its provider. It closes the room once the provider sent a `confirmation`; otherwise the model replies, waits, or closes.
+The consumer (`lib/agents/consumer.ts`) starts from the human's request as written. `chooseProvider` searches with `directory.searchText` and gives the model the first five cards that allow some intent, as `<card>:<intent>` pairs. The model picks one pair, or none, and writes the opening message. The request never enters the room's contract, which skips moderation: the contract's intent description names only the intent and the provider, and the provider learns the request from the moderated opening. In the room, `consumerTurn` answers only delivered messages its provider sent to it or to everyone. It closes the room when the provider's `confirmation` reaches it; otherwise the model replies, waits, or closes, reading the request from its own opening in the transcript.
 
 ## Test
 
