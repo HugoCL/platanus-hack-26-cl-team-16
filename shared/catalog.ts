@@ -99,10 +99,12 @@ export type Availability = z.infer<typeof Availability>;
 export const TransactionKind = z.enum(["booking", "order"]);
 export const TransactionStatus = z.enum(["held", "confirmed", "cancelled"]);
 
-export const TimeRange = z.object({
-  start: z.number().int(),
-  end: z.number().int(),
-});
+export const TimeRange = z
+  .object({ start: z.number().int(), end: z.number().int() })
+  .refine((range) => range.end > range.start, {
+    path: ["end"],
+    message: "end must be after start",
+  });
 
 export const TransactionLine = z.object({
   offeringId: z.string().min(1),

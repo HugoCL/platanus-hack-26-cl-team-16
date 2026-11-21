@@ -484,6 +484,28 @@ export const CONTRACT_EXAMPLES: Record<string, ContractExamples> = {
         },
       },
       {
+        why: "booking range ends before it starts",
+        value: {
+          kind: "booking",
+          lines: [
+            { offeringId: "o1", quantity: 1, range: { start: 2, end: 1 } },
+          ],
+          total: { amount: 0, currency: "CLP" },
+          status: "held",
+        },
+      },
+      {
+        why: "booking range with no duration",
+        value: {
+          kind: "booking",
+          lines: [
+            { offeringId: "o1", quantity: 1, range: { start: 1, end: 1 } },
+          ],
+          total: { amount: 0, currency: "CLP" },
+          status: "held",
+        },
+      },
+      {
         why: "a sent status does not exist",
         value: {
           kind: "order",
