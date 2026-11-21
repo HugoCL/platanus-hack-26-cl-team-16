@@ -7,7 +7,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { freeSlots } from "../../convex/bookings";
 import schema from "../../convex/schema";
 import { Transaction } from "../../shared/catalog";
-import { CLINIC_AGENT_SLUG, CONSUMER_AGENT_SLUG } from "../../shared/seedData";
+import { CLINIC_AGENT_SLUG, CONSUMER_AGENT_SLUG } from "../../shared/seed-data";
 import { agentBySlug, insertRoom, NOW } from "./rooms";
 
 const modules = import.meta.glob("../../convex/**/*.ts");

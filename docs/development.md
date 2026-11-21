@@ -8,15 +8,17 @@ From a clean clone, one command installs and starts the app. It needs no account
 pnpm install && pnpm dev
 ```
 
-`pnpm dev` starts a local Convex backend, loads the seed data into every empty table (`seed:ensure`), and serves the app at http://localhost:3000. The seed data lives in `shared/seedData.ts`: 15 fictitious agent cards across 13 categories, the Providencia clinic with 2 doctors and 4 open slots, a hotel with nightly availability, shops with priced products, and one example room.
+`pnpm dev` starts a local Convex backend, loads the seed data into every empty table (`seed:ensure`), and serves the app at http://localhost:3000. The seed data lives in `shared/seed-data.ts`: 15 fictitious agent cards across 13 categories, the Providencia clinic with 2 doctors and 4 open slots, a hotel with nightly availability, shops with priced products, and one example room.
 
-If a schema change is rejected because your local data no longer matches it, stop `pnpm dev`, delete `.convex/local`, and start again. That gives you a fresh local database that is reseeded from `shared/seedData.ts`.
+The directory, the MCP server and the tests work like this. Rooms do not: the default `fake` LLM has no judge, so the moderator blocks every request that reaches it (`RequestBlocked`, "El moderador falló") and the reference scene answers `NotConfigured`. To open rooms locally, set `LLM_PROVIDER=openrouter` and `OPENROUTER_API_KEY` on the local deployment as described in [Try Claude through OpenRouter locally](#try-claude-through-openrouter-locally).
+
+If a schema change is rejected because your local data no longer matches it, stop `pnpm dev`, delete `.convex/local`, and start again. That gives you a fresh local database that is reseeded from `shared/seed-data.ts`.
 
 Rooms seeded before E2 have a contract without the provider's `purpose`. The schema still accepts them, and `pnpm migrate` (with `pnpm dev` running) copies the purpose from the recipient's card (`backfillSessionPurpose`). Run it once on every deployment that kept its data: local, the team's cloud dev and reused previews. `pnpm seed:reset` also works on a local deployment.
 
 ## Agent directory (E1)
 
-The directory lives in `convex/directory.ts` and the page at http://localhost:3000/directorio. Other code calls these functions:
+The directory lives in `convex/directory.ts` and the page at http://localhost:3000/directory. Other code calls these functions:
 
 | Function | Kind | What it does |
 | --- | --- | --- |
@@ -38,6 +40,9 @@ A room is a `session` in `convex/rooms.ts`. E4 calls these public functions with
 | Function | Kind | What it does |
 | --- | --- | --- |
 | `rooms.get({ sessionId })` | query | Returns the shared `Session` and its participants. |
+| `rooms.openFromCard({ providerSlug, intent, description })` | action | Resolves both agents server-side, opens a moderated room owned by the caller, and returns `{ sessionId }`. The human name comes from the identity (`name`, then `givenName`, then "Tú"); the email is never used, because the name reaches the agents' models. Missing cards raise `NotFound`. |
+| `rooms.mine({})` | query | Returns up to 20 rooms with active human membership, newest first within the 100 newest active memberships from the tokenIdentifier/leftAt index. Items contain `sessionId`, `status`, `intent` (name), `provider: { name, slug }`, and `lastActivityTime` (room creation time). Signed-out callers receive `[]` rather than `Unauthorized`. |
+| `rooms.view({ sessionId })` | query | Same membership check as `get`. Returns `{ session, participantNames: [{ participantId, name, slug? }], humanParticipantId }` or `null` if the session is missing. Agent names come from their cards; missing cards use `Agente`. |
 | `rooms.close({ sessionId })` | mutation | Closes the room, records who closed it in `closedReason` (`closed_by_<role>`) and publishes one `session_closed` notice. Calling it again changes nothing. Later sends fail with `RoomClosed`, even if moderation started before the close. |
 | `gate.send({ sessionId, recipient, content })` | action | Sends as the signed-in participant. `recipient` is a participant ID or `"all"`; `content` is `SendableContent` (text, a UI block or a UI response). Returns the message with its verdict. A blocked send is stored as `blocked` and generates a `moderator_alert`. A `ui_response` must answer (`inReplyTo`) an allowed UI block in the same room addressed to the sender, and a participant who left can't send; otherwise the gate throws `InvalidArgument` or `NotParticipant`. |
 | `gate.history({ sessionId })` | reactive query | Returns the latest visible messages in chronological order (up to 500 messages and 4 MiB). |
@@ -99,10 +104,13 @@ This runs Vitest offline, with no network and no credentials. `tests/setup.ts` r
 - the valid and invalid examples of every shared contract (`shared/examples.ts`),
 - the seed data: every card and offering validates, including offerings against their category's `attributeSchema`,
 - the fake LLM, model selection from the environment, and the business sources,
+- the directory: text parsing (`lib/directory.ts`), the list view, and `directory.*` against an in-memory Convex,
+- the moderator: the versioned moderation set (`shared/fixtures/moderation-set.ts`), the deterministic rules and the full moderator with the fake LLM,
+- the room demo UI's formatting helpers (`src/components/room/room-format.ts`),
 - `seed:ensure` against an in-memory Convex (convex-test): every seeded agent is a valid card,
 - bookings and the reference agents against the same in-memory Convex, with the fake LLM.
 
-`pnpm smoke` starts `pnpm dev` and drives the home and directory pages in Chromium. The room checks run offline with a scripted judge and Convex test identities. They re-read the live history query as a member and the internal views as each agent after sends, and check membership, pagination and hosted replies. This verifies the visibility of successive snapshots, not authenticated WebSocket delivery; verify the latter with a signed-in client when integrating the E4/E8 room view.
+`pnpm smoke` starts `pnpm dev` and drives the landing and directory pages in Chromium. The room checks run offline with a scripted judge and Convex test identities. They re-read the live history query as a member and the internal views as each agent after sends, and check membership, pagination and hosted replies. This verifies the visibility of successive snapshots, not authenticated WebSocket delivery; verify the latter with a signed-in client when integrating the E4/E8 room view.
 
 ## Configuration
 

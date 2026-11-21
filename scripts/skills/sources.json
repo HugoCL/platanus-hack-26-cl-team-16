@@ -148,6 +148,38 @@
     ]
   },
   {
+    "id": "emilkowalski-skills",
+    "title": "Emil Kowalski skills (design and motion)",
+    "upstream": "https://github.com/emilkowalski/skills",
+    "source": "https://github.com/emilkowalski/skills",
+    "skills": [
+      "animate",
+      "animation-performance",
+      "animation-vocabulary",
+      "apple-design",
+      "ask-emil",
+      "break-ui",
+      "choreograph",
+      "emil-design-eng",
+      "gestures",
+      "improve-animations",
+      "learn-taste",
+      "mobile-native",
+      "prototype"
+    ],
+    "license": {
+      "spdx": "MIT",
+      "upstreamPath": "LICENSE"
+    },
+    "notes": [
+      "13 of the repo's web skills. Not vendored: `animate-expo` and `write-swift` (native), `ask-sonner`, `find-animation-opportunities`, `pick-ui-library`, `remove-animations`, `review-animations`."
+    ],
+    "limitations": [
+      "Several vendored skills (`animate`, `ask-emil`, `choreograph`, `improve-animations`, `prototype` and others) point to skills that are not vendored, mostly `review-animations`. Those names do nothing here; add them to this collection's `skills` list if the team wants them.",
+      "Each skill answers its first bare invocation with a fixed one-line greeting and waits for a question."
+    ]
+  },
+  {
     "id": "mattpocock-skills",
     "title": "Matt Pocock skills",
     "upstream": "https://github.com/mattpocock/skills",

@@ -3,7 +3,7 @@ import {
   MODERATION_CASES,
   type ModerationCase,
   moderationInput,
-} from "../shared/fixtures/moderationSet";
+} from "../shared/fixtures/moderation-set";
 import { JUDGE_HISTORY_SIZE } from "../shared/moderator/judge";
 import {
   createModerator,
@@ -156,7 +156,9 @@ describe("criterion 5: fail-closed", () => {
       createFakeLlmProvider({ object: () => ({ decision: "maybe" }) }),
     ],
   ])("blocks when %s", async (_why, llm) => {
+    const generateObject = vi.spyOn(llm, "generateObject");
     const { verdict, events } = await createModerator({ llm }).moderate(legit);
+    expect(generateObject).toHaveBeenCalledTimes(1);
     expect(verdict).toMatchObject({ decision: "block", rule: "purpose" });
     expect(events[1]).toMatchObject({ stage: "purpose", action: "block" });
     expect(events[1].reasons[0].code).toBe("moderator_error");
@@ -165,15 +167,17 @@ describe("criterion 5: fail-closed", () => {
     );
   });
 
-  it("blocks when the judge takes longer than the limit", async () => {
+  it("aborts both stalled attempts and blocks without a third", async () => {
     vi.useFakeTimers();
-    let signal: AbortSignal | undefined;
-    const llm = stubbornJudge(({ abortSignal }) => {
-      signal = abortSignal;
-      return new Promise(() => {});
-    });
+    const llm = stubbornJudge(() => new Promise(() => {}));
+    const generateObject = vi.spyOn(llm, "generateObject");
+    const beforeJudge = vi.fn(async () => {});
     let settled = false;
-    const result = createModerator({ llm, model: "fake/moderador" })
+    const result = createModerator({
+      llm,
+      model: "fake/moderador",
+      beforeJudge,
+    })
       .moderate(legit)
       .finally(() => {
         settled = true;
@@ -181,20 +185,66 @@ describe("criterion 5: fail-closed", () => {
 
     await vi.advanceTimersByTimeAsync(MODERATOR_TIMEOUT_MS - 1);
     expect(settled).toBe(false);
-    expect(signal?.aborted).toBe(false);
+    const first = generateObject.mock.calls[0][0].abortSignal;
+    expect(first?.aborted).toBe(false);
     await vi.advanceTimersByTimeAsync(1);
-    expect(signal?.aborted).toBe(true);
+    expect(first?.aborted).toBe(true);
+    expect(settled).toBe(false);
+    expect(generateObject).toHaveBeenCalledTimes(2);
+    const second = generateObject.mock.calls[1][0].abortSignal;
+    expect(second).not.toBe(first);
+    expect(second?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(MODERATOR_TIMEOUT_MS - 1);
+    expect(settled).toBe(false);
+    expect(second?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(second?.aborted).toBe(true);
     const { verdict, events } = await result;
+    expect(generateObject).toHaveBeenCalledTimes(2);
+    expect(beforeJudge).toHaveBeenCalledTimes(2);
 
     expect(verdict).toMatchObject({ decision: "block", rule: "purpose" });
     expect(events[1]).toMatchObject({
       stage: "purpose",
       action: "block",
       model: "fake/moderador",
-      latencyMs: MODERATOR_TIMEOUT_MS,
+      latencyMs: 2 * MODERATOR_TIMEOUT_MS,
     });
     expect(events[1].reasons[0].code).toBe("moderator_error");
   });
+
+  it.each([
+    ["allow", { decision: "allow", rule: "purpose" }, []],
+    ["block", { decision: "block", rule: "scope" }, ["forbidden_topic"]],
+    ["error", undefined, ["moderator_error"]],
+  ])(
+    "uses the second attempt's %s after a timeout",
+    async (kind, answer, codes) => {
+      vi.useFakeTimers();
+      const scripted = createFakeLlmProvider({
+        object: () => {
+          if (!answer) throw new Error("provider failure");
+          return answer;
+        },
+      });
+      const generateObject = vi
+        .spyOn(scripted, "generateObject")
+        .mockImplementationOnce(
+          ({ abortSignal }) =>
+            new Promise((_, reject) => {
+              abortSignal?.addEventListener("abort", () =>
+                reject(abortSignal.reason),
+              );
+            }),
+        );
+      const result = createModerator({ llm: scripted }).moderate(legit);
+      await vi.advanceTimersByTimeAsync(MODERATOR_TIMEOUT_MS);
+      const { verdict, events } = await result;
+      expect(verdict.decision).toBe(kind === "allow" ? "allow" : "block");
+      expect(events[1].reasons.map((r) => r.code)).toEqual(codes);
+      expect(generateObject).toHaveBeenCalledTimes(2);
+    },
+  );
 
   it("lets through an answer that arrives just in time", async () => {
     vi.useFakeTimers();
@@ -220,10 +270,12 @@ describe("criterion 5: fail-closed", () => {
     "takes %j with no reason as the judge's decision",
     async (answer, codes) => {
       const llm = createFakeLlmProvider({ object: () => answer });
+      const generateObject = vi.spyOn(llm, "generateObject");
       const { verdict, events } = await createModerator({ llm }).moderate(
         legit,
       );
       expect(verdict.decision).toBe(answer.decision);
+      expect(generateObject).toHaveBeenCalledTimes(1);
       expect(events[1].reasons.map((r) => r.code)).toEqual(codes);
     },
   );

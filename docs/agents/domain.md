@@ -1,6 +1,6 @@
 # Domain Docs
 
-How agents and skills (for example `$to-tickets`) should consume this repo's domain documentation when exploring the codebase. This repo has no `GLOSSARY.md` or `docs/adr/` yet; create them when the first term or decision is resolved.
+How agents and skills (for example `$to-tickets`) should consume this repo's domain documentation when exploring the codebase. This repo has a single-context `GLOSSARY.md` at the root and no `docs/adr/` yet; create `docs/adr/` when the first decision is recorded.
 
 ## Before exploring, read these
 

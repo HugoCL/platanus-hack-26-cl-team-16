@@ -7,7 +7,7 @@ import { internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import schema from "../../convex/schema";
 import * as providers from "../../shared/providers/llm";
-import { CLINIC_AGENT_SLUG, CONSUMER_AGENT_SLUG } from "../../shared/seedData";
+import { CLINIC_AGENT_SLUG, CONSUMER_AGENT_SLUG } from "../../shared/seed-data";
 
 const modules = import.meta.glob("../../convex/**/*.ts");
 

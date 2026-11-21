@@ -349,15 +349,17 @@ describe("the moderation gate", () => {
     await expectFailure(message);
   });
 
-  it("aborts a stalled judge and persists the timeout as a block", async () => {
+  it("aborts two stalled judge attempts and persists the timeout as a block", async () => {
     vi.useFakeTimers();
     try {
       let started: (signal: AbortSignal | undefined) => void = () => {};
       const judging = new Promise<AbortSignal | undefined>((resolve) => {
         started = resolve;
       });
-      vi.spyOn(rooms.llm, "generateObject").mockImplementationOnce(
+      const signals: (AbortSignal | undefined)[] = [];
+      vi.spyOn(rooms.llm, "generateObject").mockImplementation(
         ({ abortSignal }) => {
+          signals.push(abortSignal);
           started(abortSignal);
           return new Promise(() => {});
         },
@@ -366,7 +368,10 @@ describe("the moderation gate", () => {
       const signal = await judging;
       await vi.advanceTimersByTimeAsync(MODERATOR_TIMEOUT_MS);
       expect(signal?.aborted).toBe(true);
+      await vi.advanceTimersByTimeAsync(MODERATOR_TIMEOUT_MS);
       await expectFailure(await pending);
+      expect(signals).toHaveLength(2);
+      expect(signals[1]?.aborted).toBe(true);
     } finally {
       vi.useRealTimers();
     }

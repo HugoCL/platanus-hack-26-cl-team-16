@@ -9,7 +9,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 
-// API keys for agents that connect from outside, through the MCP server in app/api/mcp.
+// API keys for agents that connect from outside, through the MCP server in src/app/api/mcp.
 // `issue` shows a key in clear once; only its SHA-256 hash and a short visible prefix are stored.
 // The caller's identity always comes from the key, through `agentForApiKey`: no public function
 // takes an agentId as the caller. Keys are only for external agents: the platform speaks for hosted

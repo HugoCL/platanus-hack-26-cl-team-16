@@ -1,5 +1,5 @@
 import { effectiveAllowedIntents } from "../shared/agent";
-import { REFERENCE_ATTACK } from "../shared/fixtures/moderationSet";
+import { REFERENCE_ATTACK } from "../shared/fixtures/moderation-set";
 import type { SendableContent } from "../shared/messages";
 import type { ModerationReason } from "../shared/moderation";
 import { checkRules } from "../shared/moderator/rules";
@@ -13,7 +13,7 @@ import {
   SEED_AVAILABILITY,
   SEED_CATEGORIES,
   SEED_OFFERINGS,
-} from "../shared/seedData";
+} from "../shared/seed-data";
 import { DEFAULT_MAX_TURNS, type SessionContract } from "../shared/session";
 import type { Id, TableNames } from "./_generated/dataModel";
 import { internalMutation, type MutationCtx } from "./_generated/server";

@@ -1,0 +1,72 @@
+@layer ui-sdk;
+
+@import "tailwindcss";
+@import "@ui-sdk/core/web.css" layer(components);
+@import "./tokens.css";
+@import "./ui.css";
+@import "./landing.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Theme switch. Next builds light-dark() down to var(--lightningcss-light, a) var(--lightningcss-dark, b),
+ * and UI SDK's web.css pins those two variables to light on :root. next-themes puts .light or .dark
+ * on <html>; these rules flip the variables (and color-scheme) to match.
+ */
+:root.light {
+  color-scheme: light;
+  --lightningcss-light: initial;
+  --lightningcss-dark: ;
+}
+
+:root.dark {
+  color-scheme: dark;
+  --lightningcss-light: ;
+  --lightningcss-dark: initial;
+}
+
+@utility press-blur {
+  & > * {
+    transition:
+      filter 200ms ease,
+      opacity 200ms ease;
+  }
+  &:active > * {
+    filter: blur(2px);
+    opacity: 0.7;
+  }
+}
+
+@theme inline {
+  --color-background: var(--ui-background);
+  --color-foreground: var(--ui-foreground);
+  --color-card: var(--sm-card);
+  --color-muted: var(--ui-muted);
+  --color-muted-foreground: var(--ui-muted-foreground);
+  --color-subtle-foreground: var(--sm-subtle-foreground);
+  --color-border: var(--ui-border);
+  --color-input: var(--ui-input);
+  --color-ring: var(--ui-ring);
+  --color-primary: var(--ui-primary);
+  --color-primary-foreground: var(--ui-primary-foreground);
+  --color-destructive: var(--ui-destructive);
+  --color-destructive-text: var(--sm-destructive-text);
+  --color-destructive-soft: var(--sm-destructive-soft);
+  --color-success: var(--sm-success);
+  --color-warning: var(--sm-warning);
+  --radius-lg: var(--ui-radius);
+  --radius-2xl: var(--sm-radius-2xl);
+  --radius-3xl: var(--sm-radius-3xl);
+  --radius-4xl: var(--sm-radius-4xl);
+  --shadow-card: var(--ui-shadow);
+  --font-sans: var(--ui-font-sans);
+  --font-mono: var(--ui-font-mono);
+}
+
+body {
+  background: var(--ui-background);
+  color: var(--ui-foreground);
+  font-family: var(--ui-font-sans);
+  font-size: var(--ui-font-size);
+  line-height: var(--ui-line-height);
+}
