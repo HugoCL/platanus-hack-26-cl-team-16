@@ -63,7 +63,7 @@ const MapView = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 function useIsDesktop() {
   const [desktop, setDesktop] = useState(false);
   useEffect(() => {
-    const query = window.matchMedia("(min-width: 1024px)");
+    const query = window.matchMedia("(min-width: 64rem)");
     setDesktop(query.matches);
     const onChange = () => setDesktop(query.matches);
     query.addEventListener("change", onChange);
