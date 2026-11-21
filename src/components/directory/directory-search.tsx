@@ -167,6 +167,19 @@ export function DirectorySearch() {
   const categoryLabel = categories?.find((c) => c.slug === category)?.label;
 
   const isDesktop = useIsDesktop();
+  const [offerLocation, setOfferLocation] = useState(false);
+
+  // Locate right away when the visitor already allowed it; otherwise offer it, never prompt on load.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once on mount
+  useEffect(() => {
+    navigator.permissions
+      ?.query({ name: "geolocation" })
+      .then((status) => {
+        if (status.state === "granted") startLocating();
+        else if (status.state === "prompt") setOfferLocation(true);
+      })
+      .catch(() => {});
+  }, []);
 
   function locate() {
     if (geo.state === "on" || geo.state === "locating") {
@@ -174,6 +187,11 @@ export function DirectorySearch() {
       if (sort === "distance") setSort("relevance");
       return;
     }
+    startLocating();
+  }
+
+  function startLocating() {
+    setOfferLocation(false);
     if (!("geolocation" in navigator)) {
       setGeo({
         state: "error",
@@ -436,6 +454,31 @@ export function DirectorySearch() {
             </fieldset>
           ) : null}
         </div>
+
+        {offerLocation && geo.state === "off" ? (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 self-start rounded-2xl bg-muted py-2 pr-2 pl-3.5 text-[13px]">
+            <LocateFixed aria-hidden size={15} />
+            <span>
+              Comparte tu ubicación y te mostramos primero lo que está cerca.
+            </span>
+            <div className="flex gap-1">
+              <Button
+                data-variant="solid"
+                data-size="sm"
+                onClick={startLocating}
+              >
+                Usar mi ubicación
+              </Button>
+              <Button
+                data-variant="ghost"
+                data-size="sm"
+                onClick={() => setOfferLocation(false)}
+              >
+                Ahora no
+              </Button>
+            </div>
+          </div>
+        ) : null}
 
         {geo.state === "error" ? (
           <p role="alert" className="m-0 text-[13px] text-destructive-text">
