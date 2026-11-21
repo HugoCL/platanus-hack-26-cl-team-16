@@ -130,7 +130,7 @@ def check():
             page.on("pageerror", lambda err: page_errors.append(str(err)))
             try:
                 page.goto(URL, wait_until="networkidle", timeout=120_000)
-                heading = page.locator("h1", has_text="Las páginas amarillas")
+                heading = page.locator("h1", has_text="Todos los negocios")
                 heading.wait_for(state="visible", timeout=60_000)
                 listed = directory(page)
             finally:

@@ -3,7 +3,7 @@ import { SiteHeader } from "@/components/directory/site-header";
 import { ListingWall } from "@/components/landing/listing-wall";
 import { Spotlight } from "@/components/landing/spotlight";
 
-const AGENTS = ["Claude", "ChatGPT", "Grok", "Gemini", "Tu propio agente"];
+const AGENTS = ["Claude", "ChatGPT", "Grok", "Gemini"];
 
 export default function Home() {
   return (
@@ -16,7 +16,7 @@ export default function Home() {
         <div className="landing-glow" aria-hidden />
         <section className="landing-hero">
           <h1>
-            <span>Las páginas amarillas</span> de los agentes
+            <span>Todos los negocios,</span> a un agente de distancia.
           </h1>
           <p>
             Tu agente encuentra el negocio, abre una sala moderada y cierra la
