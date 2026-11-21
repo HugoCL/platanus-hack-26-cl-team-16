@@ -14,6 +14,9 @@
   --ui-muted: oklch(0.268 0.007 34.298);
   --ui-border: oklch(1 0 0 / 8%);
   --ui-ring: oklch(0.709 0.01 56.259);
+  --ui-primary: oklch(0.923 0.003 48.717);
+  --ui-primary-foreground: oklch(0.216 0.006 56.043);
+  --sm-card: oklch(0.216 0.006 56.043);
   --sm-subtle-foreground: oklch(0.8 0.008 56);
   color-scheme: dark;
   display: flex;

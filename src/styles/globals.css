@@ -6,6 +6,37 @@
 @import "./ui.css";
 @import "./landing.css";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Theme switch. Next builds light-dark() down to var(--lightningcss-light, a) var(--lightningcss-dark, b),
+ * and UI SDK's web.css pins those two variables to light on :root. next-themes puts .light or .dark
+ * on <html>; these rules flip the variables (and color-scheme) to match.
+ */
+:root.light {
+  color-scheme: light;
+  --lightningcss-light: initial;
+  --lightningcss-dark: ;
+}
+
+:root.dark {
+  color-scheme: dark;
+  --lightningcss-light: ;
+  --lightningcss-dark: initial;
+}
+
+@utility press-blur {
+  & > * {
+    transition:
+      filter 200ms ease,
+      opacity 200ms ease;
+  }
+  &:active > * {
+    filter: blur(2px);
+    opacity: 0.7;
+  }
+}
+
 @theme inline {
   --color-background: var(--ui-background);
   --color-foreground: var(--ui-foreground);

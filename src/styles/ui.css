@@ -44,6 +44,11 @@
       font-size: 0.9375rem;
     }
 
+    &[data-size="icon"] {
+      width: calc(var(--ui-spacing) * 9);
+      padding-inline: 0;
+    }
+
     &[data-variant="ghost"] {
       border-color: transparent;
       background: transparent;
