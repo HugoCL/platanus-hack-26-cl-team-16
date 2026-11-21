@@ -1,5 +1,13 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,6 +43,12 @@ it.each([
     {},
   ],
   [
+    "colon-form dotenv deploy key",
+    "CONVEX_DEPLOYMENT=anonymous:anonymous-demo\n",
+    "CONVEX_DEPLOY_KEY: synthetic-test-value\n",
+    {},
+  ],
+  [
     "self-hosted selector",
     "CONVEX_DEPLOYMENT=anonymous:anonymous-demo\n",
     "CONVEX_SELF_HOSTED_URL=https://example.invalid\n",
@@ -63,6 +77,42 @@ it.each([
     expect(result.status).toBe(1);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+it("refuses to start dev with a colon-form production selector", () => {
+  const root = mkdtempSync(join(tmpdir(), "scene-dev-test-"));
+  try {
+    const modules = join(root, "node_modules");
+    const bin = join(modules, ".bin");
+    mkdirSync(bin, { recursive: true });
+    symlinkSync(
+      fileURLToPath(new URL("../node_modules/dotenv", import.meta.url)),
+      join(modules, "dotenv"),
+      "dir",
+    );
+    mkdirSync(join(root, "scripts"));
+    const entry = join(root, "scripts/dev.mjs");
+    copyFileSync(new URL("../scripts/dev.mjs", import.meta.url), entry);
+    writeFileSync(
+      join(root, ".env"),
+      "CONVEX_DEPLOY_KEY: prod:example|synthetic\n",
+    );
+    writeFileSync(join(bin, "convex"), "#!/bin/sh\n: > convex-called\n", {
+      mode: 0o700,
+    });
+
+    const result = spawnSync(process.execPath, [entry], {
+      cwd: root,
+      env: { NODE_ENV: "test", PATH: bin },
+      encoding: "utf8",
+      timeout: 5000,
+    });
+    expect(existsSync(join(root, "convex-called"))).toBe(false);
+    expect(result.stderr).toContain("refusing to start");
+    expect(result.status).toBe(1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 

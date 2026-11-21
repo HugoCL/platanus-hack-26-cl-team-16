@@ -34,6 +34,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { constants } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parse } from "dotenv";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -51,18 +52,11 @@ function envFileSelectors() {
   for (const name of [".env.local", ".env"]) {
     const file = join(root, name);
     if (!existsSync(file)) continue;
-    const seen = {};
-    for (const line of readFileSync(file, "utf8").split(/\r?\n/)) {
-      const m = /^\s*(?:export\s+)?(CONVEX_[A-Z_]+)\s*=\s*(.*)$/.exec(line);
-      if (!m || !SELECTORS.includes(m[1])) continue;
-      // Convex writes `CONVEX_DEPLOYMENT=dev:name # team: ..., project: ...`
-      seen[m[1]] = m[2]
-        .replace(/\s+#.*$/, "")
-        .trim()
-        .replace(/^(["'])(.*)\1$/, "$2");
-    }
-    for (const [k, v] of Object.entries(seen)) {
-      if (v && !(k in found)) found[k] = v;
+    const seen = parse(readFileSync(file));
+    for (const key of SELECTORS) {
+      if (Object.hasOwn(seen, key) && !Object.hasOwn(found, key)) {
+        found[key] = seen[key];
+      }
     }
   }
   return found;
