@@ -38,7 +38,7 @@ The `buildFilter` in `render.yaml` keeps deploys from spending build minutes on 
 
 The Free instance stops after 15 minutes without traffic, and the next request waits about a minute while it starts. That is the price of $0. For a demo, change `plan` in `render.yaml` to `0.5c-512mb` (see [Costs](#costs)). Do not add a service that pings the app to keep it awake: it uses up the month's free instance hours, and when they run out Render suspends every Free service in the workspace.
 
-Seed data is not loaded in production. `pnpm seed` runs `seed:ensure` against the deployment a person has selected.
+Seed data is not loaded in production. `pnpm seed` runs `seed:ensure` against the deployment a person has selected. On 2026-11-21 production showed no agent cards on `/directorio`.
 
 ## PR previews
 
@@ -49,11 +49,12 @@ A preview is a second, temporary copy of the web service at its own `onrender.co
 - **Remove it:** take the label off, or merge or close the pull request. Render deletes the preview instance.
 - **Idle cost:** none. A preview is a Free instance too, so it stops after 15 minutes without traffic.
 - **Convex deletes a preview deployment 5 days after it was created.** The Render preview then shows errors until the next push or a manual deploy from the Render Dashboard, which creates a new deployment.
-- A pull request that only changes files ignored by `buildFilter` gets no preview.
+- Render creates the preview when the label goes on, whatever the branch's last commit changed: on 2026-11-21 the label on a Markdown-only head commit still produced a preview service. `buildFilter` decides which later pushes rebuild it.
 
 Things to know:
 
 - A preview instance copies the variables of the base service when it is created, including the production deploy key. The build script therefore picks the key from `IS_PULL_REQUEST` and refuses a preview build with a production key and a production build with a preview key. Later changes to the base service's variables do not reach previews that already exist.
+- That guard works and fails fast: on 2026-11-21 the first preview build stopped 30 s after the label went on with `This is a preview build, but its Convex deploy key is not a preview key`, and the preview service was deleted within a minute of the label coming off.
 - Convex functions in a preview read their variables from the project's default environment variables for preview deployments, not from Render.
 - Previews need the Hobby workspace plan only. Render's full "preview environments" need the Pro plan ($25/month) and are for projects with several Render services or Render databases, which this app does not have.
 - The repository is public. A Render employee wrote in 2021 that a pull request from a fork does not create a preview, and the current docs do not mention forks. Check it before you rely on it: a preview build runs the pull request's code with the service's secrets.
@@ -123,12 +124,12 @@ Sign-in and sign-up do not work yet, locally or deployed. Clerk answers both wit
 13. GitHub Actions needs no secrets. CI is offline and the deploy runs on Render. Only a future smoke step would need the Clerk development keys.
 14. Put the production URL in `deploy-url` in `platanus-hack-project.jsonc`.
 
-## Not verified until the first deploy
+## Measured on the first deploy
 
-These could not be tested without creating the service. Check them on the first deploy and correct this page.
+The first production deploy ran on 2026-11-21 for commit `7afbeee`, triggered by the Blueprint sync.
 
-- How long a Render build takes, and so how many deploys fit in 500 minutes. If a build takes 4 minutes, about 125.
-- Which pnpm Render's Node runtime ships. `scripts/render-build.sh` installs the version pinned in `package.json` when the two differ.
-- That the health check on `/` passes with real Clerk keys.
-- That a signed-in user gets an identity in Convex. It needs the Clerk SDK upgrade first.
-- That Render waits for the `check` job when another app's check, such as GitGuardian's, finishes first.
+- **88 seconds end to end**, 09:14:23 to 09:15:51 UTC: clone 4 s, install 15 s, `convex deploy` and `next build` 34 s, start and the health check on `/` 32 s. A deploy spends about one build minute, so 500 minutes carry roughly 500 deploys.
+- **pnpm already matched.** The Node 24.22.3 runtime reported `pnpm --version` as 11.22.0, the version in `package.json`, so `scripts/render-build.sh` skipped its global install and installed the 164 lockfile packages in 12 s.
+- **The health check on `/` passed with real Clerk keys.** The service went live at 09:15:51. From outside, `/` answers 200, loads Clerk from the development instance, and opens a WebSocket to the production Convex deployment; `/server` redirects to Clerk's sign-in page.
+- **Not verified yet:** that Render holds a `checksPass` deploy until the `check` job finishes. The first deploy came from the Blueprint sync and the first preview from the label, so neither waited on CI. The next push to `main` shows it.
+- **Not verified yet:** that a signed-in user gets an identity in Convex. Clerk refuses sign-in and sign-up from the clerk-js build this app loads, so until the SDK is upgraded (see `AGENTS.md`) there is no session to test with.
