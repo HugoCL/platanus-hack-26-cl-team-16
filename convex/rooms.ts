@@ -1,4 +1,5 @@
-import { ConvexError, type ObjectType, v } from "convex/values";
+import { ConvexError, convexToJson, type ObjectType, v } from "convex/values";
+import { zodToConvex } from "convex-helpers/server/zod4";
 import { effectiveAllowedIntents } from "../shared/agent";
 import {
   DEFAULT_MAX_TURNS,
@@ -56,11 +57,11 @@ export async function openRoom(
     internal.rooms.plan,
     args,
   );
-  const [initiator, provider] = participants;
+  const [initiator] = participants;
   const { verdict, events } = await moderate({
     content: { kind: "text", text: contract.intent.description },
     sender: initiator,
-    recipient: provider.participantId,
+    recipient: "all",
     participants,
     contract,
     history: [],
@@ -72,7 +73,11 @@ export async function openRoom(
       rule: verdict.rule,
     });
   }
-  return ctx.runMutation(internal.rooms.create, { ...args, events });
+  return ctx.runMutation(internal.rooms.create, {
+    ...args,
+    contract,
+    events,
+  });
 }
 
 export const plan = internalQuery({
@@ -110,9 +115,27 @@ export const plan = internalQuery({
 });
 
 export const create = internalMutation({
-  args: { ...openArgs, events: v.array(eventValidator) },
-  handler: async (ctx, { events, ...args }): Promise<Session> => {
-    const { cardName, contract, humanName } = await planRoom(ctx, args);
+  args: {
+    ...openArgs,
+    contract: zodToConvex(SessionContract),
+    events: v.array(eventValidator),
+  },
+  handler: async (ctx, { contract, events, ...args }): Promise<Session> => {
+    const {
+      cardName,
+      contract: currentContract,
+      humanName,
+    } = await planRoom(ctx, args);
+    if (
+      JSON.stringify(convexToJson(contract)) !==
+      JSON.stringify(convexToJson(currentContract))
+    ) {
+      throw new ConvexError({
+        kind: "RoomContractChanged",
+        message:
+          "the provider's card changed during moderation; retry opening the room",
+      });
+    }
     const sessionId = await ctx.db.insert("sessions", {
       initiatorAgentId: args.initiatorAgentId,
       intent: contract.intent,
