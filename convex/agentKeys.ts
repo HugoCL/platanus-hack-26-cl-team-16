@@ -5,6 +5,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import {
   internalAction,
   internalMutation,
+  type MutationCtx,
   mutation,
   type QueryCtx,
 } from "./_generated/server";
@@ -21,7 +22,9 @@ const API_KEY_FORMAT = /^dak_[0-9a-f]{64}$/;
 const LAST_USED_RESOLUTION_MS = MINUTE;
 
 // Every MCP request spends one token of its key's bucket, so one client in a loop cannot use up
-// the deployment for the rest.
+// the deployment for the rest. The endpoint spends it through `authenticate`, and every public
+// function that takes a key (convex/mcpRooms.ts) spends it again, so calling Convex directly does
+// not skip the quota.
 const rateLimiter = new RateLimiter(components.rateLimiter, {
   mcpRequest: { kind: "token bucket", rate: 120, period: MINUTE, capacity: 60 },
 });
@@ -87,8 +90,26 @@ export async function credentialForApiKey(
     : null;
 }
 
-// Called once per MCP request: checks the key, spends a token of its bucket and records when it
-// was last used, to the minute so a busy key does not write on every request.
+// Spends a token of the key's bucket and records when the key was last used, to the minute so a
+// busy key does not write on every request.
+export async function spendRequest(
+  ctx: MutationCtx,
+  key: Doc<"agentApiKeys">,
+  { throws = false }: { throws?: boolean } = {},
+) {
+  const limit = await rateLimiter.limit(ctx, "mcpRequest", {
+    key: key._id,
+    throws,
+  });
+  if (!limit.ok) return limit;
+  const now = Date.now();
+  if (now - (key.lastUsedAt ?? 0) >= LAST_USED_RESOLUTION_MS) {
+    await ctx.db.patch(key._id, { lastUsedAt: now });
+  }
+  return limit;
+}
+
+// Called once per MCP request: checks the key and spends a token of its bucket.
 export const authenticate = mutation({
   args: { apiKey: v.string() },
   returns: v.union(
@@ -100,13 +121,9 @@ export const authenticate = mutation({
     const credential = await credentialForApiKey(ctx, apiKey);
     if (!credential) return null;
     const { key, agent } = credential;
-    const limit = await rateLimiter.limit(ctx, "mcpRequest", { key: key._id });
+    const limit = await spendRequest(ctx, key);
     if (!limit.ok)
       return { ok: false as const, retryAfterMs: limit.retryAfter ?? 0 };
-    const now = Date.now();
-    if (now - (key.lastUsedAt ?? 0) >= LAST_USED_RESOLUTION_MS) {
-      await ctx.db.patch(key._id, { lastUsedAt: now });
-    }
     return { ok: true as const, agentId: agent._id };
   },
 });

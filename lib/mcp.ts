@@ -47,7 +47,7 @@ type ToolRun<N extends McpToolName> = (
 ) => Promise<z.input<Tool<N>["output"]>>;
 
 const BEARER = /^Bearer\s+(\S+)$/i;
-const POLL_MS = 500;
+const POLL_MS = 1000;
 const FIRST_READ_MS = 2000;
 
 const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
@@ -207,7 +207,7 @@ async function waitForMessages(
   const started = performance.now();
   const deadline = started + timeoutMs;
   const read = (cursor: string | null) =>
-    convex.query(api.mcpRooms.messages, {
+    convex.mutation(api.mcpRooms.messages, {
       apiKey,
       sessionId,
       after: cursor ?? undefined,

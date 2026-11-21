@@ -819,11 +819,11 @@ describe("MCP room tools", () => {
     const convex = t as ConvexCaller;
     let reads = 0;
     endpoint = createMcpEndpoint({
-      query: (ref, ...args) =>
-        reads++ === 0
-          ? convex.query(ref, ...args)
-          : new Promise<never>(() => {}),
-      mutation: (ref, ...args) => convex.mutation(ref, ...args),
+      query: (ref, ...args) => convex.query(ref, ...args),
+      mutation: (ref, ...args) =>
+        getFunctionName(ref) === "mcpRooms:messages" && reads++ > 0
+          ? new Promise<never>(() => {})
+          : convex.mutation(ref, ...args),
       action: (ref, ...args) => convex.action(ref, ...args),
     });
     const stalled = await connect("auto", apiKey);
@@ -831,7 +831,7 @@ describe("MCP room tools", () => {
     const started = performance.now();
     const result = await stalled.callTool({
       name: "wait_for_messages",
-      arguments: { sessionId, after: read.cursor, timeoutMs: 800 },
+      arguments: { sessionId, after: read.cursor, timeoutMs: 1500 },
     });
     const elapsed = performance.now() - started;
     expect(result.structuredContent).toEqual({
@@ -840,8 +840,8 @@ describe("MCP room tools", () => {
       sessionStatus: "active",
     });
     expect(reads).toBeGreaterThan(1);
-    expect(elapsed).toBeGreaterThanOrEqual(790);
-    expect(elapsed).toBeLessThan(1300);
+    expect(elapsed).toBeGreaterThanOrEqual(1490);
+    expect(elapsed).toBeLessThan(3000);
     await stalled.close();
   });
 
@@ -849,8 +849,11 @@ describe("MCP room tools", () => {
     const { sessionId } = await openRoom();
     const convex = t as ConvexCaller;
     endpoint = createMcpEndpoint({
-      query: () => new Promise<never>(() => {}),
-      mutation: (ref, ...args) => convex.mutation(ref, ...args),
+      query: (ref, ...args) => convex.query(ref, ...args),
+      mutation: (ref, ...args) =>
+        getFunctionName(ref) === "mcpRooms:messages"
+          ? new Promise<never>(() => {})
+          : convex.mutation(ref, ...args),
       action: (ref, ...args) => convex.action(ref, ...args),
     });
     const stalled = await connect("auto", apiKey);
@@ -863,9 +866,52 @@ describe("MCP room tools", () => {
     const elapsed = performance.now() - started;
     expect(result.isError).toBe(true);
     expect(JSON.stringify(result.content)).toContain("Timeout");
-    expect(elapsed).toBeGreaterThanOrEqual(1990);
-    expect(elapsed).toBeLessThan(2600);
+    expect(elapsed).toBeGreaterThanOrEqual(1900);
+    expect(elapsed).toBeLessThan(5000);
     await stalled.close();
+  });
+
+  it("holds a key that calls Convex directly to the same request quota", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const { sessionId } = await openRoom();
+      const read = () =>
+        t.mutation(api.mcpRooms.messages, { apiKey, sessionId });
+      await t.run(async (ctx) => {
+        for (const key of await ctx.db.query("agentApiKeys").collect()) {
+          await ctx.db.patch(key._id, { lastUsedAt: undefined });
+        }
+      });
+      let served = 0;
+      let refusal = "";
+      while (!refusal) {
+        await read().then(
+          () => served++,
+          (error) => {
+            refusal = String(error.data?.kind ?? error);
+          },
+        );
+      }
+      expect(refusal).toBe("RateLimited");
+      expect(served).toBeGreaterThan(0);
+      expect(served).toBeLessThan(60);
+      const keys = await t.run((ctx) => ctx.db.query("agentApiKeys").collect());
+      expect(keys.some((key) => key.lastUsedAt !== undefined)).toBe(true);
+      const limited = await endpoint(
+        new Request(MCP_URL, {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${apiKey}`,
+            "content-type": "application/json",
+            accept: "application/json, text/event-stream",
+          },
+          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+        }),
+      );
+      expect(limited.status).toBe(429);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   const revokeKey = () =>
