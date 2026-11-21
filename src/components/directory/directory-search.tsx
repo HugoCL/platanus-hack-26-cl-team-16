@@ -19,7 +19,7 @@ import {
 } from "@ui-sdk/react/slider";
 import { Switch, SwitchThumb } from "@ui-sdk/react/switch";
 import { Toggle } from "@ui-sdk/react/toggle";
-import { useAction, useQuery } from "convex/react";
+import { useAction, useQueries, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
 import {
   Check,
@@ -30,21 +30,25 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useMemo, useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
-import type { DirectoryCard } from "@/convex/directory";
+import type { DirectoryCard, DirectorySearchResult } from "@/convex/directory";
 import type { LatLng } from "@/shared/geo";
 import { COMUNAS, MAX_QUERY_LENGTH } from "../../../lib/directory";
 import { intentLabel } from "../room/room-format";
 import { cardDistance, categoryTree, pluralAgents } from "./directory-format";
 import DirectoryList from "./directory-list";
 import { DirectoryMap } from "./directory-map";
+import { FixtureToggle, useFixtureState } from "./fixture-toggle";
 import { OpenSessionDialog } from "./open-session-dialog";
 import { SiteHeader } from "./site-header";
+import { fixtureResult } from "./worst-case-fixture";
 
 const ALL = "all";
 const MAX_INTENT_FILTERS = 6;
 const DEFAULT_RADIUS_KM = 5;
+const PAGE_SIZE = 20;
+const FIRST_PAGE = [0];
 
 type Sort = "relevance" | "distance" | "name";
 type Geo =
@@ -73,10 +77,17 @@ export function DirectorySearch() {
   const [view, setView] = useState<"list" | "map">("list");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  const result = useQuery(api.directory.search, {
-    category: category ?? undefined,
-    comuna: comuna ?? undefined,
-  });
+  const [fixture, setFixture] = useFixtureState();
+  const filterKey = `${category}|${comuna}`;
+  const [more, setMore] = useState({ key: filterKey, offsets: FIRST_PAGE });
+  const offsets = more.key === filterKey ? more.offsets : FIRST_PAGE;
+  const { result: liveResult, loadingMore } = usePagedSearch(
+    category,
+    comuna,
+    offsets,
+  );
+  const result =
+    fixture === "demo" ? liveResult : fixtureResult(fixture, liveResult);
   const categories = useQuery(api.directory.categories, {});
 
   const origin = geo.state === "on" ? geo.origin : null;
@@ -455,7 +466,7 @@ export function DirectorySearch() {
               ) : (
                 <>
                   <span className="font-medium text-foreground tabular-nums">
-                    {pluralAgents(cards.length)}
+                    {pluralAgents(cards.length, result.truncated)}
                   </span>
                   {summary ? ` · ${summary}` : null}
                 </>
@@ -492,19 +503,12 @@ export function DirectorySearch() {
               </p>
             ) : (
               <div className="flex flex-col gap-3">
-                {result.truncated ? (
-                  <p
-                    className="m-0 text-[13px] text-subtle-foreground"
-                    data-testid="partial"
-                  >
-                    Resultado parcial: se muestran las primeras{" "}
-                    {result.agents.length} fichas.
-                  </p>
-                ) : null}
                 {cards.length === 0 ? (
                   <div className="flex flex-col items-start gap-2 py-6">
                     <p className="m-0 font-medium">
-                      No hay agentes con estos filtros.
+                      {active.length > 0
+                        ? "No hay agentes con estos filtros."
+                        : "Todavía no hay agentes en el directorio."}
                     </p>
                     {active.length > 0 ? (
                       <Button data-size="sm" onClick={clearAll}>
@@ -522,6 +526,22 @@ export function DirectorySearch() {
                     onConverse={setConverse}
                   />
                 )}
+                {result.nextOffset !== undefined ? (
+                  <Button
+                    data-testid="load-more"
+                    className="self-center"
+                    aria-busy={loadingMore}
+                    disabled={loadingMore}
+                    onClick={() =>
+                      setMore({
+                        key: filterKey,
+                        offsets: [...offsets, result.nextOffset ?? 0],
+                      })
+                    }
+                  >
+                    {loadingMore ? "Cargando…" : "Ver más agentes"}
+                  </Button>
+                ) : null}
                 {origin && radiusKm < 50 ? (
                   <p className="m-0 text-center text-xs text-subtle-foreground">
                     No hay más resultados en {radiusKm} km.{" "}
@@ -566,6 +586,7 @@ export function DirectorySearch() {
       </Button>
 
       <OpenSessionDialog card={converse} onClose={() => setConverse(null)} />
+      <FixtureToggle state={fixture} onChange={setFixture} />
     </div>
   );
 }
@@ -662,4 +683,61 @@ function TextSearch({
       ) : null}
     </div>
   );
+}
+
+function usePagedSearch(
+  category: string | null,
+  comuna: string | null,
+  offsets: number[],
+) {
+  const requests = useMemo(
+    () =>
+      Object.fromEntries(
+        offsets.map((offset, page) => [
+          String(page),
+          {
+            query: api.directory.search,
+            args: {
+              ...(category ? { category } : {}),
+              ...(comuna ? { comuna } : {}),
+              limit: PAGE_SIZE,
+              offset,
+            },
+          },
+        ]),
+      ),
+    [category, comuna, offsets],
+  );
+  const results = useQueries(requests);
+  const loaded: DirectorySearchResult[] = [];
+  for (let page = 0; page < offsets.length; page++) {
+    const value: DirectorySearchResult | Error | undefined =
+      results[String(page)];
+    if (value instanceof Error) throw value;
+    if (value === undefined) break;
+    loaded.push(value);
+  }
+  // Keep the merged result's identity while no page changed, so the map does not re-fit.
+  const cache = useRef<{
+    pages: DirectorySearchResult[];
+    result: DirectorySearchResult | undefined;
+  }>({ pages: [], result: undefined });
+  if (
+    loaded.length !== cache.current.pages.length ||
+    loaded.some((page, i) => page !== cache.current.pages[i])
+  ) {
+    const last = loaded.at(-1);
+    cache.current = {
+      pages: loaded,
+      result: last && {
+        agents: loaded.flatMap((page) => page.agents),
+        truncated: last.truncated && last.agents.length > 0,
+        nextOffset: last.nextOffset,
+      },
+    };
+  }
+  return {
+    result: cache.current.result,
+    loadingMore: loaded.length > 0 && loaded.length < offsets.length,
+  };
 }
