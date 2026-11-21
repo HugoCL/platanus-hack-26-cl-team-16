@@ -78,10 +78,12 @@ export function createModerator({
       await beforeJudge?.();
       const started = Date.now();
       for (let retry = false; ; retry = true) {
-        if (retry) await beforeJudge?.();
+        let attemptStarted = false;
         let verdict: Verdict;
         let reasons: ModerationReason[];
         try {
+          if (retry) await beforeJudge?.();
+          attemptStarted = true;
           const decision = await withTimeout(
             (signal) => judge(llm, input, signal),
             timeoutMs,
@@ -113,7 +115,9 @@ export function createModerator({
               stage: "purpose",
               detail: timedOut
                 ? `El juez no respondió en ${2 * timeoutMs} ms.`
-                : "El juez falló o devolvió una respuesta inválida.",
+                : attemptStarted
+                  ? "El juez falló o devolvió una respuesta inválida."
+                  : "No se pudo iniciar el reintento del juez.",
             },
           ];
         }
