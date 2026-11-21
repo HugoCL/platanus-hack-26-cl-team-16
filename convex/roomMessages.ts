@@ -46,18 +46,19 @@ function invalidCursor(): never {
   });
 }
 
+// Only the two shapes encodeCursor writes: `s:<seq>` with seq >= 1, and `c:<_creationTime>:<id>`.
+const SEQ_CURSOR = /^s:([1-9]\d*)$/;
+const CREATION_CURSOR = /^c:(\d+(?:\.\d+)?):([^:]+)$/;
+
 function decodeCursor(ctx: QueryCtx, cursor: string): Position {
-  const [kind, value, id, extra] = cursor.split(":");
-  const number = Number(value);
-  if (extra !== undefined || !value || !Number.isFinite(number)) {
-    invalidCursor();
+  const seq = SEQ_CURSOR.exec(cursor);
+  if (seq && Number.isSafeInteger(Number(seq[1]))) {
+    return { seq: Number(seq[1]) };
   }
-  if (kind === "s" && id === undefined && Number.isSafeInteger(number)) {
-    return { seq: number };
-  }
-  const messageId = kind === "c" && id && ctx.db.normalizeId("messages", id);
-  if (!messageId) invalidCursor();
-  return { creationTime: number, messageId };
+  const creation = CREATION_CURSOR.exec(cursor);
+  const messageId = creation && ctx.db.normalizeId("messages", creation[2]);
+  if (!creation || !messageId) invalidCursor();
+  return { creationTime: Number(creation[1]), messageId };
 }
 
 function encodeCursor(doc: Doc<"messages">) {
