@@ -110,7 +110,7 @@ function buildSections(): Section[] {
     ).map(
       (listing): Entry => ({
         label: `${listing.name}, ${listing.comuna}`,
-        phone: listing.phone ?? phone(),
+        phone: listing.phone ?? "sin teléfono",
         tone: "seed",
       }),
     );
