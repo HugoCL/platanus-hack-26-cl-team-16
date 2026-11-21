@@ -40,6 +40,7 @@ function room(providerSlug: string, intent: SessionIntent): ModerationRoom {
   return {
     contract: {
       intent,
+      purpose: card.purpose,
       capabilities: card.capabilities,
       allowedIntents: effectiveAllowedIntents(card),
       forbiddenTopics: card.scope.forbiddenTopics,

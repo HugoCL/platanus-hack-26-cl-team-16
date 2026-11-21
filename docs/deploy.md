@@ -87,7 +87,7 @@ What changes the bill:
 
 No agent does these steps. The repository records only one of them: `convex/auth.config.ts` names the team's Clerk app (step 6). Check the others in each dashboard.
 
-Clerk keyless mode works only under `next dev`. A deployed build runs `next start`, which answers every request with an error (`Missing publishableKey`) unless `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` are set. The publishable key is compiled into the build, so both must be on the Render service before the first deploy.
+Clerk keyless mode works only under `next dev`. A deployed build runs `next start`, which answers every request with an error ("Clerk keys are missing from your environment") unless `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` are set. The publishable key is compiled into the build, so both must be on the Render service before the first deploy.
 
 ### Convex
 
@@ -102,7 +102,7 @@ Clerk keyless mode works only under `next dev`. A deployed build runs `next star
 6. Activate the Convex integration in Clerk and copy the Frontend API URL. `convex/auth.config.ts` names it as a literal `domain`: `https://cheerful-cougar-1086.clerk.accounts.dev`. Change it in a pull request only when the Clerk app changes. Convex then gives a signed-in user of that app an identity, in production and in previews.
 7. A Clerk production instance (`pk_live_...`) needs a domain you own and DNS records on it, so it cannot use an `onrender.com` address. Create it only when the app has its own domain. Production and previews would then use different Clerk instances, and `auth.config.ts` would need the `CLERK_JWT_ISSUER_DOMAIN` variable per Convex deployment instead of a literal.
 
-Sign-in and sign-up do not work yet, locally or deployed. Clerk answers both with `action_blocked` ("This app uses an outdated version of Clerk") for clerk-js 5, which `@clerk/nextjs` 6 loads; the same request with clerk-js 6 is accepted. The app renders and works signed out. Signing in needs a Clerk SDK upgrade: the repository has `@clerk/nextjs` 6 and the current major is 7.
+`@clerk/nextjs` 7 loads Clerk JS 6, replacing the version that Clerk rejected with `action_blocked`. To verify the team's integration, run with the existing Clerk development instance and a Convex dev deployment. Sign up a test user with a first and last name, sign in, and check that the home page says “Welcome” followed by that name rather than “Anonymous”; the name comes from Convex's authenticated identity, and a user without a name also shows “Anonymous”. Sign out and confirm that opening `/server` redirects to sign-in. Keyless mode cannot verify the team's Convex identity.
 
 ### Render
 
@@ -142,4 +142,4 @@ The first production deploy ran on 2026-11-21 for commit `7afbeee`, triggered by
 - **pnpm already matched.** The Node 24.22.3 runtime reported `pnpm --version` as 11.22.0, the version in `package.json`, so `scripts/render-build.sh` skipped its global install and installed the 164 lockfile packages in 12 s.
 - **The health check on `/` passed with real Clerk keys.** The service went live at 09:15:51. From outside, `/` answers 200, loads Clerk from the development instance, and opens a WebSocket to the production Convex deployment; `/server` redirects to Clerk's sign-in page.
 - **Render does wait for CI.** The merge commit `6e44f8a` put the `check` job in progress at 09:51:45 UTC and Render created no deploy while it ran; the job passed at 09:52:44 and the deploy appeared two seconds later, live after 68 s. The first deploy of the service came from the Blueprint sync, so only a push to `main` could show this.
-- **Not verified yet:** that a signed-in user gets an identity in Convex. Clerk refuses sign-in and sign-up from the clerk-js build this app loads, so until the SDK is upgraded (see `AGENTS.md`) there is no session to test with.
+- **Not verified on the first deploy:** that a signed-in user gets an identity in Convex. Clerk rejected the old browser SDK used in that deploy. Verify with the current SDK and the team's development instance as described above.

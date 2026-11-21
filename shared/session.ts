@@ -11,6 +11,7 @@ export type SessionIntent = z.infer<typeof SessionIntent>;
 
 export const SessionContract = z.object({
   intent: SessionIntent,
+  purpose: z.string().min(1).max(1000),
   capabilities: z.array(Capability),
   allowedIntents: z.array(IntentName).min(1),
   forbiddenTopics: z.array(z.string()),
