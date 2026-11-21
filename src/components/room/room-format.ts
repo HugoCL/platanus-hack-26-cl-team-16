@@ -247,3 +247,53 @@ export function splitRedacted(text: string) {
       return piece;
     });
 }
+
+// The last session notice decides whether the room is open, closed, or terminated.
+export function sessionEnd(messages: RoomMessage[]) {
+  const notice = messages.findLast(
+    (m) =>
+      m.content.kind === "system" &&
+      (m.content.code === "session_closed" ||
+        m.content.code === "session_terminated"),
+  );
+  if (notice?.content.kind !== "system") return null;
+  const status: SessionStatus =
+    notice.content.code === "session_terminated" ? "terminated" : "closed";
+  return { status, text: notice.content.text };
+}
+
+const secondsFormat = new Intl.NumberFormat("es-CL", {
+  maximumFractionDigits: 1,
+});
+const msFormat = new Intl.NumberFormat("es-CL");
+
+export function formatLatency(ms: number) {
+  return ms < 1000
+    ? `${msFormat.format(ms)} ms`
+    : `${secondsFormat.format(ms / 1000)} s`;
+}
+
+const scoreFormat = new Intl.NumberFormat("es-CL", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+export function formatScore(score: number) {
+  return scoreFormat.format(score);
+}
+
+const graphemes = new Intl.Segmenter("es", { granularity: "grapheme" });
+
+// Prefer capitalized words ("Agendamiento y Reservas" gives "AR"), else any words ("mi asistente 🦊" gives "MA").
+export function initials(name: string) {
+  const words = name.split(/\s+/).filter((word) => /^\p{L}/u.test(word));
+  const capitalized = words.filter((word) => /^\p{Lu}/u.test(word));
+  return (capitalized.length >= 2 ? capitalized : words)
+    .slice(0, 2)
+    .map(
+      (word) =>
+        graphemes.segment(word)[Symbol.iterator]().next().value?.segment ?? "",
+    )
+    .join("")
+    .toLocaleUpperCase("es");
+}

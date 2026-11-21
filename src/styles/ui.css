@@ -145,6 +145,16 @@
     }
   }
 
+  /* GenUI labels come from the provider and can be long: buttons wrap instead of overflowing the card. */
+  [data-genui] [data-slot="button"] {
+    max-width: 100%;
+    height: auto;
+    min-height: calc(var(--ui-spacing) * 8);
+    padding-block: calc(var(--ui-spacing) * 1.5);
+    white-space: normal;
+    text-align: start;
+  }
+
   /* Slot picker tiles: the time is the control; the chosen one takes the action color. */
   .room-slot {
     background: var(--ui-muted);

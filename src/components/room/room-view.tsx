@@ -11,6 +11,12 @@ import {
   DialogTitle,
 } from "@ui-sdk/react/dialog";
 import {
+  Drawer,
+  DrawerBackdrop,
+  DrawerContent,
+  DrawerTitle,
+} from "@ui-sdk/react/drawer";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -23,11 +29,12 @@ import { Textarea } from "@ui-sdk/react/textarea";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
+  BotIcon,
   PanelRightIcon,
   ShieldCheckIcon,
   UserIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { ThemeToggle } from "@/components/toggle-theme";
 import type { UiSpec } from "@/shared/genui";
 import { MAX_TEXT_LENGTH } from "@/shared/messages";
@@ -40,13 +47,17 @@ import { ReasonList } from "./moderation";
 import {
   auditMetrics,
   dataFieldLabel,
+  formatLatency,
   formatLongDay,
+  formatScore,
   formatTime,
+  initials,
   intentLabel,
   REASON_LABELS,
   type RoomMessage,
   type RoomParticipant,
   SESSION_STATUS_LABELS,
+  sessionEnd,
   type Viewer,
   violationTone,
 } from "./room-format";
@@ -83,6 +94,7 @@ export function DemoRoom({
   const room = useDemoRoom(fixture.script, dataset !== "demo");
   const [role, setRole] = useState<Viewer["role"]>("owner");
   const [panelOpen, setPanelOpen] = useState(true);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [control, setControl] = useState(false);
   const [auditFor, setAuditFor] = useState<string | null>(null);
   const [highlighted, setHighlighted] = useState<string | null>(null);
@@ -106,11 +118,8 @@ export function DemoRoom({
     return map;
   }, [room.messages]);
 
-  const status: SessionStatus = room.messages.some(
-    (m) => m.content.kind === "system" && m.content.code === "session_closed",
-  )
-    ? "closed"
-    : "active";
+  const end = sessionEnd(room.messages);
+  const status: SessionStatus = end?.status ?? "active";
   const violations = room.messages.filter(
     (m) => m.status === "blocked" && m.senderParticipantId !== null,
   ).length;
@@ -118,6 +127,7 @@ export function DemoRoom({
   const canControl = role !== "observer";
 
   function jumpTo(messageId: string) {
+    setSheetOpen(false);
     document
       .getElementById(`msg-${messageId}`)
       ?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -126,6 +136,16 @@ export function DemoRoom({
   }
 
   const auditMessage = room.messages.find((m) => m.messageId === auditFor);
+
+  const sidePanel = (
+    <SidePanel
+      contract={fixture.contract}
+      messages={room.messages}
+      participants={fixture.participants}
+      role={role}
+      onJump={jumpTo}
+    />
+  );
 
   return (
     <div className="flex h-dvh flex-col bg-background">
@@ -145,8 +165,11 @@ export function DemoRoom({
             contract={fixture.contract}
             status={status}
             violations={violations}
-            panelOpen={panelOpen}
-            onTogglePanel={() => setPanelOpen((o) => !o)}
+            onTogglePanel={() => {
+              if (window.matchMedia("(min-width: 64rem)").matches)
+                setPanelOpen((o) => !o);
+              else setSheetOpen(true);
+            }}
           />
           <Thread
             messages={room.messages}
@@ -154,28 +177,42 @@ export function DemoRoom({
               room.typing ? participants.get(room.typing)?.name : undefined
             }
           >
-            {room.messages.map((message) => (
-              <MessageItem
-                key={message.messageId}
-                message={message}
-                sender={
-                  message.senderParticipantId
-                    ? participants.get(message.senderParticipantId)
-                    : undefined
-                }
-                viewer={viewer}
-                answers={room.answers}
-                uiSpecsByMessage={uiSpecsByMessage}
-                highlighted={highlighted === message.messageId}
-                onRespond={(response) =>
-                  room.respond(response, message.messageId)
-                }
-                onShowAudit={setAuditFor}
-              />
-            ))}
+            {room.messages.map((message, i) => {
+              const prev = room.messages[i - 1];
+              const day = formatLongDay(message.sentAt);
+              const newDay = !prev || formatLongDay(prev.sentAt) !== day;
+              return (
+                <Fragment key={message.messageId}>
+                  {newDay ? <DayDivider label={day} /> : null}
+                  <MessageItem
+                    message={message}
+                    continued={
+                      !newDay &&
+                      message.senderParticipantId !== null &&
+                      prev?.senderParticipantId === message.senderParticipantId
+                    }
+                    sender={
+                      message.senderParticipantId
+                        ? participants.get(message.senderParticipantId)
+                        : undefined
+                    }
+                    viewer={viewer}
+                    answers={room.answers}
+                    uiSpecsByMessage={uiSpecsByMessage}
+                    highlighted={highlighted === message.messageId}
+                    onRespond={(response) =>
+                      room.respond(response, message.messageId)
+                    }
+                    onShowAudit={setAuditFor}
+                    onReview={room.review}
+                  />
+                </Fragment>
+              );
+            })}
           </Thread>
           <Composer
             readOnly={readOnly}
+            closedText={end?.text}
             control={control}
             canControl={canControl}
             selfName={self?.name ?? "tu agente"}
@@ -190,17 +227,17 @@ export function DemoRoom({
             aria-label="Contrato y auditoría"
             className="hidden w-[340px] shrink-0 flex-col overflow-y-auto lg:flex"
           >
-            <SidePanel
-              contract={fixture.contract}
-              otherName={other?.name ?? "el proveedor"}
-              messages={room.messages}
-              participants={fixture.participants}
-              role={role}
-              onJump={jumpTo}
-            />
+            {sidePanel}
           </aside>
         ) : null}
       </div>
+      <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
+        <DrawerBackdrop />
+        <DrawerContent className="max-h-[85dvh] overflow-y-auto">
+          <DrawerTitle className="sr-only">Contrato y auditoría</DrawerTitle>
+          {sidePanel}
+        </DrawerContent>
+      </Drawer>
       {showDataToggle ? <DataToggle current={dataset} /> : null}
       <Dialog
         open={auditFor !== null}
@@ -213,7 +250,7 @@ export function DemoRoom({
           <DialogTitle>Auditoría del mensaje</DialogTitle>
           <DialogDescription>
             {auditMessage
-              ? `${participants.get(auditMessage.senderParticipantId ?? "")?.name ?? "Sistema"} · ${formatTime(auditMessage.sentAt)} · ${auditMessage.audit?.model ?? MODERATOR_MODEL} · ${auditMessage.audit?.latencyMs ?? "—"} ms`
+              ? `${participants.get(auditMessage.senderParticipantId ?? "")?.name ?? "Sistema"} · ${formatTime(auditMessage.sentAt)} · ${auditMessage.audit?.model ?? MODERATOR_MODEL} · ${auditMessage.audit ? formatLatency(auditMessage.audit.latencyMs) : "—"}`
               : null}
           </DialogDescription>
           {auditMessage?.reasons?.length ? (
@@ -243,7 +280,7 @@ function DemoToolbar({
       <span className="hidden opacity-80 sm:inline">
         Sin backend: datos del seed y una conversación guionada
       </span>
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
         <Select
           value={role}
           onValueChange={(value) => {
@@ -278,12 +315,7 @@ function Avatar({
   participant?: RoomParticipant;
   size?: number;
 }) {
-  const initials = (participant?.name ?? "?")
-    .split(/\s+/)
-    .filter((w) => /^[A-ZÁÉÍÓÚÑ]/.test(w))
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join("");
+  const letters = initials(participant?.name ?? "");
   return (
     <span
       aria-hidden="true"
@@ -294,7 +326,11 @@ function Avatar({
           : "bg-muted text-foreground"
       }`}
     >
-      {participant?.kind === "human" ? <UserIcon size={14} /> : initials}
+      {participant?.kind === "human" ? (
+        <UserIcon size={14} />
+      ) : (
+        letters || <BotIcon size={14} />
+      )}
     </span>
   );
 }
@@ -355,7 +391,6 @@ function SessionHeader({
   contract,
   status,
   violations,
-  panelOpen,
   onTogglePanel,
 }: {
   self?: RoomParticipant;
@@ -363,7 +398,6 @@ function SessionHeader({
   contract: SessionContract;
   status: SessionStatus;
   violations: number;
-  panelOpen: boolean;
   onTogglePanel: () => void;
 }) {
   const tone = violationTone(violations, contract.maxViolations);
@@ -380,7 +414,9 @@ function SessionHeader({
         </span>
         <div className="flex min-w-0 flex-col gap-0.5">
           <h1 className="m-0 flex min-w-0 items-center gap-1 text-lg leading-tight font-semibold tracking-tight">
-            <span className="truncate">{other?.name}</span>
+            <span className="truncate" title={other?.name}>
+              {other?.name}
+            </span>
             <VerifiedBadge />
           </h1>
           <p className="m-0 truncate text-sm text-subtle-foreground">
@@ -392,7 +428,7 @@ function SessionHeader({
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-5 text-xs">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
         <span
           data-testid="session-status"
           className="inline-flex items-center gap-1.5 font-medium"
@@ -407,7 +443,7 @@ function SessionHeader({
           data-testid="violations"
           className="inline-flex items-center gap-2 text-subtle-foreground"
         >
-          Violaciones
+          <span className="max-sm:sr-only">Violaciones</span>
           <span aria-hidden="true" className="flex gap-0.5">
             {segments.map((segment) => (
               <span
@@ -423,16 +459,24 @@ function SessionHeader({
         <Button
           data-size="sm"
           data-variant="ghost"
-          aria-label={panelOpen ? "Ocultar contrato" : "Mostrar contrato"}
-          aria-pressed={panelOpen}
-          className="hidden lg:inline-flex"
+          aria-label="Contrato y auditoría"
           onClick={onTogglePanel}
         >
           <PanelRightIcon size={16} />
         </Button>
+        <ThemeToggle variant="icon" />
       </div>
-      <ThemeToggle variant="icon" />
     </header>
+  );
+}
+
+function DayDivider({ label }: { label: string }) {
+  return (
+    <p className="m-0 flex w-full items-center gap-3 text-xs font-medium text-subtle-foreground">
+      <span aria-hidden="true" className="h-px flex-1 bg-border" />
+      {label}
+      <span aria-hidden="true" className="h-px flex-1 bg-border" />
+    </p>
   );
 }
 
@@ -486,11 +530,9 @@ function Thread({
         }}
         className="flex h-full flex-col gap-6 overflow-y-auto px-4 py-6"
       >
-        {messages[0] ? (
-          <p className="m-0 mx-auto flex w-full max-w-3xl items-center gap-3 text-xs font-medium text-subtle-foreground">
-            <span aria-hidden="true" className="h-px flex-1 bg-border" />
-            {formatLongDay(messages[0].sentAt)}
-            <span aria-hidden="true" className="h-px flex-1 bg-border" />
+        {messages.length === 0 && !typingName ? (
+          <p className="m-auto text-center text-sm text-subtle-foreground">
+            Esperando el primer mensaje de los agentes…
           </p>
         ) : null}
         <section
@@ -539,6 +581,7 @@ function Thread({
 
 function Composer({
   readOnly,
+  closedText,
   control,
   canControl,
   selfName,
@@ -548,6 +591,7 @@ function Composer({
   onRestart,
 }: {
   readOnly: boolean;
+  closedText?: string;
   control: boolean;
   canControl: boolean;
   selfName: string;
@@ -561,7 +605,7 @@ function Composer({
   if (readOnly) {
     return (
       <div className="flex flex-wrap items-center gap-3 border-t border-border bg-muted px-4 py-3 text-sm">
-        <span className="flex-1">Sala cerrada · objetivo cumplido</span>
+        <span className="flex-1">{closedText ?? "Sala cerrada"}</span>
         <Button data-size="sm" onClick={onRestart}>
           Abrir nueva sala
         </Button>
@@ -650,14 +694,12 @@ function Composer({
 
 function SidePanel({
   contract,
-  otherName,
   messages,
   participants,
   role,
   onJump,
 }: {
   contract: SessionContract;
-  otherName: string;
   messages: RoomMessage[];
   participants: RoomParticipant[];
   role: Viewer["role"];
@@ -671,7 +713,7 @@ function SidePanel({
         <TabsTab value="participantes">Participantes</TabsTab>
       </TabsList>
       <TabsPanel value="contrato">
-        <ContractView contract={contract} otherName={otherName} />
+        <ContractView contract={contract} />
       </TabsPanel>
       <TabsPanel value="auditoria">
         <AuditView messages={messages} onJump={onJump} />
@@ -717,9 +759,9 @@ function Terms({
       {items.map((item) => (
         <li
           key={item.code ?? item.label}
-          className="flex items-baseline justify-between gap-3 py-1"
+          className="flex flex-wrap items-baseline justify-between gap-x-3 py-1"
         >
-          <span className="flex items-center gap-2">
+          <span className="flex min-w-0 items-center gap-2">
             {marker ? (
               <span
                 aria-hidden="true"
@@ -729,7 +771,7 @@ function Terms({
             {item.label}
           </span>
           {item.code ? (
-            <code className="font-mono text-xs text-subtle-foreground">
+            <code className="min-w-0 font-mono text-xs break-all text-subtle-foreground">
               {item.code}
             </code>
           ) : null}
@@ -739,14 +781,7 @@ function Terms({
   );
 }
 
-function ContractView({
-  contract,
-  otherName,
-}: {
-  contract: SessionContract;
-  otherName: string;
-}) {
-  const short = otherName.replace(/^Agendamiento\s+/, "la ");
+function ContractView({ contract }: { contract: SessionContract }) {
   const fields = (codes: string[]) =>
     codes.map((code) => ({ label: dataFieldLabel(code), code }));
   return (
@@ -779,10 +814,10 @@ function ContractView({
           items={contract.forbiddenTopics.map((label) => ({ label }))}
         />
       </Section>
-      <Section title={`Qué comparte ${short}`}>
+      <Section title="Qué comparte el proveedor">
         <Terms items={fields(contract.recipientShares)} />
       </Section>
-      <Section title={`Qué pide ${short}`}>
+      <Section title="Qué pide el proveedor">
         <Terms items={fields(contract.recipientRequests)} />
       </Section>
       <Section title="Máximo de violaciones">
@@ -822,7 +857,7 @@ function AuditView({
             "Latencia media",
             metrics.averageLatencyMs === null
               ? "—"
-              : `${metrics.averageLatencyMs} ms`,
+              : formatLatency(metrics.averageLatencyMs),
           ],
         ].map(([label, value]) => (
           <div key={label} className="flex flex-col px-3 py-2.5 first:pl-0">
@@ -861,7 +896,7 @@ function AuditView({
                   {AUDIT_ACTION[m.status]} · {formatTime(m.sentAt)}
                 </span>
                 <span className="font-mono tabular-nums text-subtle-foreground">
-                  {m.audit?.latencyMs ?? "—"} ms
+                  {m.audit ? formatLatency(m.audit.latencyMs) : "—"}
                 </span>
               </span>
               {m.reasons?.length ? (
@@ -869,7 +904,7 @@ function AuditView({
                   {m.reasons
                     .map(
                       (r) =>
-                        `${r.code}${r.score !== undefined ? ` ${r.score.toFixed(2)}` : ""}`,
+                        `${r.code}${r.score !== undefined ? ` ${formatScore(r.score)}` : ""}`,
                     )
                     .join(" · ")}
                 </span>
