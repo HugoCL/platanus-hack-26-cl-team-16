@@ -49,6 +49,12 @@ it.each([
     {},
   ],
   [
+    "remote alias revealed by an empty shell override",
+    "CONVEX_DEPLOYMENT=anonymous:anonymous-demo\nCONVEX_DEPLOY_KEY=<ignore_deploy_key>\nCONVEX_DEPLOYMENT_TOKEN=synthetic-test-value\n",
+    "",
+    { CONVEX_DEPLOY_KEY: "" },
+  ],
+  [
     "self-hosted selector",
     "CONVEX_DEPLOYMENT=anonymous:anonymous-demo\n",
     "CONVEX_SELF_HOSTED_URL=https://example.invalid\n",
@@ -80,7 +86,15 @@ it.each([
   }
 });
 
-it("refuses to start dev with a colon-form production selector", () => {
+it.each([
+  ["a colon-form production selector", {}],
+  [
+    "a higher-priority production selector than the shell alias",
+    {
+      CONVEX_DEPLOYMENT_TOKEN: "dev:example|synthetic",
+    },
+  ],
+] as const)("refuses to start dev with %s", (_, env) => {
   const root = mkdtempSync(join(tmpdir(), "scene-dev-test-"));
   try {
     const modules = join(root, "node_modules");
@@ -104,7 +118,7 @@ it("refuses to start dev with a colon-form production selector", () => {
 
     const result = spawnSync(process.execPath, [entry], {
       cwd: root,
-      env: { NODE_ENV: "test", PATH: bin },
+      env: { NODE_ENV: "test", PATH: bin, ...env },
       encoding: "utf8",
       timeout: 5000,
     });

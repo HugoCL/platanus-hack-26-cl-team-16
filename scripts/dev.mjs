@@ -6,16 +6,9 @@
 // the environment and then from .env.local and .env, BEFORE it looks at CONVEX_AGENT_MODE:
 //   CONVEX_DEPLOY_KEY, CONVEX_DEPLOYMENT_TOKEN (alias of the key), CONVEX_DEPLOYMENT,
 //   CONVEX_SELF_HOSTED_URL, CONVEX_SELF_HOSTED_ADMIN_KEY
-// Mode detection, first match wins:
-//   1. CONVEX_DEPLOY_KEY or CONVEX_DEPLOYMENT_TOKEN is set in the environment
-//                                                        -> plain `convex dev` (cloud)
-//   2. .env.local or .env sets a selector other than an `anonymous:` CONVEX_DEPLOYMENT
-//                                                        -> plain `convex dev` (cloud)
-//   3. otherwise                                         -> CONVEX_AGENT_MODE=anonymous
-// In anonymous mode every selector is removed from the children's environment, so a stray
-// project-wide variable cannot send the machine to a login prompt or to someone else's
-// deployment while this script says "anonymous". In cloud mode the deployment comes from the key
-// or from .env.local, and CONVEX_AGENT_MODE is removed. Cloud mode refuses to start when the key
+// The deploy key and its alias follow Convex precedence, including empty values and its ignore
+// sentinel. Other selectors are read from .env.local or .env, not the shell.
+// Cloud mode refuses to start when the key
 // or CONVEX_DEPLOYMENT targets production (`prod:` prefix, or a legacy key with no prefix),
 // because this script pushes and seeds.
 // Before starting, `convex dev --once --run seed:ensure` pushes and fills empty tables with
@@ -73,15 +66,13 @@ function selectedKey(get) {
 }
 
 function detect() {
-  const key = selectedKey((n) => process.env[n]);
-  if (key) return { anonymous: false, why: `${key.name} is set`, key };
   const files = envFileSelectors();
-  const fileKey = selectedKey((n) => files[n]);
-  if (fileKey)
+  const key = selectedKey((n) => process.env[n] ?? files[n]);
+  if (key)
     return {
       anonymous: false,
-      why: `${fileKey.name} is set in .env.local or .env`,
-      key: fileKey,
+      why: `${key.name} is set`,
+      key,
     };
   const deployment = files.CONVEX_DEPLOYMENT;
   if (deployment && !deployment.startsWith("anonymous:")) {
@@ -116,14 +107,10 @@ const env = {
     .filter(Boolean)
     .join(delimiter),
 };
+for (const name of SELECTORS) if (!KEY_VARS.includes(name)) delete env[name];
 if (mode.anonymous) {
-  // Anonymous mode: convex resolves every selector before CONVEX_AGENT_MODE, so none may reach it.
-  for (const name of SELECTORS) delete env[name];
   env.CONVEX_AGENT_MODE = "anonymous";
 } else {
-  // The deployment comes from the key or from .env.local, so a shell CONVEX_DEPLOYMENT or
-  // CONVEX_SELF_HOSTED_* (resolved first, and a conflict between them) must not reach convex.
-  for (const name of SELECTORS) if (!KEY_VARS.includes(name)) delete env[name];
   delete env.CONVEX_AGENT_MODE;
   if (targetsProd(mode)) {
     console.error(

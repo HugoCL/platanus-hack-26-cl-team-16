@@ -44,16 +44,15 @@ const remoteSelectors = [
   "CONVEX_SELF_HOSTED_URL",
   "CONVEX_SELF_HOSTED_ADMIN_KEY",
 ];
-function hasDeployKey(env) {
-  const key = env.CONVEX_DEPLOY_KEY || env.CONVEX_DEPLOYMENT_TOKEN;
-  return Boolean(key && key !== "<ignore_deploy_key>");
-}
+const effective = { ...dotenv, ...local, ...process.env };
+const deployKey =
+  effective.CONVEX_DEPLOY_KEY || effective.CONVEX_DEPLOYMENT_TOKEN;
 
 if (
   !/^anonymous:anonymous-[\w-]+$/.test(deployment) ||
+  (deployKey && deployKey !== "<ignore_deploy_key>") ||
   [process.env, dotenv, local].some(
     (env) =>
-      hasDeployKey(env) ||
       remoteSelectors.some((key) => env[key]) ||
       (env.CONVEX_DEPLOYMENT && env.CONVEX_DEPLOYMENT !== deployment),
   )
