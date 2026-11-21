@@ -277,3 +277,28 @@ describe("the moderation gate", () => {
     expect(await history()).toHaveLength(1);
   });
 });
+
+describe("long rooms", () => {
+  it("keeps sending and listing when the stored messages pass the read limit", async () => {
+    rooms = await seededRooms({ transactionLimits: true });
+    room = await roomWithHuman(rooms);
+    const large = "x".repeat(120_000);
+    for (let batch = 0; batch < 3; batch++) {
+      await rooms.t.run(async (ctx) => {
+        for (let i = 0; i < 50; i++) {
+          await ctx.db.insert("messages", {
+            sessionId: room.sessionId,
+            senderParticipantId: room.consumer,
+            recipient: "all",
+            content: { kind: "text", text: large },
+            moderation: { status: "allowed", reasons: [] },
+          });
+        }
+      });
+    }
+
+    const sent = await send(room.human, room.provider, text("¿Sigue ahí?"));
+
+    expect((await history()).at(-1)).toEqual(sent);
+  });
+});

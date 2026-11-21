@@ -13,8 +13,12 @@ export const REQUEST = "Necesito hora con un cardiólogo en Providencia";
 
 export type OpenArgs = FunctionArgs<typeof api.rooms.open>;
 
-export async function seededRooms() {
-  const t = convexTest(schema, modules);
+export async function seededRooms({
+  transactionLimits = false,
+}: {
+  transactionLimits?: boolean;
+} = {}) {
+  const t = convexTest({ schema, modules, transactionLimits });
   rateLimiter.register(t);
   await t.mutation(internal.seed.ensure, {});
   const agentId = (slug: string) =>
@@ -29,7 +33,7 @@ export async function seededRooms() {
   const consumerId = await agentId(CONSUMER_AGENT_SLUG);
   const clinicId = await agentId(CLINIC_AGENT_SLUG);
   const open = (overrides: Partial<OpenArgs> = {}) =>
-    t.mutation(api.rooms.open, {
+    t.action(api.rooms.open, {
       initiatorAgentId: consumerId,
       providerAgentId: clinicId,
       request: REQUEST,
