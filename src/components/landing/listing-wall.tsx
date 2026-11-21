@@ -2,37 +2,47 @@
 
 import { useTheme } from "next-themes";
 import { useEffect, useRef, useState } from "react";
+import { SEED_AGENTS } from "@/shared/seed-data";
 
-const CATEGORIES = [
-  ["Abogados", "Estudio"],
+/*
+ * The hero's background: a page of the yellow pages, after Vercel's 404 wall of names. Columns
+ * of listings (name, comuna, dotted leader, phone) under ruled headings, in alphabetical rubros.
+ * The businesses from the seed sit in their rubro with their real phone and are the only entries
+ * marked in yellow; a few others are drawn a little brighter. Everything is drawn into one canvas,
+ * so the wall costs one DOM node, and redrawn only on resize or theme change.
+ */
+const RUBROS = [
+  ["Abogados", "Estudio Jurídico", "abogados"],
   ["Almacenes", "Almacén"],
-  ["Cafeterías", "Café"],
+  ["Cafeterías", "Café", "cafeteria"],
+  ["Cardiólogos", "Centro Cardiológico", "cardiologia"],
   ["Carpinteros", "Carpintería"],
   ["Cerrajeros", "Cerrajería"],
-  ["Clínicas dentales", "Clínica Dental"],
+  ["Clínicas dentales", "Clínica Dental", "odontologia"],
   ["Electricistas", "Eléctrica"],
-  ["Ferreterías", "Ferretería"],
+  ["Farmacias", "Farmacia", "farmacia"],
+  ["Ferreterías", "Ferretería", "ferreteria"],
   ["Florerías", "Florería"],
-  ["Gasfíteres", "Gasfitería"],
-  ["Gimnasios", "Gimnasio"],
+  ["Gasfíteres", "Gasfitería", "gasfiteria"],
+  ["Gimnasios", "Gimnasio", "gimnasio"],
+  ["Hoteles", "Hotel", "hoteleria"],
   ["Imprentas", "Imprenta"],
-  ["Kinesiólogos", "Kine"],
   ["Lavanderías", "Lavandería"],
   ["Librerías", "Librería"],
+  ["Médicos", "Centro Médico", "medicina_general"],
   ["Mudanzas", "Mudanzas"],
   ["Ópticas", "Óptica"],
-  ["Panaderías", "Panadería"],
-  ["Peluquerías", "Peluquería"],
+  ["Panaderías", "Panadería", "panaderia"],
+  ["Peluquerías", "Peluquería", "peluqueria"],
   ["Restaurantes", "Restorán"],
   ["Talleres mecánicos", "Taller"],
-  ["Veterinarias", "Veterinaria"],
-  ["Viveros", "Vivero"],
+  ["Veterinarias", "Veterinaria", "veterinaria"],
   ["Zapaterías", "Zapatería"],
 ] as const;
 
-const NAMES = [
+const PLACES = [
   "Altamira",
-  "Andes",
+  "Los Andes",
   "Bellavista",
   "Los Aromos",
   "Don Lucho",
@@ -43,7 +53,6 @@ const NAMES = [
   "Manquehue",
   "Matta",
   "Pocuro",
-  "Providencia",
   "San Diego",
   "Santa Isabel",
   "El Sauce",
@@ -55,275 +64,188 @@ const NAMES = [
   "Los Castaños",
   "Doña Rosa",
   "Plaza Egaña",
-  "Macul",
   "El Golf",
-  "Vicuña",
+  "Vicuña Mackenna",
   "Pedro de Valdivia",
 ];
 
+const SEED_LISTINGS = SEED_AGENTS.flatMap(({ card, entity }) =>
+  entity && card.location
+    ? [
+        {
+          name: entity.name,
+          comuna: card.location.comuna,
+          phone: entity.contact.phone,
+          categories: card.categories,
+        },
+      ]
+    : [],
+);
+
 const COMUNAS = [
-  "Providencia",
-  "Ñuñoa",
-  "Las Condes",
-  "Santiago",
-  "La Reina",
-  "Vitacura",
-  "Maipú",
-  "San Miguel",
-  "Macul",
-  "Recoleta",
+  ...new Set([
+    ...SEED_LISTINGS.map((listing) => listing.comuna),
+    "Macul",
+    "San Miguel",
+    "Independencia",
+  ]),
 ];
 
-type Entry = {
-  id: string;
-  name: string;
-  comuna: string;
-  handle: string;
-  featured: boolean;
-};
-type Section = { id: string; category: string; entries: Entry[] };
+type Entry = { label: string; phone: string; tone?: "seed" | "bright" };
+type Section = { heading: string; entries: Entry[] };
 
-const COLUMN_COUNT = 16;
-const SECTIONS_PER_COLUMN = 3;
-
-function slug(text: string) {
-  return text
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
-
-function buildColumns(): Section[][] {
+function buildSections(): Section[] {
   let seed = 26;
-  const next = () => {
+  const next = (max: number) => {
     seed = (seed * 1103515245 + 12345) % 2147483648;
-    return seed;
+    return Math.floor((seed / 2147483648) * max);
   };
-  const sections = Array.from(
-    { length: COLUMN_COUNT * SECTIONS_PER_COLUMN },
-    (_, sectionIndex) => {
-      const [category, noun] = CATEGORIES[sectionIndex % CATEGORIES.length];
-      const id = `${sectionIndex}`;
-      const entries = Array.from({ length: 24 + (next() % 12) }, (_, index) => {
-        const place = NAMES[next() % NAMES.length];
-        return {
-          id: `${id}-${index}`,
-          name: `${noun} ${place}`,
-          comuna: COMUNAS[next() % COMUNAS.length],
-          handle: `@${slug(place).split("-").at(-1)}${(next() % 900) + 100}`,
-          featured: next() % 17 === 0,
-        };
-      });
-      return { id, category, entries };
-    },
-  );
-  return Array.from({ length: COLUMN_COUNT }, (_, column) =>
-    sections.slice(
-      column * SECTIONS_PER_COLUMN,
-      (column + 1) * SECTIONS_PER_COLUMN,
-    ),
-  );
-}
+  const phone = () =>
+    `+56 2 2${100 + next(900)} ${String(next(10000)).padStart(4, "0")}`;
 
-const COLUMNS = buildColumns();
-
-/*
- * The wall used to be ~6,200 DOM nodes. Now each visible column's listings are drawn once into a
- * canvas, exported as an image, and shown twice in a track that CSS slides (landing.css). Metrics
- * mirror the old CSS: 9px mono rows on a 13px line, 10px sans headings, 13rem columns (9.5rem on
- * phones) with a 1.25rem gap.
- */
-const ROW = 13;
-const HEADING = 15;
-const HEADING_GAP = { before: 8, after: 3 };
-
-type Palette = {
-  text: string;
-  heading: string;
-  yellow: string;
-  ink: string;
-  mono: string;
-  sans: string;
-};
-
-function drawColumn(
-  sections: Section[],
-  width: number,
-  scale: number,
-  palette: Palette,
-) {
-  const height = sections.reduce(
-    (total, section) =>
-      total +
-      HEADING_GAP.before +
-      HEADING +
-      HEADING_GAP.after +
-      section.entries.length * ROW,
-    0,
-  );
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.ceil(width * scale);
-  canvas.height = Math.ceil(height * scale);
-  const context = canvas.getContext("2d");
-  if (!context) return null;
-  context.scale(scale, scale);
-  context.textBaseline = "middle";
-
-  let y = 0;
-  for (const section of sections) {
-    y += HEADING_GAP.before;
-    context.fillStyle = palette.yellow;
-    context.fillRect(0, y, width, 2);
-    context.fillStyle = palette.heading;
-    context.font = `800 10px ${palette.sans}`;
-    context.fillText(
-      section.category.toUpperCase(),
-      0,
-      y + 2 + (HEADING - 2) / 2,
+  return Array.from({ length: RUBROS.length * 3 }, (_, index) => {
+    const [heading, noun, slug] = RUBROS[index % RUBROS.length];
+    const seeded = SEED_LISTINGS.filter(
+      (listing) => slug && listing.categories[0] === slug,
+    ).map(
+      (listing): Entry => ({
+        label: `${listing.name}, ${listing.comuna}`,
+        phone: listing.phone ?? phone(),
+        tone: "seed",
+      }),
     );
-    y += HEADING + HEADING_GAP.after;
-
-    for (const entry of section.entries) {
-      const middle = y + ROW / 2;
-      context.font = `${entry.featured ? 700 : 500} 9px ${palette.mono}`;
-      if (entry.featured) {
-        context.fillStyle = palette.yellow;
-        context.fillRect(0, y, width, ROW);
-      }
-      context.fillStyle = entry.featured ? palette.ink : palette.text;
-      const handleWidth = context.measureText(entry.handle).width;
-      context.fillText(entry.handle, width - handleWidth - 2, middle);
-
-      let label = `${entry.name} · ${entry.comuna}`;
-      const room = width - handleWidth - 10;
-      while (label.length > 1 && context.measureText(label).width > room) {
-        label = label.slice(0, -1);
-      }
-      context.fillText(label, 2, middle);
-
-      context.globalAlpha = entry.featured ? 1 : 0.5;
-      const dot = context.measureText(". ").width;
-      for (
-        let x = context.measureText(label).width + 6;
-        x < width - handleWidth - 6;
-        x += dot
-      ) {
-        context.fillText(".", x, middle);
-      }
-      context.globalAlpha = 1;
-      y += ROW;
-    }
-  }
-  return { canvas, width, height };
+    const generated: Entry[] = Array.from({ length: 9 + next(14) }, () => ({
+      label: `${noun} ${PLACES[next(PLACES.length)]}, ${COMUNAS[next(COMUNAS.length)]}`,
+      phone: phone(),
+      tone: next(23) === 0 ? "bright" : undefined,
+    }));
+    generated.splice(next(generated.length), 0, ...seeded);
+    return { heading: heading.toUpperCase(), entries: generated };
+  });
 }
 
-type Column = { src: string; width: number; height: number };
+const SECTIONS = buildSections();
+
+const ROW = 12;
+const HEADING = { before: 10, height: 13, after: 2 };
+const GAP = 20;
 
 export function ListingWall() {
-  const ref = useRef<HTMLDivElement>(null);
-  const [columns, setColumns] = useState<Column[]>([]);
+  const ref = useRef<HTMLCanvasElement>(null);
+  const [ready, setReady] = useState(false);
   const { resolvedTheme } = useTheme();
 
   useEffect(() => {
-    const element = ref.current;
-    if (!element) return;
-    let urls: string[] = [];
-    let layout = "";
+    const canvas = ref.current;
+    const context = canvas?.getContext("2d");
+    if (!canvas || !context || !resolvedTheme) return;
     let cancelled = false;
 
-    const render = async () => {
-      const rem = Number.parseFloat(
-        getComputedStyle(document.documentElement).fontSize,
-      );
-      const width = (matchMedia("(max-width: 40rem)").matches ? 9.5 : 13) * rem;
-      const count = Math.min(
-        COLUMNS.length,
-        Math.ceil((element.clientWidth - rem) / (width + 1.25 * rem)),
-      );
-      const scale = Math.min(window.devicePixelRatio || 1, 2);
-      const next = `${count}:${width}:${scale}:${resolvedTheme}`;
-      if (next === layout) return;
-      layout = next;
-
-      await document.fonts.ready;
-      const style = getComputedStyle(element);
-      const palette: Palette = {
-        text: style.color,
-        heading: style.getPropertyValue("--landing-wall-heading"),
-        yellow: style.getPropertyValue("--sm-yellow"),
-        ink: style.getPropertyValue("--landing-ink"),
-        mono: style.fontFamily,
-        sans: getComputedStyle(document.body).fontFamily,
-      };
-      const drawn = await Promise.all(
-        COLUMNS.slice(0, count).map(async (sections) => {
-          const column = drawColumn(sections, width, scale, palette);
-          if (!column) return null;
-          const blob = await new Promise<Blob | null>((resolve) =>
-            column.canvas.toBlob(resolve),
-          );
-          return blob
-            ? {
-                src: URL.createObjectURL(blob),
-                width: column.width,
-                height: column.height,
-              }
-            : null;
-        }),
-      );
-      const ready = drawn.filter((column): column is Column => column !== null);
-      if (cancelled) {
-        for (const column of ready) URL.revokeObjectURL(column.src);
-        return;
-      }
-      for (const url of urls) URL.revokeObjectURL(url);
-      urls = ready.map((column) => column.src);
-      setColumns(ready);
+    const resolve = (property: "color" | "fontFamily", value: string) => {
+      canvas.style[property] = value;
+      return getComputedStyle(canvas)[property];
     };
 
-    render();
+    const draw = async () => {
+      await document.fonts.ready;
+      if (cancelled) return;
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      const scale = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.ceil(width * scale);
+      canvas.height = Math.ceil(height * scale);
+      context.setTransform(scale, 0, 0, scale, 0, 0);
+      context.textBaseline = "middle";
+
+      const color = {
+        text: resolve("color", "var(--landing-wall-text)"),
+        bright: resolve("color", "var(--landing-wall-bright)"),
+        rule: resolve("color", "var(--landing-wall-rule)"),
+        markBg: resolve("color", "var(--landing-wall-mark-bg)"),
+        markFg: resolve("color", "var(--landing-wall-mark-fg)"),
+      };
+      const sans = resolve("fontFamily", "var(--ui-font-sans)");
+      const mono = resolve("fontFamily", "var(--ui-font-mono)");
+      const column = width < 640 ? 176 : 232;
+
+      context.font = `500 8px ${mono}`;
+      const dot = context.measureText(" .").width;
+      let section = 0;
+      let entry = -1;
+      for (let x = 12; x < width; x += column + GAP) {
+        context.fillStyle = color.rule;
+        context.fillRect(x - GAP / 2, 0, 1, height);
+        let y = 0;
+        while (y < height) {
+          const current = SECTIONS[section % SECTIONS.length];
+          if (entry === -1) {
+            y += HEADING.before;
+            context.fillStyle = color.bright;
+            context.fillRect(x, y, column, 1.5);
+            context.font = `800 8.5px ${sans}`;
+            context.fillText(current.heading, x, y + 1.5 + HEADING.height / 2);
+            y += HEADING.height + HEADING.after;
+            entry = 0;
+            continue;
+          }
+          const listing = current.entries[entry];
+          const middle = y + ROW / 2;
+          if (listing.tone === "seed") {
+            context.fillStyle = color.markBg;
+            context.fillRect(x - 2, y, column + 4, ROW);
+          }
+          context.fillStyle =
+            listing.tone === "seed"
+              ? color.markFg
+              : listing.tone === "bright"
+                ? color.bright
+                : color.text;
+          context.font = `500 8px ${mono}`;
+          const phoneWidth = context.measureText(listing.phone).width;
+          context.fillText(listing.phone, x + column - phoneWidth, middle);
+          context.font = `${listing.tone === "seed" ? 700 : 500} 9px ${sans}`;
+          let label = listing.label;
+          const room = column - phoneWidth - 8;
+          while (label.length > 1 && context.measureText(label).width > room) {
+            label = label.slice(0, -1);
+          }
+          const labelWidth = context.measureText(label).width;
+          context.fillText(label, x, middle);
+          context.font = `500 8px ${mono}`;
+          const dots = Math.floor((room - labelWidth) / dot);
+          if (dots > 0)
+            context.fillText(" .".repeat(dots), x + labelWidth, middle);
+          y += ROW;
+          entry += 1;
+          if (entry === current.entries.length) {
+            section += 1;
+            entry = -1;
+          }
+        }
+      }
+      setReady(true);
+    };
+
+    draw();
     let timer: ReturnType<typeof setTimeout>;
     const observer = new ResizeObserver(() => {
       clearTimeout(timer);
-      timer = setTimeout(render, 200);
+      timer = setTimeout(draw, 150);
     });
-    observer.observe(element);
+    observer.observe(canvas);
     return () => {
       cancelled = true;
       clearTimeout(timer);
       observer.disconnect();
-      for (const url of urls) URL.revokeObjectURL(url);
     };
   }, [resolvedTheme]);
 
   return (
-    <div
+    <canvas
       ref={ref}
+      aria-hidden
       className="landing-wall"
-      data-ready={columns.length > 0 || undefined}
-    >
-      {columns.map((column, index) => (
-        <div key={column.src} className="landing-column">
-          <div
-            className="landing-track"
-            data-direction={index % 2 === 0 ? "up" : "down"}
-          >
-            {["a", "b"].map((copy) => (
-              // biome-ignore lint/performance/noImgElement: a blob URL from a canvas, not an asset next/image can optimize.
-              <img
-                key={copy}
-                src={column.src}
-                alt=""
-                width={column.width}
-                height={column.height}
-                decoding="async"
-              />
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
+      data-ready={ready || undefined}
+    />
   );
 }

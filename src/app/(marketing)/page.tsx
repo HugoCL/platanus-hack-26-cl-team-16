@@ -5,7 +5,6 @@ import { ListingWall } from "@/components/landing/listing-wall";
 import { RevealWords, revealAt } from "@/components/landing/reveal";
 import { RoomSection } from "@/components/landing/room-section";
 import { ScrollReveal } from "@/components/landing/scroll-reveal";
-import { Spotlight } from "@/components/landing/spotlight";
 import { ThemeToggle } from "@/components/toggle-theme";
 
 const AGENTS = ["Claude", "ChatGPT", "Grok", "Gemini"];
@@ -16,11 +15,16 @@ export default function Home() {
       <SiteHeader />
       <main>
         <section className="landing-main">
-          <Spotlight>
-            <ListingWall />
-          </Spotlight>
+          <ListingWall />
           <div className="landing-glow" aria-hidden />
           <div className="landing-hero">
+            <ul className="landing-badges" {...revealAt(0)}>
+              <li>Directorio abierto por MCP</li>
+              <li>
+                Salas <span aria-hidden className="landing-badge-dot" /> con
+                moderador
+              </li>
+            </ul>
             <h1>
               <span>
                 <RevealWords text="Todos los negocios," />
