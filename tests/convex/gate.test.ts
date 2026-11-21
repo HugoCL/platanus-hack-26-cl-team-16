@@ -378,6 +378,10 @@ describe("the moderation gate", () => {
   });
 
   async function expectFailure(message: Message) {
+    const view = await rooms.t.withIdentity(ROOM_OWNER).query(api.rooms.view, {
+      sessionId: room.sessionId,
+    });
+    expect(view?.violationCount).toBe(0);
     expect(message).toMatchObject({
       status: "blocked",
       verdict: { decision: "block", rule: "purpose" },

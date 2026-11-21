@@ -11,6 +11,7 @@ import {
   auditMetrics,
   canAnswerUi,
   canSeeContent,
+  countViolations,
   describeUiResponse,
   formatTime,
   groupSlotsByDay,
@@ -22,6 +23,35 @@ import {
 } from "../src/components/room/room-format";
 
 const messages = DEMO_SCRIPT.map((step) => step.message);
+
+describe("countViolations", () => {
+  it("counts only participant blocks unrelated to moderator failures", () => {
+    const blocked = {
+      ...messages[0],
+      senderParticipantId: "agent",
+      status: "blocked" as const,
+    };
+    expect(countViolations([])).toBe(0);
+    expect(countViolations([blocked])).toBe(1);
+    expect(
+      countViolations([
+        blocked,
+        { ...blocked, status: "allowed" },
+        { ...blocked, senderParticipantId: null },
+        {
+          ...blocked,
+          reasons: [
+            {
+              code: "moderator_error",
+              stage: "purpose",
+              detail: "Unavailable",
+            },
+          ],
+        },
+      ]),
+    ).toBe(1);
+  });
+});
 const slotPicker = messages.find(
   (m) => m.content.kind === "ui" && m.content.spec.type === "slot_picker",
 );

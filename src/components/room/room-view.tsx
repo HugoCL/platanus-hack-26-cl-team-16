@@ -29,9 +29,10 @@ import { Tabs, TabsList, TabsPanel, TabsTab } from "@ui-sdk/react/tabs";
 import { Textarea } from "@ui-sdk/react/textarea";
 import {
   ArrowDownIcon,
-  ArrowUpIcon,
   BotIcon,
   PanelRightIcon,
+  SendHorizontalIcon,
+  ShieldAlertIcon,
   ShieldCheckIcon,
   UserIcon,
 } from "lucide-react";
@@ -43,7 +44,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { ThemeToggle } from "@/components/toggle-theme";
 import type { UiResponse, UiSpec } from "@/shared/genui";
 import { MAX_TEXT_LENGTH } from "@/shared/messages";
 import type { SessionContract, SessionStatus } from "@/shared/session";
@@ -54,6 +54,7 @@ import { MessageItem } from "./message-item";
 import { ReasonList } from "./moderation";
 import {
   auditMetrics,
+  countViolations,
   dataFieldLabel,
   formatLatency,
   formatLongDay,
@@ -71,17 +72,10 @@ import {
 } from "./room-format";
 import { useDemoRoom } from "./use-demo-room";
 
-const STATUS_DOT: Record<SessionStatus, string> = {
-  requested: "bg-muted-foreground",
-  active: "bg-success",
-  closed: "bg-muted-foreground",
-  terminated: "bg-destructive",
-};
-
-const TONE_SEGMENT = {
-  neutral: "bg-foreground",
-  warning: "bg-warning",
-  danger: "bg-destructive",
+const BLOCK_TONE = {
+  neutral: "bg-muted text-subtle-foreground",
+  warning: "bg-warning/15 text-foreground",
+  danger: "bg-destructive-soft text-destructive-text",
 } as const;
 
 const ROLE_LABELS: Record<Viewer["role"], string> = {
@@ -128,6 +122,7 @@ export function RoomView({
   status,
   messages,
   answers,
+  violationCount,
   typingName,
   onRespond,
   onSendText,
@@ -146,6 +141,7 @@ export function RoomView({
   status: SessionStatus;
   messages: RoomMessage[];
   answers: Record<string, GenUiAnswer>;
+  violationCount?: number;
   typingName?: string;
   sessions?: { sessionId: string; name: string; intent: string }[];
   onRespond: (response: UiResponse, inReplyTo: string) => void;
@@ -159,7 +155,7 @@ export function RoomView({
   answersReadOnly?: boolean;
 }) {
   const role = viewer.role;
-  const [panelOpen, setPanelOpen] = useState(true);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [control, setControl] = useState(false);
   const [auditFor, setAuditFor] = useState<string | null>(null);
@@ -179,9 +175,7 @@ export function RoomView({
     return map;
   }, [messages]);
 
-  const violations = messages.filter(
-    (m) => m.status === "blocked" && m.senderParticipantId !== null,
-  ).length;
+  const blocked = violationCount ?? countViolations(messages);
   const readOnly = status !== "active";
   const canControl = role !== "observer";
 
@@ -199,6 +193,7 @@ export function RoomView({
   const sidePanel = contract ? (
     <SidePanel
       contract={contract}
+      blocked={blocked}
       messages={messages}
       participants={people}
       role={role}
@@ -207,7 +202,7 @@ export function RoomView({
   ) : null;
 
   return (
-    <div className="flex h-dvh flex-col bg-background">
+    <div className="flex min-h-0 flex-1 flex-col bg-background">
       {toolbar}
       <div className="flex min-h-0 flex-1">
         <SessionList
@@ -223,9 +218,6 @@ export function RoomView({
             <SessionHeader
               self={self}
               other={other}
-              contract={contract}
-              status={status}
-              violations={violations}
               panelOpen={panelOpen}
               onTogglePanel={() => {
                 if (window.matchMedia("(min-width: 64rem)").matches)
@@ -247,7 +239,7 @@ export function RoomView({
               Cerrar sala
             </Button>
           ) : null}
-          <Thread messages={messages} typingName={typingName}>
+          <Thread messages={messages} typingName={typingName} blocked={blocked}>
             {messages.map((message, i) => {
               const prev = messages[i - 1];
               const day = formatLongDay(message.sentAt);
@@ -286,6 +278,9 @@ export function RoomView({
             <p role="alert" className="m-0 px-4 py-2 text-sm text-destructive">
               {error}
             </p>
+          ) : null}
+          {contract && blocked > 0 && !readOnly ? (
+            <BlockNotice blocked={blocked} max={contract.maxViolations} />
           ) : null}
           <Composer
             readOnly={readOnly}
@@ -438,14 +433,14 @@ function SessionList({
   return (
     <nav
       aria-label="Salas"
-      className="hidden w-[260px] shrink-0 flex-col gap-1 px-3 py-4 xl:flex"
+      className="hidden w-[260px] shrink-0 flex-col gap-1 py-4 xl:flex"
     >
-      <h2 className="m-0 px-3 pb-2 text-sm font-semibold">Salas</h2>
+      <h2 className="m-0 px-6 pb-2 text-sm font-semibold">Salas</h2>
       {sessions?.map((session) => (
         <a
           key={session.sessionId}
           href={`/room/${session.sessionId}`}
-          className="px-3 py-2"
+          className="px-6 py-2"
         >
           {session.name} · {intentLabel(session.intent)}
         </a>
@@ -453,7 +448,7 @@ function SessionList({
       <a
         href="#thread"
         aria-current="page"
-        className="relative flex items-start gap-3 rounded-2xl bg-muted px-3 py-2.5 !text-foreground !no-underline before:absolute before:inset-y-3 before:left-0 before:w-[3px] before:rounded-full before:bg-foreground"
+        className="relative flex items-start gap-3 bg-muted px-6 py-3 !text-foreground !no-underline before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-foreground"
       >
         <span className="flex -space-x-2">
           <Avatar participant={self} size={28} />
@@ -474,7 +469,7 @@ function SessionList({
           />
         </span>
       </a>
-      <p className="m-0 mt-2 px-3 text-xs text-pretty text-subtle-foreground">
+      <p className="m-0 mt-2 px-6 text-xs text-pretty text-subtle-foreground">
         Las salas que abra tu agente aparecen aquí.
       </p>
     </nav>
@@ -484,25 +479,14 @@ function SessionList({
 function SessionHeader({
   self,
   other,
-  contract,
-  status,
-  violations,
   panelOpen,
   onTogglePanel,
 }: {
   self?: RoomParticipant;
   other?: RoomParticipant;
-  contract: SessionContract;
-  status: SessionStatus;
-  violations: number;
   panelOpen: boolean;
   onTogglePanel: () => void;
 }) {
-  const tone = violationTone(violations, contract.maxViolations);
-  const segments = Array.from({ length: contract.maxViolations }, (_, i) => ({
-    id: `violation-${i}`,
-    filled: i < violations,
-  }));
   return (
     <header className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-border px-5 py-4">
       <div className="flex min-w-0 flex-[1_1_18rem] items-center gap-3">
@@ -517,9 +501,6 @@ function SessionHeader({
             </span>
             {other?.verified && <VerifiedBadge />}
           </h1>
-          <p className="m-0 truncate text-sm text-subtle-foreground">
-            {self?.name} pide: “{contract.intent.description}”
-          </p>
           <p className="m-0 flex items-center gap-1.5 text-xs text-subtle-foreground">
             <ShieldCheckIcon size={13} className="shrink-0" />
             Moderada: cada mensaje se revisa antes de entregarse
@@ -527,33 +508,6 @@ function SessionHeader({
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
-        <span
-          data-testid="session-status"
-          className="inline-flex items-center gap-1.5 font-medium"
-        >
-          <span
-            aria-hidden="true"
-            className={`size-1.5 rounded-full ${STATUS_DOT[status]}`}
-          />
-          {SESSION_STATUS_LABELS[status]}
-        </span>
-        <span
-          data-testid="violations"
-          className="inline-flex items-center gap-2 text-subtle-foreground"
-        >
-          <span className="max-sm:sr-only">Violaciones</span>
-          <span aria-hidden="true" className="flex gap-0.5">
-            {segments.map((segment) => (
-              <span
-                key={segment.id}
-                className={`h-1.5 w-3.5 rounded-full ${segment.filled ? TONE_SEGMENT[tone] : "bg-muted-foreground/30"}`}
-              />
-            ))}
-          </span>
-          <span className="font-mono text-foreground tabular-nums">
-            {violations}/{contract.maxViolations}
-          </span>
-        </span>
         <Button
           data-size="sm"
           data-variant="ghost"
@@ -574,7 +528,6 @@ function SessionHeader({
         >
           <PanelRightIcon size={16} />
         </Button>
-        <ThemeToggle variant="icon" />
       </div>
     </header>
   );
@@ -591,10 +544,12 @@ function DayDivider({ label }: { label: string }) {
 }
 
 function Thread({
+  blocked,
   messages,
   typingName,
   children,
 }: {
+  blocked: number;
   messages: RoomMessage[];
   typingName?: string;
   children: React.ReactNode;
@@ -624,8 +579,6 @@ function Thread({
     if (messages.length === 0) setUnread(0);
     else if (added > 0 && !atBottom.current) setUnread((n) => n + added);
   }, [messages.length]);
-
-  const blocked = messages.filter((m) => m.status === "blocked").length;
 
   return (
     <div className="relative min-h-0 flex-1">
@@ -713,6 +666,11 @@ function Composer({
   onRestart?: () => void;
 }) {
   const [text, setText] = useState("");
+  const input = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (control) input.current?.focus();
+  }, [control]);
 
   if (readOnly) {
     return (
@@ -727,25 +685,6 @@ function Composer({
     );
   }
 
-  if (!control) {
-    return (
-      <div className="border-t border-border px-4 py-3">
-        <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center gap-3">
-          <p className="m-0 flex-1 text-sm text-subtle-foreground">
-            {canControl
-              ? "Tu agente está conversando. Toma el control para escribir."
-              : "Estás observando. Solo el dueño o un operador puede escribir."}
-          </p>
-          {canControl ? (
-            <Button data-variant="solid" onClick={onTakeControl}>
-              Tomar control
-            </Button>
-          ) : null}
-        </div>
-      </div>
-    );
-  }
-
   const send = async () => {
     const value = text.trim();
     if (!value || sending) return;
@@ -755,16 +694,18 @@ function Composer({
 
   return (
     <div className="flex flex-col border-t border-border">
-      <div className="flex items-center gap-2 bg-primary px-4 py-1.5 text-xs text-primary-foreground">
-        <span className="flex-1">Estás hablando como {selfName}</span>
-        <Button
-          data-size="sm"
-          className="!h-6 !bg-transparent !text-primary-foreground !border-primary-foreground/40"
-          onClick={onReturnControl}
-        >
-          Devolver control
-        </Button>
-      </div>
+      {control ? (
+        <div className="flex items-center gap-2 bg-primary px-4 py-1.5 text-xs text-primary-foreground">
+          <span className="flex-1">Estás hablando como {selfName}</span>
+          <Button
+            data-size="sm"
+            className="!h-6 !bg-transparent !text-primary-foreground !border-primary-foreground/40"
+            onClick={onReturnControl}
+          >
+            Devolver control
+          </Button>
+        </div>
+      ) : null}
       <form
         className="flex flex-col gap-1 px-4 pt-3 pb-2"
         onSubmit={(e) => {
@@ -772,9 +713,10 @@ function Composer({
           send();
         }}
       >
-        <div className="flex items-end gap-2">
+        <div className="mx-auto flex w-full max-w-3xl items-end gap-2">
           <Textarea
-            disabled={sending}
+            ref={input}
+            disabled={!control || sending}
             aria-label="Mensaje"
             value={text}
             onValueChange={setText}
@@ -782,38 +724,75 @@ function Composer({
             autoResize
             onSubmit={send}
             rows={1}
-            placeholder="Escribe un mensaje"
-            className="flex-1"
+            placeholder={
+              control
+                ? "Escribe un mensaje"
+                : canControl
+                  ? "Toma el control para escribir"
+                  : "Solo el dueño o un operador puede escribir"
+            }
+            className="room-composer-input min-w-0 flex-1"
           />
-          <Button
-            type="submit"
-            data-variant="solid"
-            aria-label="Enviar"
-            disabled={sending || !text.trim()}
-            className="!w-10 !p-0"
-            data-size="lg"
-          >
-            <ArrowUpIcon size={16} />
-          </Button>
+          {canControl ? (
+            <Button
+              type={control ? "submit" : "button"}
+              data-variant="solid"
+              data-size="xl"
+              data-control={control ? "" : undefined}
+              aria-label={control ? "Enviar" : undefined}
+              disabled={control && (sending || !text.trim())}
+              onClick={control ? undefined : onTakeControl}
+              className="room-composer-action"
+            >
+              <span className="room-composer-label">Tomar control</span>
+              <SendHorizontalIcon
+                size={16}
+                aria-hidden="true"
+                className="room-composer-icon"
+              />
+            </Button>
+          ) : null}
         </div>
-        <div className="flex justify-between text-[11px] text-subtle-foreground">
-          <span>Tus mensajes también pasan por el moderador</span>
-          <span className="tabular-nums">
-            {text.length} / {MAX_TEXT_LENGTH}
-          </span>
-        </div>
+        {control ? (
+          <div className="mx-auto flex w-full max-w-3xl justify-between text-[11px] text-subtle-foreground">
+            <span>Tus mensajes también pasan por el moderador</span>
+            <span className="tabular-nums">
+              {text.length} / {MAX_TEXT_LENGTH}
+            </span>
+          </div>
+        ) : null}
       </form>
     </div>
   );
 }
 
+function BlockNotice({ blocked, max }: { blocked: number; max: number }) {
+  return (
+    <div className="px-4 pt-2">
+      <p
+        role="status"
+        className={`m-0 mx-auto flex w-full max-w-3xl items-center gap-2 rounded-2xl px-3 py-2 text-xs ${BLOCK_TONE[violationTone(blocked, max)]}`}
+      >
+        <ShieldAlertIcon size={14} className="shrink-0" />
+        <span>
+          {blocked} de {max}{" "}
+          {max === 1 ? "mensaje bloqueado" : "mensajes bloqueados"}. La sala se
+          cierra al llegar a {max}.
+        </span>
+      </p>
+    </div>
+  );
+}
+
 function SidePanel({
+  blocked,
   contract,
   messages,
   participants,
   role,
   onJump,
 }: {
+  blocked: number;
   contract: SessionContract;
   messages: RoomMessage[];
   participants: RoomParticipant[];
@@ -831,7 +810,12 @@ function SidePanel({
         <ContractView contract={contract} />
       </TabsPanel>
       <TabsPanel value="auditoria">
-        <AuditView messages={messages} onJump={onJump} />
+        <AuditView
+          blocked={blocked}
+          messages={messages}
+          maxBlocked={contract.maxViolations}
+          onJump={onJump}
+        />
       </TabsPanel>
       <TabsPanel value="participantes">
         <ParticipantsView participants={participants} role={role} />
@@ -935,8 +919,10 @@ function ContractView({ contract }: { contract: SessionContract }) {
       <Section title="Qué pide el proveedor">
         <Terms items={fields(contract.recipientRequests)} />
       </Section>
-      <Section title="Máximo de violaciones">
-        <p className="m-0">{contract.maxViolations} antes de cerrar la sala</p>
+      <Section title="Máximo de bloqueos">
+        <p className="m-0">
+          {contract.maxViolations} mensajes bloqueados antes de cerrar la sala
+        </p>
       </Section>
       <p className="m-0 text-xs text-subtle-foreground">
         Calculado al abrir la sala cruzando la intención de tu agente con el
@@ -947,10 +933,14 @@ function ContractView({ contract }: { contract: SessionContract }) {
 }
 
 function AuditView({
+  blocked,
   messages,
+  maxBlocked,
   onJump,
 }: {
+  blocked: number;
   messages: RoomMessage[];
+  maxBlocked: number;
   onJump: (messageId: string) => void;
 }) {
   const [onlyInterventions, setOnlyInterventions] = useState(false);
@@ -964,10 +954,11 @@ function AuditView({
 
   return (
     <div className="flex flex-col gap-4">
-      <dl className="m-0 grid grid-cols-3 divide-x divide-border border-y border-border">
+      <dl className="m-0 grid grid-cols-2 gap-y-1 border-y border-border py-1">
         {[
           ["Revisados", metrics.reviewed],
           ["Intervenciones", metrics.interventions],
+          ["Bloqueos", `${blocked}/${maxBlocked}`],
           [
             "Latencia media",
             metrics.averageLatencyMs === null
@@ -975,7 +966,7 @@ function AuditView({
               : formatLatency(metrics.averageLatencyMs),
           ],
         ].map(([label, value]) => (
-          <div key={label} className="flex flex-col px-3 py-2.5 first:pl-0">
+          <div key={label} className="flex flex-col py-1.5">
             <dt className="text-[11px] text-subtle-foreground">{label}</dt>
             <dd className="m-0 text-base font-semibold tabular-nums">
               {value}

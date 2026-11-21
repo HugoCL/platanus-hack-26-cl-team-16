@@ -162,7 +162,7 @@ function Bubble({
       <div
         className={`room-bubble flex max-w-[min(560px,92%)] flex-col gap-2 ${
           isUi && visible && status !== "blocked"
-            ? ""
+            ? "w-full"
             : `rounded-3xl px-4 py-2.5 ${compact ? "text-sm" : ""} ${
                 self
                   ? "bg-primary text-primary-foreground"

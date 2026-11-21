@@ -26,6 +26,11 @@ const BADGES: Record<
   Exclude<ModerationStatus, "allowed">,
   { label: string; icon: ReactNode; className: string }
 > = {
+  blocked: {
+    label: "Bloqueado",
+    icon: <BanIcon size={14} />,
+    className: "bg-destructive-soft text-destructive-text",
+  },
   pending: {
     label: "Revisando…",
     icon: (
@@ -37,11 +42,6 @@ const BADGES: Record<
     label: "Editado",
     icon: <PencilIcon size={14} />,
     className: "bg-warning/15 text-foreground",
-  },
-  blocked: {
-    label: "Bloqueado",
-    icon: <BanIcon size={14} />,
-    className: "bg-destructive-soft text-destructive-text",
   },
   escalated: {
     label: "Requiere tu aprobación",

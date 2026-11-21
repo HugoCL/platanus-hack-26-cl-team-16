@@ -330,7 +330,7 @@ const WORST_SCRIPT: ScriptStep[] = [
     "w10",
     7,
     "message_blocked",
-    "El moderador bloqueó un mensaje · violación 1 de 10",
+    "El moderador bloqueó un mensaje · bloqueo 1 de 10",
   ),
   msg("w11", 8, "w-self", {
     content: {
@@ -518,7 +518,7 @@ const WORST_SCRIPT: ScriptStep[] = [
     "w25",
     60 * 48 + 1,
     "session_terminated",
-    "Sala terminada por el moderador · violaciones repetidas",
+    "Sala terminada por el moderador · bloqueos repetidos",
   ),
 ];
 

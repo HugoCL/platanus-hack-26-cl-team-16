@@ -102,27 +102,22 @@ export function GenUiBlock({
       aria-label={title ?? meta.label}
       data-genui={spec.type}
       data-answered={answer ? "" : undefined}
-      className="w-full max-w-[460px] overflow-hidden rounded-4xl bg-card shadow-card"
+      className="w-full max-w-[520px] overflow-hidden rounded-4xl bg-card shadow-card"
     >
-      <header className="flex items-center gap-2 px-4 pt-4 pb-2">
+      <header className="flex items-center gap-2.5 px-5 pt-5 pb-3">
         <span className="grid size-7 place-items-center rounded-full bg-muted text-subtle-foreground">
           {meta.icon}
         </span>
         <h3 className="m-0 line-clamp-2 min-w-0 flex-1 text-sm font-semibold">
           {title ?? meta.label}
         </h3>
-        {answer ? (
-          <span className="inline-flex items-center gap-1 text-xs text-subtle-foreground">
-            <CheckIcon size={13} />
-            Respondido {formatTime(answer.at)}
-          </span>
-        ) : showOwnerOnly ? (
+        {showOwnerOnly ? (
           <span className="text-xs text-subtle-foreground">
             Solo el dueño puede responder
           </span>
         ) : null}
       </header>
-      <div className="px-4 pb-3">
+      <div className="px-5 pb-5">
         {spec.type === "card" ? <CardBlock spec={spec} {...props} /> : null}
         {spec.type === "form" ? <FormBlock spec={spec} {...props} /> : null}
         {spec.type === "slot_picker" ? (
@@ -355,6 +350,12 @@ function SlotPickerBlock({
   const shownDays = showAll ? days : days.slice(0, visibleDays);
   const hiddenDays = days.length - shownDays.length;
 
+  function confirmSlot(id: string) {
+    if (disabled) return;
+    setSlotId(id);
+    onRespond({ type: "slot_selected", pickerId: spec.id, slotId: id });
+  }
+
   return (
     <div className="flex flex-col gap-3">
       <p className="m-0 text-xs text-subtle-foreground">Hora de Santiago</p>
@@ -375,7 +376,18 @@ function SlotPickerBlock({
                   data-slot="label"
                   className="room-slot flex cursor-pointer flex-col gap-0.5 rounded-2xl px-3.5 py-2.5 text-sm leading-tight has-[[data-disabled]]:cursor-default"
                 >
-                  <Radio value={slot.id} className="sr-only">
+                  <Radio
+                    value={slot.id}
+                    className="sr-only"
+                    onClick={() => confirmSlot(slot.id)}
+                    onKeyDownCapture={(event) => {
+                      if (event.key !== " " || disabled) return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      if (event.repeat) return;
+                      confirmSlot(slot.id);
+                    }}
+                  >
                     <RadioIndicator />
                   </Radio>
                   <span className="text-base font-semibold tabular-nums">
@@ -400,19 +412,6 @@ function SlotPickerBlock({
           Ver {hiddenDays} {hiddenDays === 1 ? "día más" : "días más"}
         </Button>
       ) : null}
-      {answered ? null : (
-        <Button
-          data-variant="solid"
-          disabled={disabled || slotId === null}
-          className="self-start"
-          onClick={() => {
-            if (slotId)
-              onRespond({ type: "slot_selected", pickerId: spec.id, slotId });
-          }}
-        >
-          Elegir horario
-        </Button>
-      )}
     </div>
   );
 }

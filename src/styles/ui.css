@@ -178,6 +178,65 @@
     }
   }
 
+  /* Composer: "Tomar control" shrinks into the send button and the input takes the freed width. */
+  [data-slot="button"].room-composer-action {
+    position: relative;
+    flex-shrink: 0;
+    overflow: hidden;
+    width: auto;
+    interpolate-size: allow-keywords;
+    transition:
+      width 260ms cubic-bezier(0.23, 1, 0.32, 1),
+      padding-inline 260ms cubic-bezier(0.23, 1, 0.32, 1),
+      transform 150ms ease-out,
+      background-color 150ms ease-out;
+
+    &[data-control] {
+      width: calc(var(--ui-spacing) * 12);
+      padding-inline: 0;
+    }
+  }
+
+  .room-composer-label {
+    white-space: nowrap;
+    transition: opacity 120ms ease-out;
+
+    [data-control] > & {
+      opacity: 0;
+    }
+  }
+
+  .room-composer-icon {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    opacity: 0;
+    transform: scale(0.8);
+    transition:
+      opacity 180ms ease-out 80ms,
+      transform 180ms cubic-bezier(0.23, 1, 0.32, 1) 80ms;
+
+    [data-control] > & {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  [data-slot="textarea"].room-composer-input {
+    min-height: calc(var(--ui-spacing) * 12);
+    max-height: 10rem;
+    resize: none;
+
+    &::placeholder {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    transition:
+      background-color 200ms ease-out,
+      border-color 200ms ease-out;
+  }
+
   [data-slot="meter-track"] {
     border-radius: var(--sm-radius-full);
   }
@@ -246,6 +305,13 @@
     [data-slot="tooltip-trigger"],
     [data-slot="collapsible-trigger"]
   ) {
+    transition: none;
+  }
+
+  [data-slot="button"].room-composer-action,
+  .room-composer-label,
+  .room-composer-icon,
+  [data-slot="textarea"].room-composer-input {
     transition: none;
   }
 

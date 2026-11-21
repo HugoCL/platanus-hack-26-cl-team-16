@@ -225,7 +225,7 @@ export function OpenSessionDialog({
                   />
                   <div className="flex justify-between gap-3 border-t border-border pt-3">
                     <dt className="text-subtle-foreground">
-                      Máximo de violaciones
+                      Máximo de bloqueos
                     </dt>
                     <dd className="m-0 font-medium tabular-nums">
                       {MAX_VIOLATIONS}

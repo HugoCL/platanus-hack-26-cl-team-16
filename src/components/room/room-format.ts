@@ -73,7 +73,7 @@ export const REASON_LABELS: Record<ModerationReasonCode, string> = {
   off_purpose: "Fuera del propósito",
   forbidden_topic: "Tema prohibido",
   data_leak: "Fuga de datos",
-  repeated_violations: "Violaciones repetidas",
+  repeated_violations: "Bloqueos repetidos",
   moderator_error: "Error del moderador",
 };
 
@@ -165,6 +165,15 @@ export function canSeeContent(
 
 export function canAnswerUi(viewer: Viewer) {
   return viewer.role === "owner" || viewer.role === "operator";
+}
+
+export function countViolations(messages: RoomMessage[]) {
+  return messages.filter(
+    (message) =>
+      message.status === "blocked" &&
+      message.senderParticipantId !== null &&
+      !message.reasons?.some((reason) => reason.code === "moderator_error"),
+  ).length;
 }
 
 export function uiInteractionState(
