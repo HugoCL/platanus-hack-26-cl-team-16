@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Session } from "../shared/session";
 import { DEMO_CONTRACT } from "../src/components/room/demo-session";
 import {
+  agentTurnsExhausted,
   liveAnswers,
   mapLiveRoom,
   openRoomError,
@@ -51,6 +52,31 @@ const names = [
   { participantId: "provider", name: "Clínica", slug: "clinic" },
   { participantId: "human", name: "Ana" },
 ];
+
+describe("agent turn limit", () => {
+  it("leaves answers editable before the limit", () => {
+    expect(agentTurnsExhausted(session)).toBe(false);
+    expect(
+      agentTurnsExhausted({
+        ...session,
+        turnCount: DEMO_CONTRACT.maxTurns - 1,
+      }),
+    ).toBe(false);
+  });
+
+  it.each([0, 1])("disables answers at or past the limit (+%s)", (extra) => {
+    const exhausted = {
+      ...session,
+      turnCount: DEMO_CONTRACT.maxTurns + extra,
+    };
+    expect(agentTurnsExhausted(exhausted)).toBe(true);
+    expect(mapLiveRoom(exhausted, names, "human").answersReadOnly).toBe(true);
+  });
+
+  it("handles a room without a contract", () => {
+    expect(agentTurnsExhausted({ ...session, contract: null })).toBe(false);
+  });
+});
 
 describe("live room mapping", () => {
   it("assigns the caller and initiator to self, with names and representation", () => {

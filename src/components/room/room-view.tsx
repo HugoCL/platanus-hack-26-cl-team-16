@@ -124,6 +124,7 @@ export function RoomView({
   error,
   sessions,
   sending = false,
+  answersReadOnly = false,
 }: {
   participants: RoomParticipant[];
   viewer: Viewer;
@@ -134,12 +135,13 @@ export function RoomView({
   typingName?: string;
   sessions?: { sessionId: string; name: string; intent: string }[];
   onRespond: (response: UiResponse, inReplyTo: string) => void;
-  onSendText: (text: string) => void;
+  onSendText: (text: string) => void | Promise<boolean | void>;
   onCloseRoom?: () => void;
   onRestart?: () => void;
   toolbar?: ReactNode;
   error?: string;
   sending?: boolean;
+  answersReadOnly?: boolean;
 }) {
   const role = viewer.role;
   const [panelOpen, setPanelOpen] = useState(true);
@@ -226,7 +228,7 @@ export function RoomView({
                 }
                 viewer={viewer}
                 answers={answers}
-                readOnly={readOnly || sending}
+                readOnly={readOnly || sending || answersReadOnly}
                 uiSpecsByMessage={uiSpecsByMessage}
                 highlighted={highlighted === message.messageId}
                 onRespond={(response) => onRespond(response, message.messageId)}
@@ -634,7 +636,7 @@ function Composer({
   selfName: string;
   onTakeControl: () => void;
   onReturnControl: () => void;
-  onSend: (text: string) => void;
+  onSend: (text: string) => void | Promise<boolean | void>;
   onRestart?: () => void;
 }) {
   const [text, setText] = useState("");
@@ -673,11 +675,11 @@ function Composer({
     );
   }
 
-  const send = () => {
+  const send = async () => {
     const value = text.trim();
     if (!value || sending) return;
-    onSend(value);
-    setText("");
+    const accepted = await onSend(value);
+    if (accepted !== false) setText("");
   };
 
   return (
