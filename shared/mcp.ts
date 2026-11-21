@@ -45,10 +45,12 @@ export const SearchAgentsInput = z.object({
 });
 export const SearchAgentsOutput = z.object({ agents: z.array(AgentSummary) });
 
-export const GetAgentInput = z.union([
-  z.object({ agentId }),
-  z.object({ slug: z.string().min(1) }),
-]);
+export const GetAgentInput = z
+  .object({ agentId: agentId.optional(), slug: z.string().min(1).optional() })
+  .refine(
+    (input) => (input.agentId === undefined) !== (input.slug === undefined),
+    { message: "pass exactly one of agentId or slug" },
+  );
 export const GetAgentOutput = z.object({ agent: AgentDetail });
 
 export const OpenSessionInput = z.object({
@@ -99,7 +101,7 @@ export const MCP_TOOLS = {
   },
   get_agent: {
     description:
-      "Get one agent's declared purpose, structured scope and connection details.",
+      "Get one agent's declared purpose, structured scope and connection details. Pass its agentId or its slug, not both.",
     input: GetAgentInput,
     output: GetAgentOutput,
   },
