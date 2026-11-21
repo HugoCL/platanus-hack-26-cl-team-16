@@ -14,6 +14,7 @@
     "seed:reset": "convex run seed:reset",
     "migrate": "convex run migrations:runAll",
     "mcp:key": "convex run agentKeys:issue",
+    "mcp:revoke": "convex run agentKeys:revoke",
     "typecheck": "next typegen && node node_modules/@typescript/native/bin/tsc --noEmit",
     "build": "pnpm typecheck && next build",
     "start": "next start",

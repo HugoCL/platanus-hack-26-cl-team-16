@@ -20,6 +20,7 @@ import {
   AgentSummary,
   MCP_TOOLS,
   type McpToolName,
+  SearchAgentsOutput,
 } from "../shared/mcp";
 import { createModerator } from "../shared/moderator/moderator";
 import { createFakeLlmProvider } from "../shared/providers/llm";
@@ -32,6 +33,7 @@ import {
 const modules = import.meta.glob("../convex/**/*.ts");
 const MCP_URL = "http://localhost/api/mcp";
 const REJECTED = /invalid_token|unauthorized|401/i;
+const PUBLIC_ORIGIN = "https://directorio.example";
 
 type Negotiation = "legacy" | "auto";
 
@@ -49,20 +51,23 @@ beforeEach(async () => {
   }));
   convexCalls = [];
   const convex = t as ConvexCaller;
-  endpoint = createMcpEndpoint({
-    query: (ref, ...args) => {
-      convexCalls.push(getFunctionName(ref));
-      return convex.query(ref, ...args);
+  endpoint = createMcpEndpoint(
+    {
+      query: (ref, ...args) => {
+        convexCalls.push(getFunctionName(ref));
+        return convex.query(ref, ...args);
+      },
+      mutation: (ref, ...args) => {
+        convexCalls.push(getFunctionName(ref));
+        return convex.mutation(ref, ...args);
+      },
+      action: (ref, ...args) => {
+        convexCalls.push(getFunctionName(ref));
+        return convex.action(ref, ...args);
+      },
     },
-    mutation: (ref, ...args) => {
-      convexCalls.push(getFunctionName(ref));
-      return convex.mutation(ref, ...args);
-    },
-    action: (ref, ...args) => {
-      convexCalls.push(getFunctionName(ref));
-      return convex.action(ref, ...args);
-    },
-  });
+    { publicOrigin: PUBLIC_ORIGIN },
+  );
 });
 
 async function connect(mode: Negotiation, key?: string) {
@@ -95,9 +100,7 @@ describe.each<[Negotiation, string]>([
   const searchSlugs = async (args: Record<string, unknown>) => {
     const result = await call("search_agents", args);
     expect(result.isError).toBeFalsy();
-    const { agents } = z
-      .object({ agents: z.array(AgentSummary) })
-      .parse(result.structuredContent);
+    const { agents } = SearchAgentsOutput.parse(result.structuredContent);
     return agents.map((agent) => agent.slug);
   };
 
@@ -150,10 +153,13 @@ describe.each<[Negotiation, string]>([
     const result = await call("search_agents", {
       query: "cardiólogo en Providencia",
     });
-    const { agents } = z
-      .object({ agents: z.array(AgentSummary) })
-      .strict()
-      .parse(result.structuredContent);
+    const { agents, truncated, unresolved } = SearchAgentsOutput.strict().parse(
+      result.structuredContent,
+    );
+    expect({ truncated, unresolved }).toEqual({
+      truncated: false,
+      unresolved: [],
+    });
     expect(agents[0]).toMatchObject({
       slug: CLINIC_AGENT_SLUG,
       comuna: "Providencia",
@@ -177,17 +183,64 @@ describe.each<[Negotiation, string]>([
     }
   });
 
-  it("search_agents returns an empty list when nothing matches or part of the text is not understood", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  const search = async (args: Record<string, unknown>) => {
+    const result = await call("search_agents", args);
+    expect(result.isError).toBeFalsy();
+    const { agents, truncated, unresolved } = SearchAgentsOutput.parse(
+      result.structuredContent,
+    );
+    return { slugs: agents.map((agent) => agent.slug), truncated, unresolved };
+  };
+
+  it("search_agents tells an empty result apart from text it could not read", async () => {
     for (const args of [
       { query: "gimnasio en Pirque" },
       { query: "cardiólogo", comuna: "Comuna Inventada" },
-      { query: "algo rarísimo zzz", comuna: "Providencia" },
-      { query: "cardiólogo en Narnialandia", category: "cardiologia" },
     ]) {
-      await expect(searchSlugs(args)).resolves.toEqual([]);
+      await expect(search(args)).resolves.toEqual({
+        slugs: [],
+        truncated: false,
+        unresolved: [],
+      });
     }
-    warn.mockRestore();
+    await expect(
+      search({ query: "algo rarísimo zzz", comuna: "Providencia" }),
+    ).resolves.toEqual({
+      slugs: [],
+      truncated: false,
+      unresolved: ["category"],
+    });
+    await expect(
+      search({ query: "cardiólogo en Narnialandia", category: "cardiologia" }),
+    ).resolves.toEqual({ slugs: [], truncated: false, unresolved: ["comuna"] });
+  });
+
+  it("search_agents says when the list was cut at the limit", async () => {
+    const { slugs, truncated } = await search({
+      query: "en Providencia",
+      limit: 1,
+    });
+    expect(slugs).toHaveLength(1);
+    expect(truncated).toBe(true);
+  });
+
+  it("search_agents never sends the query text to the LLM fallback", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      // More searches than the site-wide LLM bucket holds (10): none of them spends from it.
+      for (let i = 0; i < 12; i++) {
+        await expect(
+          search({ query: `me duele el pecho, soy Juan Pérez ${i}` }),
+        ).resolves.toEqual({
+          slugs: [],
+          truncated: false,
+          unresolved: ["category"],
+        });
+      }
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("search_agents refuses near, which the directory cannot search yet", async () => {
@@ -238,8 +291,8 @@ describe("MCP endpoint over raw HTTP", () => {
     },
   );
 
-  const post = (headers: Record<string, string>) =>
-    endpoint(
+  const post = (headers: Record<string, string>, to = endpoint) =>
+    to(
       new Request(MCP_URL, {
         method: "POST",
         headers: {
@@ -289,28 +342,80 @@ describe("MCP endpoint over raw HTTP", () => {
     for (const origin of [
       "https://evil.example",
       "http://localhost.evil.example",
-      "https://localhost",
       "http://localhost/api/mcp",
+      "file://localhost",
       "null",
     ]) {
       expect((await post({ authorization, origin })).status).toBe(403);
     }
     expect(directoryCalls()).toEqual([]);
-    expect(
-      (await post({ authorization, origin: "http://localhost" })).status,
-    ).toBe(200);
+    for (const origin of [
+      "http://localhost",
+      "http://localhost:3000",
+      "https://127.0.0.1:8443",
+      PUBLIC_ORIGIN,
+    ]) {
+      expect((await post({ authorization, origin })).status).toBe(200);
+    }
+  });
 
-    const proxy = {
-      authorization,
-      "x-forwarded-proto": "https",
-      "x-forwarded-host": "directorio.example",
+  it("refuses a page rebound to this server, whose Origin and Host match each other", async () => {
+    const rebound = {
+      authorization: `Bearer ${apiKey}`,
+      host: "evil.example:3000",
     };
     expect(
-      (await post({ ...proxy, origin: "https://directorio.example" })).status,
+      (await post({ ...rebound, origin: "http://evil.example:3000" })).status,
+    ).toBe(403);
+    expect((await post(rebound)).status).toBe(403);
+    expect(directoryCalls()).toEqual([]);
+  });
+
+  it("accepts the public origin behind proxies and only that one", async () => {
+    const authorization = `Bearer ${apiKey}`;
+    const behindProxies = (forwardedHost: string, origin = PUBLIC_ORIGIN) => ({
+      authorization,
+      origin,
+      "x-forwarded-proto": "https, http",
+      "x-forwarded-host": forwardedHost,
+    });
+    expect((await post(behindProxies("directorio.example"))).status).toBe(200);
+    expect(
+      (await post(behindProxies("directorio.example, internal.render:10000")))
+        .status,
     ).toBe(200);
-    expect((await post({ ...proxy, origin: "http://localhost" })).status).toBe(
-      403,
-    );
+    expect((await post(behindProxies("evil.example"))).status).toBe(403);
+    expect(
+      (await post(behindProxies("directorio.example", "https://evil.example")))
+        .status,
+    ).toBe(403);
+
+    const unconfigured = createMcpEndpoint(t as ConvexCaller);
+    expect(
+      (await post(behindProxies("directorio.example"), unconfigured)).status,
+    ).toBe(403);
+  });
+
+  it("answers 429 with Retry-After once a key spends its bucket", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const authorization = `Bearer ${apiKey}`;
+      const statuses = [];
+      for (let i = 0; i < 60; i++) {
+        statuses.push((await post({ authorization })).status);
+      }
+      expect(statuses).toEqual(Array(60).fill(200));
+      const calls = directoryCalls().length;
+      const limited = await post({ authorization });
+      expect(limited.status).toBe(429);
+      expect(Number(limited.headers.get("retry-after"))).toBeGreaterThan(0);
+      expect(directoryCalls()).toHaveLength(calls);
+
+      vi.advanceTimersByTime(1000);
+      expect((await post({ authorization })).status).toBe(200);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

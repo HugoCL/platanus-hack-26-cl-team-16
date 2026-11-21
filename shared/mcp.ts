@@ -44,7 +44,13 @@ export const SearchAgentsInput = z.object({
   radiusKm: z.number().positive().max(50).default(5),
   limit: z.number().int().min(1).max(20).default(10),
 });
-export const SearchAgentsOutput = z.object({ agents: z.array(AgentSummary) });
+// `truncated`: more agents matched than were returned. `unresolved`: what the query text named
+// but the directory could not read (a need or a place); pass it as `category` or `comuna` instead.
+export const SearchAgentsOutput = z.object({
+  agents: z.array(AgentSummary),
+  truncated: z.boolean(),
+  unresolved: z.array(z.enum(["category", "comuna"])),
+});
 
 export const GetAgentInput = z
   .object({ agentId: agentId.optional(), slug: z.string().min(1).optional() })
