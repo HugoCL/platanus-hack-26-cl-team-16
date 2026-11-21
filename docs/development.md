@@ -71,6 +71,12 @@ A `slot_selected` answer, from the human its picker was sent to, books that slot
 
 The consumer (`lib/agents/consumer.ts`) starts from the human's request as written. `chooseProvider` searches with `directory.searchText`, using the request as written or, when it is longer than the search's 300 characters, a short query the model writes from it. It gives the model the first five cards that allow some intent, as `<card>:<intent>` pairs. The model picks one pair, or none, and writes the opening message. The request never enters the room's contract, which skips moderation: the contract's intent description names only the intent and the provider, and the provider learns the request from the moderated opening. In the room, `consumerTurn` answers only delivered messages its provider sent to it or to everyone: the model replies, waits, or closes, and always sees the consumer's opening, however long the room gets. The provider closes the room when it confirms the booking.
 
+### Reference rooms
+
+`internal.referenceScene.start` accepts a request and the human's display name. The seed consumer searches the directory and chooses a provider. The action opens an E2 room with the neutral intent description, then sends the actual opening through the gate. The qualified hosted provider uses the same room participant and gate regardless of which consumer opened the room; an external consumer can send its own opening and receive replies without running the seed consumer.
+
+The reference agents use a model with structured output (`LLM_PROVIDER=openrouter` on the Convex deployment). In unconfigured local rooms E2 still uses its acknowledgment double. Tests inject a scripted fake through the model factory. The room moderator is configured independently; PLTNS-39 owns connecting the real moderator.
+
 ## Test
 
 ```sh
