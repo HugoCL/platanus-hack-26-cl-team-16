@@ -357,21 +357,17 @@ function SlotPickerBlock({
                 <label
                   key={slot.id}
                   data-slot="label"
-                  className="flex cursor-pointer items-center gap-2 rounded-3xl border border-input bg-card px-3 py-2 text-sm has-[[data-checked]]:border-transparent has-[[data-checked]]:shadow-[0_0_0_2px_var(--ui-foreground)] has-[[data-disabled]]:cursor-default"
+                  className="room-slot flex cursor-pointer flex-col gap-0.5 rounded-2xl px-3.5 py-2.5 text-sm leading-tight has-[[data-disabled]]:cursor-default"
                 >
-                  <Radio value={slot.id}>
+                  <Radio value={slot.id} className="sr-only">
                     <RadioIndicator />
                   </Radio>
-                  <span className="flex flex-col leading-tight">
-                    <span className="font-medium tabular-nums">
-                      {slot.label ?? formatTime(slot.start)}
-                    </span>
-                    {slot.detail ? (
-                      <span className="text-xs text-subtle-foreground">
-                        {slot.detail}
-                      </span>
-                    ) : null}
+                  <span className="text-base font-semibold tabular-nums">
+                    {slot.label ?? formatTime(slot.start)}
                   </span>
+                  {slot.detail ? (
+                    <span className="text-xs opacity-80">{slot.detail}</span>
+                  ) : null}
                 </label>
               ))}
             </div>

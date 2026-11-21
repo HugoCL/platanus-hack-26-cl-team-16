@@ -52,6 +52,14 @@
     &[data-variant="solid"] {
       background: var(--ui-primary);
     }
+
+    /* Disabled: a flat muted fill with readable text, instead of web.css's half opacity. */
+    &[data-disabled] {
+      opacity: 1;
+      border-color: transparent;
+      background: var(--ui-muted);
+      color: var(--sm-subtle-foreground);
+    }
   }
 
   :is(
@@ -105,19 +113,53 @@
     }
   }
 
+  /* Tabs as a segmented control: a muted track, the selected tab raised on it. */
   [data-slot="tabs-list"] {
-    gap: calc(var(--ui-spacing) * 1);
+    gap: 2px;
+    padding: 3px;
     border-bottom: 0;
+    border-radius: var(--sm-radius-full);
+    background: var(--ui-muted);
   }
 
   [data-slot="tabs-tab"] {
+    flex: 1;
+    justify-content: center;
     margin-bottom: 0;
     border-bottom: 0;
     border-radius: var(--sm-radius-full);
+    color: var(--sm-subtle-foreground);
 
     &[data-selected] {
-      background: color-mix(in oklch, var(--ui-foreground) 8%, transparent);
+      background: light-dark(
+        var(--sm-card),
+        color-mix(in oklch, var(--ui-foreground) 14%, var(--ui-muted))
+      );
+      box-shadow: var(--ui-shadow);
       color: var(--ui-foreground);
+    }
+  }
+
+  /* Slot picker tiles: the time is the control; the chosen one takes the action color. */
+  .room-slot {
+    background: var(--ui-muted);
+    transition: background-color 150ms ease-out;
+
+    &:hover:not(:has([data-disabled], [data-checked])) {
+      background: color-mix(
+        in oklch,
+        var(--ui-foreground) 10%,
+        var(--ui-muted)
+      );
+    }
+
+    &:has([data-checked]) {
+      background: var(--ui-primary);
+      color: var(--ui-primary-foreground);
+    }
+
+    &:has(:focus-visible) {
+      outline: 4px solid var(--ui-ring);
     }
   }
 
@@ -181,6 +223,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .room-bubble,
+  .room-slot,
   :is(
     [data-slot="button"],
     [data-slot="dialog-trigger"],

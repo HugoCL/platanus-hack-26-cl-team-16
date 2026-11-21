@@ -23,7 +23,6 @@ import { Textarea } from "@ui-sdk/react/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-sdk/react/tooltip";
 import {
   ArrowDownIcon,
-  ArrowLeftRightIcon,
   ArrowUpIcon,
   BadgeCheckIcon,
   PanelRightIcon,
@@ -57,17 +56,17 @@ import {
 } from "./room-format";
 import { useDemoRoom } from "./use-demo-room";
 
-const STATUS_CHIP: Record<SessionStatus, string> = {
-  requested: "bg-muted text-subtle-foreground",
-  active: "bg-success/15 text-foreground",
-  closed: "bg-muted text-foreground",
-  terminated: "bg-destructive-soft text-destructive-text",
+const STATUS_DOT: Record<SessionStatus, string> = {
+  requested: "bg-muted-foreground",
+  active: "bg-success",
+  closed: "bg-muted-foreground",
+  terminated: "bg-destructive",
 };
 
-const TONE_CHIP = {
-  neutral: "bg-muted text-foreground",
-  warning: "bg-warning/20 text-foreground",
-  danger: "bg-destructive-soft text-destructive-text",
+const TONE_SEGMENT = {
+  neutral: "bg-foreground",
+  warning: "bg-warning",
+  danger: "bg-destructive",
 } as const;
 
 const ROLE_LABELS: Record<Viewer["role"], string> = {
@@ -144,10 +143,6 @@ export function DemoRoom() {
             panelOpen={panelOpen}
             onTogglePanel={() => setPanelOpen((o) => !o)}
           />
-          <p className="m-0 flex items-center gap-1.5 border-b border-border px-4 py-1.5 text-xs text-subtle-foreground">
-            <ShieldCheckIcon size={13} />
-            Moderada · cada mensaje es revisado antes de entregarse
-          </p>
           <Thread
             messages={room.messages}
             typingName={
@@ -237,10 +232,10 @@ function DemoToolbar({
   onReset: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-border bg-card px-4 py-2 text-xs">
-      <span className="font-medium">Demo sin backend</span>
-      <span className="text-subtle-foreground">
-        Datos del seed · conversación guionada
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 bg-primary px-4 py-1.5 text-xs text-primary-foreground">
+      <span className="font-semibold">Demo</span>
+      <span className="hidden opacity-80 sm:inline">
+        Sin backend: datos del seed y una conversación guionada
       </span>
       <div className="ml-auto flex items-center gap-2">
         <Select
@@ -250,7 +245,7 @@ function DemoToolbar({
           }}
         >
           <SelectLabel className="sr-only">Ver como</SelectLabel>
-          <SelectTrigger className="!h-8 !text-xs">
+          <SelectTrigger className="!h-7 !border-transparent !text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -258,7 +253,11 @@ function DemoToolbar({
             <SelectItem value="observer">Ver como observador</SelectItem>
           </SelectContent>
         </Select>
-        <Button data-size="sm" onClick={onReset}>
+        <Button
+          data-size="sm"
+          className="!h-7 !border-transparent"
+          onClick={onReset}
+        >
           Reiniciar demo
         </Button>
       </div>
@@ -308,13 +307,13 @@ function SessionList({
   return (
     <nav
       aria-label="Salas"
-      className="hidden w-[280px] shrink-0 flex-col gap-3 p-3 xl:flex"
+      className="hidden w-[260px] shrink-0 flex-col gap-1 px-3 py-4 xl:flex"
     >
-      <h2 className="m-0 px-2 pt-1 text-sm font-semibold">Salas</h2>
+      <h2 className="m-0 px-3 pb-2 text-sm font-semibold">Salas</h2>
       <a
         href="#thread"
         aria-current="page"
-        className="flex items-start gap-3 rounded-3xl bg-card p-3 !no-underline shadow-card"
+        className="relative flex items-start gap-3 rounded-2xl bg-muted px-3 py-2.5 !text-foreground !no-underline before:absolute before:inset-y-3 before:left-0 before:w-[3px] before:rounded-full before:bg-foreground"
       >
         <span className="flex -space-x-2">
           <Avatar participant={DEMO_PARTICIPANTS[0]} size={28} />
@@ -335,6 +334,9 @@ function SessionList({
           />
         </span>
       </a>
+      <p className="m-0 mt-2 px-3 text-xs text-pretty text-subtle-foreground">
+        Las salas que abra tu agente aparecen aquí.
+      </p>
     </nav>
   );
 }
@@ -357,45 +359,68 @@ function SessionHeader({
   onTogglePanel: () => void;
 }) {
   const tone = violationTone(violations, contract.maxViolations);
+  const segments = Array.from({ length: contract.maxViolations }, (_, i) => ({
+    id: `violation-${i}`,
+    filled: i < violations,
+  }));
   return (
-    <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border px-4 py-3">
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <h1 className="m-0 flex flex-wrap items-center gap-1.5 text-sm font-semibold">
-          <Avatar participant={self} size={24} />
-          {self?.name}
-          <ArrowLeftRightIcon size={14} className="text-subtle-foreground" />
-          <Avatar participant={other} size={24} />
-          {other?.name}
-          <Tooltip>
-            <TooltipTrigger
-              aria-label="Ficha verificada"
-              data-size="sm"
-              data-variant="ghost"
-              className="!h-6 !w-6 !p-0 text-subtle-foreground"
-            >
-              <BadgeCheckIcon size={14} />
-            </TooltipTrigger>
-            <TooltipContent>Ficha verificada</TooltipContent>
-          </Tooltip>
-        </h1>
-        <p className="m-0 truncate text-xs text-subtle-foreground">
-          <code className="font-mono">{contract.intent.name}</code> · “
-          {contract.intent.description}”
-        </p>
+    <header className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-border px-5 py-4">
+      <div className="flex min-w-0 flex-[1_1_18rem] items-center gap-3">
+        <span className="hidden shrink-0 -space-x-2.5 sm:flex">
+          <Avatar participant={self} size={36} />
+          <Avatar participant={other} size={36} />
+        </span>
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <h1 className="m-0 flex min-w-0 items-center gap-1 text-lg leading-tight font-semibold tracking-tight">
+            <span className="truncate">{other?.name}</span>
+            <Tooltip>
+              <TooltipTrigger
+                aria-label="Ficha verificada"
+                data-size="sm"
+                data-variant="ghost"
+                className="!h-6 !w-6 shrink-0 !p-0 text-subtle-foreground"
+              >
+                <BadgeCheckIcon size={15} />
+              </TooltipTrigger>
+              <TooltipContent>Ficha verificada</TooltipContent>
+            </Tooltip>
+          </h1>
+          <p className="m-0 truncate text-sm text-subtle-foreground">
+            {self?.name} pide: “{contract.intent.description}”
+          </p>
+          <p className="m-0 flex items-center gap-1.5 text-xs text-subtle-foreground">
+            <ShieldCheckIcon size={13} className="shrink-0" />
+            Moderada: cada mensaje se revisa antes de entregarse
+          </p>
+        </div>
       </div>
-      <div className="ml-auto flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-5 text-xs">
         <span
           data-testid="session-status"
-          className={`inline-flex h-6 items-center rounded-full px-2.5 text-xs font-medium ${STATUS_CHIP[status]}`}
+          className="inline-flex items-center gap-1.5 font-medium"
         >
+          <span
+            aria-hidden="true"
+            className={`size-1.5 rounded-full ${STATUS_DOT[status]}`}
+          />
           {SESSION_STATUS_LABELS[status]}
         </span>
         <span
           data-testid="violations"
-          className={`inline-flex h-6 items-center rounded-full px-2.5 font-mono text-xs tabular-nums ${TONE_CHIP[tone]}`}
+          className="inline-flex items-center gap-2 text-subtle-foreground"
         >
-          <span className="sr-only">Violaciones: </span>
-          {violations} / {contract.maxViolations}
+          Violaciones
+          <span aria-hidden="true" className="flex gap-0.5">
+            {segments.map((segment) => (
+              <span
+                key={segment.id}
+                className={`h-1.5 w-3.5 rounded-full ${segment.filled ? TONE_SEGMENT[tone] : "bg-muted-foreground/30"}`}
+              />
+            ))}
+          </span>
+          <span className="font-mono text-foreground tabular-nums">
+            {violations}/{contract.maxViolations}
+          </span>
         </span>
         <Button
           data-size="sm"
@@ -460,11 +485,13 @@ function Thread({
             el.scrollHeight - el.scrollTop - el.clientHeight < 80;
           if (atBottom.current) setUnread(0);
         }}
-        className="flex h-full flex-col gap-4 overflow-y-auto px-4 py-6"
+        className="flex h-full flex-col gap-6 overflow-y-auto px-4 py-6"
       >
         {messages[0] ? (
-          <p className="m-0 self-center text-xs font-medium text-subtle-foreground">
+          <p className="m-0 mx-auto flex w-full max-w-3xl items-center gap-3 text-xs font-medium text-subtle-foreground">
+            <span aria-hidden="true" className="h-px flex-1 bg-border" />
             {formatLongDay(messages[0].sentAt)}
+            <span aria-hidden="true" className="h-px flex-1 bg-border" />
           </p>
         ) : null}
         <section
@@ -472,11 +499,11 @@ function Thread({
           aria-label="Mensajes de la sala"
           aria-live="polite"
           aria-relevant="additions"
-          className="flex flex-col gap-4"
+          className="mx-auto flex w-full max-w-3xl flex-col gap-6"
         >
           {children}
         </section>
-        <p className="m-0 h-5 shrink-0 text-xs text-subtle-foreground">
+        <p className="m-0 mx-auto h-5 w-full max-w-3xl shrink-0 text-xs text-subtle-foreground">
           {typingName ? (
             <>
               <span className="room-typing" aria-hidden="true" /> {typingName}{" "}
@@ -545,17 +572,19 @@ function Composer({
 
   if (!control) {
     return (
-      <div className="flex flex-wrap items-center gap-3 border-t border-border px-4 py-3">
-        <p className="m-0 flex-1 text-sm text-subtle-foreground">
-          {canControl
-            ? "Tu agente está conversando. Toma el control para escribir."
-            : "Estás observando. Solo el dueño o un operador puede escribir."}
-        </p>
-        {canControl ? (
-          <Button data-variant="solid" onClick={onTakeControl}>
-            Tomar control
-          </Button>
-        ) : null}
+      <div className="border-t border-border px-4 py-3">
+        <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center gap-3">
+          <p className="m-0 flex-1 text-sm text-subtle-foreground">
+            {canControl
+              ? "Tu agente está conversando. Toma el control para escribir."
+              : "Estás observando. Solo el dueño o un operador puede escribir."}
+          </p>
+          {canControl ? (
+            <Button data-variant="solid" onClick={onTakeControl}>
+              Tomar control
+            </Button>
+          ) : null}
+        </div>
       </div>
     );
   }
@@ -663,7 +692,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-2">
+    <section className="flex flex-col gap-2 border-t border-border pt-4 first:border-t-0 first:pt-0">
       <h3 className="m-0 text-xs font-medium text-subtle-foreground">
         {title}
       </h3>
@@ -672,28 +701,39 @@ function Section({
   );
 }
 
-function Chips({
+const TERM_DOT = {
+  allowed: "bg-success",
+  forbidden: "bg-destructive",
+} as const;
+
+function Terms({
   items,
-  tone,
-  mono,
+  marker,
 }: {
-  items: string[];
-  tone: "success" | "danger" | "neutral";
-  mono?: boolean;
+  items: { label: string; code?: string }[];
+  marker?: keyof typeof TERM_DOT;
 }) {
-  const cls = {
-    success: "bg-success/15 text-foreground",
-    danger: "bg-destructive-soft text-destructive-text",
-    neutral: "bg-muted text-foreground",
-  }[tone];
   return (
-    <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
+    <ul className="m-0 flex list-none flex-col p-0">
       {items.map((item) => (
         <li
-          key={item}
-          className={`rounded-full px-2.5 py-0.5 text-xs ${cls} ${mono ? "font-mono" : ""}`}
+          key={item.code ?? item.label}
+          className="flex items-baseline justify-between gap-3 py-1"
         >
-          {item}
+          <span className="flex items-center gap-2">
+            {marker ? (
+              <span
+                aria-hidden="true"
+                className={`size-1.5 shrink-0 rounded-full ${TERM_DOT[marker]}`}
+              />
+            ) : null}
+            {item.label}
+          </span>
+          {item.code ? (
+            <code className="font-mono text-xs text-subtle-foreground">
+              {item.code}
+            </code>
+          ) : null}
         </li>
       ))}
     </ul>
@@ -708,33 +748,43 @@ function ContractView({
   otherName: string;
 }) {
   const short = otherName.replace(/^Agendamiento\s+/, "la ");
+  const fields = (codes: string[]) =>
+    codes.map((code) => ({ label: dataFieldLabel(code), code }));
   return (
-    <div className="flex flex-col gap-5 text-sm">
+    <div className="flex flex-col gap-4 text-sm">
       <Section title="Intención">
-        <p className="m-0">
-          <span className="font-medium">
+        <p className="m-0 flex items-baseline justify-between gap-3">
+          <span className="text-base font-semibold">
             {intentLabel(contract.intent.name)}
-          </span>{" "}
-          <code className="font-mono text-xs">{contract.intent.name}</code>
+          </span>
+          <code className="font-mono text-xs text-subtle-foreground">
+            {contract.intent.name}
+          </code>
         </p>
         <p className="m-0 text-subtle-foreground">
-          {contract.intent.description}
+          “{contract.intent.description}”
         </p>
       </Section>
       <Section title="Intenciones permitidas">
-        <Chips items={contract.allowedIntents} tone="success" mono />
-      </Section>
-      <Section title="Temas prohibidos">
-        <Chips items={contract.forbiddenTopics} tone="danger" />
-      </Section>
-      <Section title={`Qué comparte ${short}`}>
-        <Chips
-          items={contract.recipientShares.map(dataFieldLabel)}
-          tone="neutral"
+        <Terms
+          marker="allowed"
+          items={contract.allowedIntents.map((code) => ({
+            label: intentLabel(code),
+            code,
+          }))}
         />
       </Section>
+      <Section title="Temas prohibidos">
+        <Terms
+          marker="forbidden"
+          items={contract.forbiddenTopics.map((label) => ({ label }))}
+        />
+      </Section>
+      <Section title={`Qué comparte ${short}`}>
+        <Terms items={fields(contract.recipientShares)} />
+      </Section>
       <Section title={`Qué pide ${short}`}>
-        <Chips items={contract.recipientRequests} tone="neutral" mono />
+        <Terms items={fields(contract.recipientRequests)} />
       </Section>
       <Section title="Máximo de violaciones">
         <p className="m-0">{contract.maxViolations} antes de cerrar la sala</p>
@@ -765,7 +815,7 @@ function AuditView({
 
   return (
     <div className="flex flex-col gap-4">
-      <dl className="m-0 grid grid-cols-3 gap-2">
+      <dl className="m-0 grid grid-cols-3 divide-x divide-border border-y border-border">
         {[
           ["Revisados", metrics.reviewed],
           ["Intervenciones", metrics.interventions],
@@ -776,10 +826,7 @@ function AuditView({
               : `${metrics.averageLatencyMs} ms`,
           ],
         ].map(([label, value]) => (
-          <div
-            key={label}
-            className="flex flex-col rounded-2xl bg-card p-2.5 shadow-card"
-          >
+          <div key={label} className="flex flex-col px-3 py-2.5 first:pl-0">
             <dt className="text-[11px] text-subtle-foreground">{label}</dt>
             <dd className="m-0 text-base font-semibold tabular-nums">
               {value}
