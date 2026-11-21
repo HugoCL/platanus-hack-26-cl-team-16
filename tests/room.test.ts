@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { UiSpec } from "../shared/genui";
 import { Message } from "../shared/messages";
 import { SessionContract } from "../shared/session";
@@ -14,6 +14,7 @@ import {
   describeUiResponse,
   formatTime,
   groupSlotsByDay,
+  initials,
   primaryReason,
   splitRedacted,
   uiInteractionState,
@@ -24,6 +25,35 @@ const messages = DEMO_SCRIPT.map((step) => step.message);
 const slotPicker = messages.find(
   (m) => m.content.kind === "ui" && m.content.spec.type === "slot_picker",
 );
+
+describe("initials", () => {
+  it("preserves graphemes and prefers capitalized words", () => {
+    expect(initials("Agendamiento y Reservas")).toBe("AR");
+    expect(initials("mi asistente 🦊")).toBe("MA");
+    expect(initials("a\u0301ngel pérez")).toBe("A\u0301P");
+    expect(initials("")).toBe("");
+    expect(initials("🦊")).toBe("");
+  });
+
+  it("imports and builds initials without Intl.Segmenter", async () => {
+    vi.stubGlobal(
+      "Intl",
+      Object.create(Intl, { Segmenter: { value: undefined } }),
+    );
+    vi.resetModules();
+    try {
+      const { initials } = await import("../src/components/room/room-format");
+      expect(initials("Agendamiento y Reservas")).toBe("AR");
+      expect(initials("mi asistente 🦊")).toBe("MA");
+      expect(initials("𐐨lvaro pérez")).toBe("𐐀P");
+      expect(initials("")).toBe("");
+      expect(initials("🦊")).toBe("");
+    } finally {
+      vi.unstubAllGlobals();
+      vi.resetModules();
+    }
+  });
+});
 
 describe("demo fixture", () => {
   it.each(messages.map((m) => [m.messageId, m] as const))(
