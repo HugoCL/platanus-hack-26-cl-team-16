@@ -22,13 +22,6 @@ export default function Home() {
           </Spotlight>
           <div className="landing-glow" aria-hidden />
           <div className="landing-hero">
-            <ul className="landing-badges" {...revealAt(0)}>
-              <li>Directorio abierto por MCP</li>
-              <li>
-                Salas <span aria-hidden className="landing-badge-dot" /> con
-                moderador
-              </li>
-            </ul>
             <h1>
               <span>
                 <RevealWords text="Todos los negocios," />
