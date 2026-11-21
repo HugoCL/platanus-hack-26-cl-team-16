@@ -80,7 +80,7 @@ function AgentResult({
       data-testid="agent-card"
       data-slug={card.slug}
       data-status={card.status}
-      className={`relative flex scroll-m-4 flex-col gap-3 rounded-4xl p-4.5 transition-shadow has-[[data-select]:focus-visible]:outline-2 has-[[data-select]:focus-visible]:outline-offset-2 has-[[data-select]:focus-visible]:outline-ring ${
+      className={`relative flex scroll-m-4 flex-col gap-2.5 rounded-3xl p-4 transition-shadow has-[[data-select]:focus-visible]:outline-2 has-[[data-select]:focus-visible]:outline-offset-2 has-[[data-select]:focus-visible]:outline-ring ${
         prospect ? "bg-muted [background-image:var(--sm-hatch)]" : "bg-card"
       } ${selected ? "shadow-[0_0_0_2px_var(--ui-foreground)]" : prospect ? "" : "shadow-card"}`}
     >
@@ -92,18 +92,18 @@ function AgentResult({
           <Icon size={20} />
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <h2 className="m-0 flex min-w-0 items-center gap-1 text-base leading-snug font-medium tracking-tight">
+          <h2 className="m-0 flex min-w-0 items-start gap-1 text-base leading-snug font-medium tracking-tight">
             <button
               type="button"
               data-select
               aria-pressed={selected}
               onClick={() => onSelect?.(card.agentId)}
-              className="min-w-0 cursor-pointer truncate border-0 bg-transparent p-0 text-left font-[inherit] text-inherit outline-none before:absolute before:inset-0 before:rounded-4xl"
+              className="line-clamp-2 min-w-0 cursor-pointer border-0 bg-transparent p-0 text-left font-[inherit] text-inherit outline-none before:absolute before:inset-0 before:rounded-3xl"
             >
               {card.name}
             </button>
             {!prospect && card.verified ? (
-              <VerifiedBadge className="relative z-10" />
+              <VerifiedBadge className="relative z-10 mt-0.5 flex-none" />
             ) : null}
           </h2>
           {meta.length > 0 ? (
@@ -116,7 +116,7 @@ function AgentResult({
       </div>
 
       <p
-        className={`m-0 line-clamp-2 text-[15px] leading-normal ${prospect ? "text-subtle-foreground" : ""}`}
+        className={`m-0 line-clamp-2 text-sm leading-normal ${prospect ? "text-subtle-foreground" : ""}`}
       >
         {card.purpose}
       </p>
@@ -146,7 +146,6 @@ function AgentResult({
         {prospect || card.slug === CONSUMER_AGENT_SLUG ? null : (
           <Button
             data-variant="solid"
-            data-size="lg"
             className="flex-1"
             onClick={() => onConverse?.(card)}
           >
@@ -155,7 +154,7 @@ function AgentResult({
         )}
         <Link
           href={href}
-          className="inline-flex h-10 flex-1 items-center justify-center rounded-full border border-input bg-card font-medium text-foreground no-underline hover:bg-muted"
+          className="inline-flex h-9 flex-1 items-center justify-center rounded-full border border-input bg-card text-sm font-medium text-foreground no-underline hover:bg-muted"
         >
           Ver ficha
           <span className="sr-only"> de {card.name}</span>
