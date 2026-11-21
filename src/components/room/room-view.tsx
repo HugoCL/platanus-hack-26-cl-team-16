@@ -122,6 +122,7 @@ export function RoomView({
   status,
   messages,
   answers,
+  violationCount,
   typingName,
   onRespond,
   onSendText,
@@ -140,6 +141,7 @@ export function RoomView({
   status: SessionStatus;
   messages: RoomMessage[];
   answers: Record<string, GenUiAnswer>;
+  violationCount?: number;
   typingName?: string;
   sessions?: { sessionId: string; name: string; intent: string }[];
   onRespond: (response: UiResponse, inReplyTo: string) => void;
@@ -173,7 +175,7 @@ export function RoomView({
     return map;
   }, [messages]);
 
-  const blocked = countViolations(messages);
+  const blocked = violationCount ?? countViolations(messages);
   const readOnly = status !== "active";
   const canControl = role !== "observer";
 
@@ -191,6 +193,7 @@ export function RoomView({
   const sidePanel = contract ? (
     <SidePanel
       contract={contract}
+      blocked={blocked}
       messages={messages}
       participants={people}
       role={role}
@@ -236,7 +239,7 @@ export function RoomView({
               Cerrar sala
             </Button>
           ) : null}
-          <Thread messages={messages} typingName={typingName}>
+          <Thread messages={messages} typingName={typingName} blocked={blocked}>
             {messages.map((message, i) => {
               const prev = messages[i - 1];
               const day = formatLongDay(message.sentAt);
@@ -541,10 +544,12 @@ function DayDivider({ label }: { label: string }) {
 }
 
 function Thread({
+  blocked,
   messages,
   typingName,
   children,
 }: {
+  blocked: number;
   messages: RoomMessage[];
   typingName?: string;
   children: React.ReactNode;
@@ -574,8 +579,6 @@ function Thread({
     if (messages.length === 0) setUnread(0);
     else if (added > 0 && !atBottom.current) setUnread((n) => n + added);
   }, [messages.length]);
-
-  const blocked = messages.filter((m) => m.status === "blocked").length;
 
   return (
     <div className="relative min-h-0 flex-1">
@@ -782,12 +785,14 @@ function BlockNotice({ blocked, max }: { blocked: number; max: number }) {
 }
 
 function SidePanel({
+  blocked,
   contract,
   messages,
   participants,
   role,
   onJump,
 }: {
+  blocked: number;
   contract: SessionContract;
   messages: RoomMessage[];
   participants: RoomParticipant[];
@@ -806,6 +811,7 @@ function SidePanel({
       </TabsPanel>
       <TabsPanel value="auditoria">
         <AuditView
+          blocked={blocked}
           messages={messages}
           maxBlocked={contract.maxViolations}
           onJump={onJump}
@@ -927,15 +933,16 @@ function ContractView({ contract }: { contract: SessionContract }) {
 }
 
 function AuditView({
+  blocked,
   messages,
   maxBlocked,
   onJump,
 }: {
+  blocked: number;
   messages: RoomMessage[];
   maxBlocked: number;
   onJump: (messageId: string) => void;
 }) {
-  const blocked = countViolations(messages);
   const [onlyInterventions, setOnlyInterventions] = useState(false);
   const metrics = auditMetrics(messages);
   const events = messages.filter(

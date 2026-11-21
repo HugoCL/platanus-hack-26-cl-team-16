@@ -126,6 +126,7 @@ function ConnectedRoom({ sessionId }: { sessionId: Id<"sessions"> }) {
   return (
     <RoomView
       {...mapped}
+      violationCount={view.violationCount}
       messages={[...history, ...(pending ? [pending] : [])]}
       answers={liveAnswers(history)}
       error={error}

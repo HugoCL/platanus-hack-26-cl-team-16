@@ -130,6 +130,7 @@ export const view = query({
     v.null(),
     v.object({
       session: zodToConvex(Session),
+      violationCount: v.number(),
       participantNames: v.array(
         v.object({
           participantId: v.string(),
@@ -162,7 +163,13 @@ export const view = query({
         };
       }),
     );
-    return { session, participantNames, humanParticipantId: human._id };
+    const stored = await ctx.db.get("sessions", sessionId);
+    return {
+      session,
+      violationCount: stored?.violationCount ?? 0,
+      participantNames,
+      humanParticipantId: human._id,
+    };
   },
 });
 

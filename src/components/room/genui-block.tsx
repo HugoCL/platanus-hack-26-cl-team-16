@@ -378,7 +378,22 @@ function SlotPickerBlock({
                   data-slot="label"
                   className="room-slot flex cursor-pointer flex-col gap-0.5 rounded-2xl px-3.5 py-2.5 text-sm leading-tight has-[[data-disabled]]:cursor-default"
                 >
-                  <Radio value={slot.id} className="sr-only">
+                  <Radio
+                    value={slot.id}
+                    className="sr-only"
+                    onKeyDownCapture={(event) => {
+                      if (event.key !== " " || disabled) return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      if (event.repeat) return;
+                      setSlotId(slot.id);
+                      onRespond({
+                        type: "slot_selected",
+                        pickerId: spec.id,
+                        slotId: slot.id,
+                      });
+                    }}
+                  >
                     <RadioIndicator />
                   </Radio>
                   <span className="text-base font-semibold tabular-nums">
@@ -403,19 +418,6 @@ function SlotPickerBlock({
           Ver {hiddenDays} {hiddenDays === 1 ? "día más" : "días más"}
         </Button>
       ) : null}
-      {answered ? null : (
-        <Button
-          data-variant="solid"
-          disabled={disabled || slotId === null}
-          className="self-start"
-          onClick={() => {
-            if (slotId)
-              onRespond({ type: "slot_selected", pickerId: spec.id, slotId });
-          }}
-        >
-          Elegir horario
-        </Button>
-      )}
     </div>
   );
 }
