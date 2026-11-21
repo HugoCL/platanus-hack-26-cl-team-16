@@ -124,8 +124,8 @@ function registerTool<N extends McpToolName>(
   );
 }
 
-// E1 has no distance search, so `near` is refused instead of ignored. The query text never leaves
-// this server: `llmFallback: false` keeps it from the LLM provider, so what the parser cannot read
+// E1 has no distance search, so `near` is refused instead of ignored. The query text goes to Convex
+// but never to the LLM provider: `llmFallback: false` turns the fallback off, so what the parser cannot read
 // comes back in `unresolved` for the client to pass as `category` or `comuna`.
 async function searchAgents(
   convex: ConvexCaller,
