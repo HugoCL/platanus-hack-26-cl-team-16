@@ -8,6 +8,7 @@
   "timeouts": {
     "initialize": 2400
   },
+  "startup": [],
   "commands": [
     {
       "name": "smoke",
