@@ -329,6 +329,8 @@ function FormField({
   );
 }
 
+const VISIBLE_DAYS = 2;
+
 function SlotPickerBlock({
   spec,
   answer,
@@ -338,6 +340,14 @@ function SlotPickerBlock({
   const answered =
     answer?.response.type === "slot_selected" ? answer.response.slotId : null;
   const [slotId, setSlotId] = useState<string | null>(answered);
+  const [showAll, setShowAll] = useState(false);
+  const days = groupSlotsByDay(spec.slots);
+  const answeredDay = days.findIndex((d) =>
+    d.slots.some((slot) => slot.id === answered),
+  );
+  const visibleDays = Math.max(VISIBLE_DAYS, answeredDay + 1);
+  const shownDays = showAll ? days : days.slice(0, visibleDays);
+  const hiddenDays = days.length - shownDays.length;
 
   return (
     <div className="flex flex-col gap-3">
@@ -349,10 +359,10 @@ function SlotPickerBlock({
         disabled={disabled}
         className="flex flex-col gap-3"
       >
-        {groupSlotsByDay(spec.slots).map(({ day, slots }) => (
+        {shownDays.map(({ day, slots }) => (
           <div key={day} className="flex flex-col gap-1.5">
             <span className="text-xs font-medium">{day}</span>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2">
               {slots.map((slot) => (
                 <label
                   key={slot.id}
@@ -374,6 +384,16 @@ function SlotPickerBlock({
           </div>
         ))}
       </RadioGroup>
+      {hiddenDays > 0 ? (
+        <Button
+          data-size="sm"
+          data-variant="ghost"
+          className="self-start"
+          onClick={() => setShowAll(true)}
+        >
+          Ver {hiddenDays} {hiddenDays === 1 ? "día más" : "días más"}
+        </Button>
+      ) : null}
       {answered ? null : (
         <Button
           data-variant="solid"
