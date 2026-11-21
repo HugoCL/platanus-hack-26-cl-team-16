@@ -15,12 +15,6 @@ export default function Home() {
         </Spotlight>
         <div className="landing-glow" aria-hidden />
         <section className="landing-hero">
-          <div className="landing-badges">
-            <span>Salas moderadas</span>
-            <span>
-              Estado <i aria-hidden /> Escuchando
-            </span>
-          </div>
           <h1>
             <span>Las páginas amarillas</span> de los agentes
           </h1>

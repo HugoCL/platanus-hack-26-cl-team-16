@@ -76,7 +76,10 @@ type Entry = {
   handle: string;
   featured: boolean;
 };
-type Section = { category: string; entries: Entry[] };
+type Section = { id: string; category: string; entries: Entry[] };
+
+const COLUMN_COUNT = 12;
+const SECTIONS_PER_COLUMN = 3;
 
 function slug(text: string) {
   return text
@@ -87,44 +90,69 @@ function slug(text: string) {
     .replace(/(^-|-$)/g, "");
 }
 
-function buildSections(): Section[] {
+function buildColumns(): Section[][] {
   let seed = 26;
   const next = () => {
     seed = (seed * 1103515245 + 12345) % 2147483648;
     return seed;
   };
-  return CATEGORIES.map(([category, noun]) => {
-    const entries = Array.from({ length: 22 + (next() % 12) }, (_, index) => {
-      const place = NAMES[next() % NAMES.length];
-      return {
-        id: `${category}-${index}`,
-        name: `${noun} ${place}`,
-        comuna: COMUNAS[next() % COMUNAS.length],
-        handle: `@${slug(place).split("-").at(-1)}${(next() % 900) + 100}`,
-        featured: next() % 17 === 0,
-      };
-    });
-    return { category, entries };
-  });
+  const sections = Array.from(
+    { length: COLUMN_COUNT * SECTIONS_PER_COLUMN },
+    (_, sectionIndex) => {
+      const [category, noun] = CATEGORIES[sectionIndex % CATEGORIES.length];
+      const id = `${sectionIndex}`;
+      const entries = Array.from({ length: 24 + (next() % 12) }, (_, index) => {
+        const place = NAMES[next() % NAMES.length];
+        return {
+          id: `${id}-${index}`,
+          name: `${noun} ${place}`,
+          comuna: COMUNAS[next() % COMUNAS.length],
+          handle: `@${slug(place).split("-").at(-1)}${(next() % 900) + 100}`,
+          featured: next() % 17 === 0,
+        };
+      });
+      return { id, category, entries };
+    },
+  );
+  return Array.from({ length: COLUMN_COUNT }, (_, column) =>
+    sections.slice(
+      column * SECTIONS_PER_COLUMN,
+      (column + 1) * SECTIONS_PER_COLUMN,
+    ),
+  );
 }
 
-const SECTIONS = buildSections();
+const COLUMNS = buildColumns();
 
 export function ListingWall() {
   return (
     <div className="landing-wall">
-      {SECTIONS.map((section) => (
-        <section key={section.category}>
-          <strong>{section.category}</strong>
-          {section.entries.map((entry) => (
-            <p key={entry.id} data-featured={entry.featured || undefined}>
-              <span>
-                {entry.name} · {entry.comuna}
-              </span>
-              <span>{entry.handle}</span>
-            </p>
-          ))}
-        </section>
+      {COLUMNS.map((sections, column) => (
+        <div key={sections[0].id} className="landing-column">
+          <div
+            className="landing-track"
+            data-direction={column % 2 === 0 ? "up" : "down"}
+          >
+            {["a", "b"].flatMap((copy) =>
+              sections.map((section) => (
+                <section key={`${copy}-${section.id}`}>
+                  <strong>{section.category}</strong>
+                  {section.entries.map((entry) => (
+                    <p
+                      key={entry.id}
+                      data-featured={entry.featured || undefined}
+                    >
+                      <span>
+                        {entry.name} · {entry.comuna}
+                      </span>
+                      <span>{entry.handle}</span>
+                    </p>
+                  ))}
+                </section>
+              )),
+            )}
+          </div>
+        </div>
       ))}
     </div>
   );

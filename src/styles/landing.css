@@ -38,6 +38,7 @@
   position: absolute;
   inset: 0;
   z-index: -2;
+  overflow: hidden;
   color: oklch(0.78 0.012 90);
   mask-image:
     radial-gradient(
@@ -49,26 +50,33 @@
   mask-composite: intersect;
 }
 
+/*
+ * Each column holds its listings twice and slides by one copy (-50%), so the loop is seamless.
+ * Even columns run up, odd ones down.
+ */
+@keyframes landing-scroll {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-50%);
+  }
+}
+
 .landing-wall {
+  display: flex;
+  gap: 1.25rem;
   height: 100%;
-  columns: 13rem;
-  column-gap: 1.25rem;
-  column-fill: auto;
-  padding: 0.5rem 1rem;
+  padding-inline: 1rem;
   font: 500 0.5625rem / 1.45 var(--ui-font-mono);
   letter-spacing: -0.01em;
   user-select: none;
-
-  & section {
-    display: contents;
-  }
 
   & strong {
     display: block;
     margin-block: 0.5rem 0.2rem;
     padding-top: 0.15rem;
     border-top: 2px solid var(--sm-yellow);
-    break-after: avoid;
     color: var(--sm-yellow);
     font: 800 0.625rem / 1.5 var(--ui-font-sans);
     letter-spacing: 0.04em;
@@ -97,6 +105,20 @@
     background: var(--sm-yellow);
     color: var(--landing-ink);
     font-weight: 700;
+  }
+}
+
+.landing-column {
+  flex: 0 0 13rem;
+  min-width: 0;
+}
+
+.landing-track {
+  animation: landing-scroll 140s linear infinite;
+  will-change: transform;
+
+  &[data-direction="down"] {
+    animation-direction: reverse;
   }
 }
 
@@ -153,33 +175,6 @@
     font-size: 1rem;
     line-height: 1.55;
     text-wrap: pretty;
-  }
-}
-
-.landing-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.375rem;
-  font: 500 0.625rem / 1 var(--ui-font-mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-
-  & span {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.45rem 0.6rem;
-    border: 1px solid oklch(1 0 0 / 0.1);
-    border-radius: 0.25rem;
-    background: oklch(1 0 0 / 0.05);
-    color: var(--sm-subtle-foreground);
-  }
-
-  & i {
-    width: 6px;
-    height: 6px;
-    border-radius: var(--sm-radius-full);
-    background: var(--sm-yellow);
   }
 }
 
@@ -277,8 +272,8 @@
 }
 
 @media (max-width: 40rem) {
-  .landing-wall {
-    columns: 9.5rem;
+  .landing-column {
+    flex-basis: 9.5rem;
   }
 
   .landing-spotlight {
@@ -290,5 +285,9 @@
 @media (prefers-reduced-motion: reduce) {
   .landing-cta span {
     transition: none;
+  }
+
+  .landing-track {
+    animation: none;
   }
 }
