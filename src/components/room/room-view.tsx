@@ -27,13 +27,21 @@ import {
   ShieldCheckIcon,
   UserIcon,
 } from "lucide-react";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { ThemeToggle } from "@/components/toggle-theme";
-import type { UiSpec } from "@/shared/genui";
+import type { UiResponse, UiSpec } from "@/shared/genui";
 import { MAX_TEXT_LENGTH } from "@/shared/messages";
 import type { SessionContract, SessionStatus } from "@/shared/session";
 import { VerifiedBadge } from "../verified-badge";
 import { MODERATOR_MODEL, type RoomFixture } from "./demo-session";
+import type { GenUiAnswer } from "./genui-block";
 import { MessageItem } from "./message-item";
 import { ReasonList } from "./moderation";
 import {
@@ -80,33 +88,83 @@ export function DemoRoom({
 }) {
   const room = useDemoRoom(fixture.script, instant);
   const [role, setRole] = useState<Viewer["role"]>("owner");
+  return (
+    <RoomView
+      participants={fixture.participants}
+      viewer={{ ...fixture.viewer, role }}
+      contract={fixture.contract}
+      status={sessionEnd(room.messages)?.status ?? "active"}
+      messages={room.messages}
+      answers={room.answers}
+      typingName={
+        fixture.participants.find((p) => p.participantId === room.typing)?.name
+      }
+      onRespond={room.respond}
+      onSendText={room.sendText}
+      onRestart={room.reset}
+      toolbar={
+        <DemoToolbar role={role} onRole={setRole} onReset={room.reset} />
+      }
+    />
+  );
+}
+
+export function RoomView({
+  participants: people,
+  viewer,
+  contract,
+  status,
+  messages,
+  answers,
+  typingName,
+  onRespond,
+  onSendText,
+  onCloseRoom,
+  onRestart,
+  toolbar,
+  error,
+  sessions,
+  sending = false,
+  answersReadOnly = false,
+}: {
+  participants: RoomParticipant[];
+  viewer: Viewer;
+  contract: SessionContract | null;
+  status: SessionStatus;
+  messages: RoomMessage[];
+  answers: Record<string, GenUiAnswer>;
+  typingName?: string;
+  sessions?: { sessionId: string; name: string; intent: string }[];
+  onRespond: (response: UiResponse, inReplyTo: string) => void;
+  onSendText: (text: string) => void | Promise<boolean | void>;
+  onCloseRoom?: () => void;
+  onRestart?: () => void;
+  toolbar?: ReactNode;
+  error?: string;
+  sending?: boolean;
+  answersReadOnly?: boolean;
+}) {
+  const role = viewer.role;
   const [panelOpen, setPanelOpen] = useState(true);
   const [control, setControl] = useState(false);
   const [auditFor, setAuditFor] = useState<string | null>(null);
   const [highlighted, setHighlighted] = useState<string | null>(null);
 
-  const viewer: Viewer = { ...fixture.viewer, role };
   const participants = useMemo(
-    () => new Map(fixture.participants.map((p) => [p.participantId, p])),
-    [fixture],
+    () => new Map(people.map((p) => [p.participantId, p])),
+    [people],
   );
-  const other = fixture.participants.find(
-    (p) => p.side === "other" && p.kind === "agent",
-  );
-  const self = fixture.participants.find(
-    (p) => p.side === "self" && p.kind === "agent",
-  );
+  const other = people.find((p) => p.side === "other" && p.kind === "agent");
+  const self = people.find((p) => p.side === "self" && p.kind === "agent");
 
   const uiSpecsByMessage = useMemo(() => {
     const map: Record<string, UiSpec> = {};
-    for (const m of room.messages)
+    for (const m of messages)
       if (m.content.kind === "ui") map[m.messageId] = m.content.spec;
     return map;
-  }, [room.messages]);
+  }, [messages]);
 
-  const end = sessionEnd(room.messages);
-  const status: SessionStatus = end?.status ?? "active";
-  const violations = room.messages.filter(
+  const violations = messages.filter(
     (m) => m.status === "blocked" && m.senderParticipantId !== null,
   ).length;
   const readOnly = status !== "active";
@@ -120,37 +178,48 @@ export function DemoRoom({
     window.setTimeout(() => setHighlighted(null), 1600);
   }
 
-  const auditMessage = room.messages.find((m) => m.messageId === auditFor);
+  const auditMessage = messages.find((m) => m.messageId === auditFor);
 
   return (
     <div className="flex h-dvh flex-col bg-background">
-      <DemoToolbar role={role} onRole={setRole} onReset={room.reset} />
+      {toolbar}
       <div className="flex min-h-0 flex-1">
         <SessionList
           self={self}
           other={other}
-          intent={fixture.contract.intent.name}
-          lastAt={room.messages.at(-1)?.sentAt}
+          intent={contract?.intent.name ?? ""}
+          lastAt={messages.at(-1)?.sentAt}
           status={status}
+          sessions={sessions}
         />
         <main className="flex min-w-0 flex-1 flex-col border-x border-border">
-          <SessionHeader
-            self={self}
-            other={other}
-            contract={fixture.contract}
-            status={status}
-            violations={violations}
-            panelOpen={panelOpen}
-            onTogglePanel={() => setPanelOpen((o) => !o)}
-          />
-          <Thread
-            messages={room.messages}
-            typingName={
-              room.typing ? participants.get(room.typing)?.name : undefined
-            }
-          >
-            {room.messages.map((message, i) => {
-              const prev = room.messages[i - 1];
+          {contract ? (
+            <SessionHeader
+              self={self}
+              other={other}
+              contract={contract}
+              status={status}
+              violations={violations}
+              panelOpen={panelOpen}
+              onTogglePanel={() => setPanelOpen((o) => !o)}
+            />
+          ) : (
+            <p className="px-4">
+              Contrato no disponible · {SESSION_STATUS_LABELS[status]}
+            </p>
+          )}
+          {onCloseRoom ? (
+            <Button
+              className="self-end"
+              disabled={readOnly}
+              onClick={onCloseRoom}
+            >
+              Cerrar sala
+            </Button>
+          ) : null}
+          <Thread messages={messages} typingName={typingName}>
+            {messages.map((message, i) => {
+              const prev = messages[i - 1];
               const day = formatLongDay(message.sentAt);
               const newDay = !prev || formatLongDay(prev.sentAt) !== day;
               return (
@@ -164,11 +233,12 @@ export function DemoRoom({
                         : undefined
                     }
                     viewer={viewer}
-                    answers={room.answers}
+                    answers={answers}
+                    readOnly={readOnly || sending || answersReadOnly}
                     uiSpecsByMessage={uiSpecsByMessage}
                     highlighted={highlighted === message.messageId}
                     onRespond={(response) =>
-                      room.respond(response, message.messageId)
+                      onRespond(response, message.messageId)
                     }
                     onShowAudit={setAuditFor}
                   />
@@ -176,28 +246,37 @@ export function DemoRoom({
               );
             })}
           </Thread>
+          {error ? (
+            <p role="alert" className="m-0 px-4 py-2 text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
           <Composer
             readOnly={readOnly}
-            closedText={end?.text}
+            sending={sending}
+            closedLabel={
+              sessionEnd(messages)?.text ??
+              (onRestart ? undefined : SESSION_STATUS_LABELS[status])
+            }
             control={control}
             canControl={canControl}
             selfName={self?.name ?? "tu agente"}
             onTakeControl={() => setControl(true)}
             onReturnControl={() => setControl(false)}
-            onSend={room.sendText}
-            onRestart={room.reset}
+            onSend={onSendText}
+            onRestart={onRestart}
           />
         </main>
-        {panelOpen ? (
+        {panelOpen && contract ? (
           <aside
             aria-label="Contrato y auditoría"
             className="hidden w-[340px] shrink-0 flex-col overflow-y-auto lg:flex"
           >
             <SidePanel
-              contract={fixture.contract}
+              contract={contract}
               otherName={other?.name ?? "el proveedor"}
-              messages={room.messages}
-              participants={fixture.participants}
+              messages={messages}
+              participants={people}
               role={role}
               onJump={jumpTo}
             />
@@ -307,12 +386,14 @@ function SessionList({
   intent,
   lastAt,
   status,
+  sessions,
 }: {
   self?: RoomParticipant;
   other?: RoomParticipant;
   intent: string;
   lastAt?: number;
   status: SessionStatus;
+  sessions?: { sessionId: string; name: string; intent: string }[];
 }) {
   return (
     <nav
@@ -320,6 +401,15 @@ function SessionList({
       className="hidden w-[260px] shrink-0 flex-col gap-1 px-3 py-4 xl:flex"
     >
       <h2 className="m-0 px-3 pb-2 text-sm font-semibold">Salas</h2>
+      {sessions?.map((session) => (
+        <a
+          key={session.sessionId}
+          href={`/room/${session.sessionId}`}
+          className="px-3 py-2"
+        >
+          {session.name} · {intentLabel(session.intent)}
+        </a>
+      ))}
       <a
         href="#thread"
         aria-current="page"
@@ -549,7 +639,8 @@ function Thread({
 
 function Composer({
   readOnly,
-  closedText,
+  sending,
+  closedLabel,
   control,
   canControl,
   selfName,
@@ -559,24 +650,27 @@ function Composer({
   onRestart,
 }: {
   readOnly: boolean;
-  closedText?: string;
+  sending?: boolean;
+  closedLabel?: string;
   control: boolean;
   canControl: boolean;
   selfName: string;
   onTakeControl: () => void;
   onReturnControl: () => void;
-  onSend: (text: string) => void;
-  onRestart: () => void;
+  onSend: (text: string) => void | Promise<boolean | void>;
+  onRestart?: () => void;
 }) {
   const [text, setText] = useState("");
 
   if (readOnly) {
     return (
       <div className="flex flex-wrap items-center gap-3 border-t border-border bg-muted px-4 py-3 text-sm">
-        <span className="flex-1">{closedText ?? "Sala cerrada"}</span>
-        <Button data-size="sm" onClick={onRestart}>
-          Abrir nueva sala
-        </Button>
+        <span className="flex-1">{closedLabel ?? "Sala cerrada"}</span>
+        {onRestart ? (
+          <Button data-size="sm" onClick={onRestart}>
+            Abrir nueva sala
+          </Button>
+        ) : null}
       </div>
     );
   }
@@ -600,11 +694,11 @@ function Composer({
     );
   }
 
-  const send = () => {
+  const send = async () => {
     const value = text.trim();
-    if (!value) return;
-    onSend(value);
-    setText("");
+    if (!value || sending) return;
+    const accepted = await onSend(value);
+    if (accepted !== false) setText("");
   };
 
   return (
@@ -628,6 +722,7 @@ function Composer({
       >
         <div className="flex items-end gap-2">
           <Textarea
+            disabled={sending}
             aria-label="Mensaje"
             value={text}
             onValueChange={setText}
@@ -642,7 +737,7 @@ function Composer({
             type="submit"
             data-variant="solid"
             aria-label="Enviar"
-            disabled={!text.trim()}
+            disabled={sending || !text.trim()}
             className="!w-10 !p-0"
             data-size="lg"
           >
