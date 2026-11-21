@@ -27,6 +27,8 @@ import { moderate } from "./moderator";
 import { loadSession, toMessage } from "./roomState";
 
 const HISTORY_LIMIT = 500;
+const HISTORY_BYTE_BUDGET = 4 * 1024 * 1024;
+const encoder = new TextEncoder();
 
 const recipientValidator = v.union(v.literal("all"), v.id("participants"));
 
@@ -102,16 +104,11 @@ export const moderationContext = internalQuery({
     history: Message[];
   }> => {
     const { session, sender } = await checkSend(ctx, args);
-    const recent = await ctx.db
-      .query("messages")
-      .withIndex("by_sessionId", (q) => q.eq("sessionId", args.sessionId))
-      .order("desc")
-      .take(HISTORY_LIMIT);
     return {
       contract: session.contract,
       sender,
       participants: session.participants,
-      history: recent.reverse().map(toMessage),
+      history: await recentMessages(ctx, args.sessionId),
     };
   },
 });
@@ -179,15 +176,25 @@ export const commit = internalMutation({
   },
 });
 
+async function recentMessages(ctx: QueryCtx, sessionId: Id<"sessions">) {
+  const recent: Message[] = [];
+  let bytes = 0;
+  for await (const doc of ctx.db
+    .query("messages")
+    .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+    .order("desc")) {
+    bytes += encoder.encode(JSON.stringify(doc)).length;
+    if (bytes > HISTORY_BYTE_BUDGET && recent.length > 0) break;
+    recent.push(toMessage(doc));
+    if (recent.length === HISTORY_LIMIT) break;
+  }
+  return recent.reverse();
+}
+
 export const history = query({
   args: { sessionId: v.id("sessions") },
-  handler: async (ctx, { sessionId }): Promise<Message[]> => {
-    const messages = await ctx.db
-      .query("messages")
-      .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
-      .take(HISTORY_LIMIT);
-    return messages.map(toMessage);
-  },
+  handler: (ctx, { sessionId }): Promise<Message[]> =>
+    recentMessages(ctx, sessionId),
 });
 
 export async function publishNotice(
