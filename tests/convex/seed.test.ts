@@ -6,7 +6,7 @@ import { internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
 import { AgentCard } from "../../shared/agent";
 import { Offering, validateOfferingAttributes } from "../../shared/catalog";
-import { SEED_AGENTS, SEED_CATEGORIES } from "../../shared/seedData";
+import { SEED_AGENTS, SEED_CATEGORIES } from "../../shared/seed-data";
 
 const modules = import.meta.glob("../../convex/**/*.ts");
 

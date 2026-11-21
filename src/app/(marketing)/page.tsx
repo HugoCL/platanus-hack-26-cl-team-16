@@ -5,8 +5,8 @@ import { Button } from "@ui-sdk/react/button";
 import { Separator } from "@ui-sdk/react/separator";
 import { Unauthenticated, useQuery } from "convex/react";
 import Link from "next/link";
-import AddNumberButton from "@/components/AddNumberButton";
-import { api } from "../convex/_generated/api";
+import AddNumberButton from "@/components/add-number-button";
+import { api } from "@/convex/_generated/api";
 
 export default function Home() {
   return (
@@ -89,7 +89,7 @@ function Content() {
         Edit <code>convex/myFunctions.ts</code> to change your backend
       </p>
       <p>
-        Edit <code>app/page.tsx</code> to change your frontend
+        Edit <code>src/app/(marketing)/page.tsx</code> to change your frontend
       </p>
       <p>
         See the <Link href="/server">/server route</Link> for an example of

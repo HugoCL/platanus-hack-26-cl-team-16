@@ -4,7 +4,7 @@ import { Availability, Offering, Transaction } from "./catalog";
 import { Phase1UiSpec, UiSpec } from "./genui";
 import { Message, SendableContent, UiResponseContent } from "./messages";
 import { Verdict } from "./moderation";
-import { SEED_AGENTS } from "./seedData";
+import { SEED_AGENTS } from "./seed-data";
 import { Session, SessionContract } from "./session";
 
 export type ContractExamples = {

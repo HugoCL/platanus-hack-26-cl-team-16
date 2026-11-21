@@ -12,7 +12,7 @@ import {
   SEED_AVAILABILITY,
   SEED_CATEGORIES,
   SEED_OFFERINGS,
-} from "../shared/seedData";
+} from "../shared/seed-data";
 
 const categorySlugs = new Set(SEED_CATEGORIES.map((c) => c.slug));
 

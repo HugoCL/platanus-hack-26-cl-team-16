@@ -8,7 +8,7 @@ import {
   SEED_AVAILABILITY,
   SEED_CATEGORIES,
   SEED_OFFERINGS,
-} from "../shared/seedData";
+} from "../shared/seed-data";
 import { DEFAULT_MAX_TURNS, type SessionContract } from "../shared/session";
 import type { Id, TableNames } from "./_generated/dataModel";
 import { internalMutation, type MutationCtx } from "./_generated/server";

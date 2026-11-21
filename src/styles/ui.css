@@ -1,0 +1,185 @@
+/*
+ * Sala moderada on top of UI SDK's web.css.
+ * Rules sit directly in `components`, which outranks web.css's nested `ui-sdk` sublayer at equal
+ * specificity, and stay below Tailwind utilities so a class still wins.
+ */
+@layer components {
+  :is(
+    [data-slot="button"],
+    [data-slot="dialog-trigger"],
+    [data-slot="dialog-close"],
+    [data-slot="tooltip-trigger"],
+    [data-slot="collapsible-trigger"]
+  ) {
+    height: calc(var(--ui-spacing) * 9);
+    padding-inline: calc(var(--ui-spacing) * 4);
+    border-radius: var(--sm-radius-full);
+    background: var(--sm-card);
+    transition:
+      transform 150ms ease-out,
+      background-color 150ms ease-out;
+
+    &:active:not([data-disabled]) {
+      transform: scale(0.97);
+    }
+
+    &[data-size="sm"] {
+      height: calc(var(--ui-spacing) * 8);
+      padding-inline: calc(var(--ui-spacing) * 3);
+      font-size: 0.8125rem;
+    }
+
+    &[data-size="lg"] {
+      height: calc(var(--ui-spacing) * 10);
+    }
+
+    &[data-size="xl"] {
+      height: calc(var(--ui-spacing) * 12);
+      padding-inline: calc(var(--ui-spacing) * 5);
+      font-size: 0.9375rem;
+    }
+
+    &[data-variant="ghost"] {
+      border-color: transparent;
+      background: transparent;
+    }
+
+    &[data-variant="solid"] {
+      background: var(--ui-primary);
+    }
+  }
+
+  :is(
+    [data-slot="input"],
+    [data-slot="textarea"],
+    [data-slot="select-trigger"]
+  ) {
+    border-radius: var(--sm-radius-3xl);
+    background: var(--sm-card);
+    padding-inline: calc(var(--ui-spacing) * 3.5);
+  }
+
+  :is([data-slot="input"], [data-slot="select-trigger"]) {
+    height: calc(var(--ui-spacing) * 10);
+  }
+
+  [data-slot="textarea"] {
+    padding-block: calc(var(--ui-spacing) * 2.5);
+  }
+
+  :is(
+    [data-slot="select-content"],
+    [data-slot="dialog-content"],
+    [data-slot="tooltip-content"],
+    [data-slot="popover-content"]
+  ) {
+    border-radius: var(--sm-radius-3xl);
+    background: var(--sm-card);
+  }
+
+  [data-slot="dialog-content"] {
+    border-radius: var(--sm-radius-4xl);
+    padding: calc(var(--ui-spacing) * 6);
+  }
+
+  [data-slot="tooltip-content"] {
+    border-radius: var(--sm-radius-lg);
+    background: var(--ui-primary);
+    color: var(--ui-primary-foreground);
+    font-size: 0.75rem;
+  }
+
+  /* Choice cards: a label wrapping a radio or checkbox. The 2px ring is the selected state (3:1). */
+  label[data-slot="card"] {
+    border-radius: var(--sm-radius-3xl);
+    background: var(--sm-card);
+
+    &:has([data-checked]) {
+      border-color: transparent;
+      box-shadow: 0 0 0 2px var(--ui-foreground);
+    }
+  }
+
+  [data-slot="tabs-tab"] {
+    border-radius: var(--sm-radius-full);
+
+    &[data-selected] {
+      background: var(--ui-muted);
+      color: var(--ui-foreground);
+    }
+  }
+
+  [data-slot="meter-track"] {
+    border-radius: var(--sm-radius-full);
+  }
+
+  [data-slot="meter-indicator"] {
+    border-radius: var(--sm-radius-full);
+    background: var(--ui-foreground);
+  }
+}
+
+/* Sala moderada: motion for pending messages and audit highlights. */
+@keyframes sala-scan {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes sala-flash {
+  from {
+    box-shadow: 0 0 0 3px var(--sm-ring-strong);
+  }
+  to {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+
+.sala-bubble {
+  transition:
+    opacity 180ms ease-out,
+    border-color 180ms ease-out;
+}
+
+.sala-pending {
+  opacity: 0.6;
+}
+
+.sala-stage {
+  animation: sala-scan 1.2s ease-in-out infinite;
+}
+
+.sala-highlight > .sala-bubble {
+  border-radius: var(--sm-radius-3xl);
+  animation: sala-flash 1.6s ease-out;
+}
+
+.sala-typing {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: currentColor;
+  animation: sala-scan 1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sala-bubble,
+  [data-slot="button"] {
+    transition: none;
+  }
+
+  .sala-stage,
+  .sala-typing,
+  .sala-highlight > .sala-bubble {
+    animation: none;
+  }
+
+  [data-slot="button"]:active {
+    transform: none;
+  }
+}

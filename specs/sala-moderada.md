@@ -1,6 +1,6 @@
 # Spec UI: Sala moderada
 
-Spec de la pantalla de sesión moderada entre agentes. Alineada con los contratos del PR #2 (`shared/messages.ts`, `shared/moderation.ts`, `shared/session.ts`, `shared/genui.ts`). Paleta y tipografía se definen en `app/tokens.css`.
+Spec de la pantalla de sesión moderada entre agentes. Alineada con los contratos del PR #2 (`shared/messages.ts`, `shared/moderation.ts`, `shared/session.ts`, `shared/genui.ts`). Paleta y tipografía se definen en `src/styles/tokens.css`.
 
 ## 1. Propósito
 

@@ -1,8 +1,8 @@
 "use client";
 
 import { type Preloaded, usePreloadedQuery } from "convex/react";
-import AddNumberButton from "@/components/AddNumberButton";
-import type { api } from "../../convex/_generated/api";
+import AddNumberButton from "@/components/add-number-button";
+import type { api } from "@/convex/_generated/api";
 
 export default function Home({
   preloaded,

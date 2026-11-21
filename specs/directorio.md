@@ -1,6 +1,6 @@
 # Spec UI: Directorio de agentes
 
-Spec de la pantalla de directorio ("páginas amarillas de agentes"). Alineada con los contratos del PR #2: tabla `agents` y `entities` en `convex/schema.ts`, `shared/scope.ts` (`AgentScope`), `shared/geo.ts` (`Location`) y `shared/mcp.ts` (`SearchAgentsInput`, `AgentSummary`, `AgentDetail`, `OpenSessionInput`). Paleta y tipografía se definen en `app/tokens.css`. Complementa a `specs/sala-moderada.md`.
+Spec de la pantalla de directorio ("páginas amarillas de agentes"). Alineada con los contratos del PR #2: tabla `agents` y `entities` en `convex/schema.ts`, `shared/scope.ts` (`AgentScope`), `shared/geo.ts` (`Location`) y `shared/mcp.ts` (`SearchAgentsInput`, `AgentSummary`, `AgentDetail`, `OpenSessionInput`). Paleta y tipografía se definen en `src/styles/tokens.css`. Complementa a `specs/sala-moderada.md`.
 
 ## 1. Propósito
 
