@@ -96,18 +96,50 @@ function toSummary(agent: Doc<"agents">) {
   };
 }
 
+async function requireRegistrationSecret(secret: string | undefined) {
+  const expected = process.env.AGENT_REGISTRATION_SECRET;
+  if (!expected) {
+    console.warn(
+      "AGENT_REGISTRATION_SECRET is not set; registration is unprotected.",
+    );
+    return;
+  }
+  // Native MAC verification avoids a timing-sensitive JavaScript comparison.
+  const key = await crypto.subtle.generateKey(
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign", "verify"],
+  );
+  const encoder = new TextEncoder();
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(expected),
+  );
+  if (
+    !(await crypto.subtle.verify(
+      "HMAC",
+      key,
+      signature,
+      encoder.encode(secret ?? ""),
+    ))
+  )
+    fail("Unauthorized", "registration requires the server credential");
+}
+
 export const register = action({
-  args: registrationArgs,
+  args: { ...registrationArgs, secret: v.optional(v.string()) },
   returns: registered,
   handler: async (
     ctx,
-    args,
+    { secret, ...args },
   ): Promise<{
     agentId: Id<"agents">;
     slug: string;
     apiKey: string;
     linkCode: string;
   }> => {
+    await requireRegistrationSecret(secret);
     const name = text(args.name, 120);
     const description = text(args.description, 1000);
     const { apiKey, prefix } = generateApiKey();

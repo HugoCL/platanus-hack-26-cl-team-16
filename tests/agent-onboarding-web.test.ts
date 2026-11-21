@@ -1,5 +1,5 @@
 import { ConvexError } from "convex/values";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { agentInstructions } from "../lib/agent-instructions";
 import { MCP_TOOLS } from "../shared/mcp";
 import { SEED_CATEGORIES } from "../shared/seed-data";
@@ -8,6 +8,7 @@ import { GET } from "../src/app/llms.txt/route";
 
 const { fetchAction } = vi.hoisted(() => ({ fetchAction: vi.fn() }));
 vi.mock("convex/nextjs", () => ({ fetchAction }));
+beforeEach(() => vi.stubEnv("AGENT_REGISTRATION_SECRET", undefined));
 afterEach(() => {
   vi.unstubAllEnvs();
   fetchAction.mockReset();
@@ -155,7 +156,37 @@ describe("registration HTTP endpoint", () => {
       name: "Grok Bot",
       description: "Asistente",
       clientIp: "203.0.113.1",
+      secret: undefined,
     });
+  });
+
+  it("passes only the server-configured secret and never returns it", async () => {
+    vi.stubEnv("AGENT_REGISTRATION_SECRET", "test-route-secret");
+    fetchAction.mockResolvedValue({
+      agentId: "id",
+      slug: "service",
+      apiKey: "test-key",
+      linkCode: "code",
+    });
+    const response = await POST(
+      request(
+        JSON.stringify({
+          name: "Servicio",
+          description: "Información",
+          secret: "caller-supplied-secret",
+          clientIp: "spoofed",
+        }),
+      ),
+    );
+    expect(fetchAction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        secret: "test-route-secret",
+        clientIp: "203.0.113.1",
+      }),
+    );
+    expect(response.status).toBe(201);
+    expect(await response.text()).not.toContain("test-route-secret");
   });
 
   it.each(["{", "null", "{}", '{"name":2,"description":"text"}', "[]"])(

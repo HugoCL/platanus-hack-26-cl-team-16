@@ -41,6 +41,7 @@ export async function POST(request: Request) {
       {
         name: body.name,
         description: body.description,
+        secret: process.env.AGENT_REGISTRATION_SECRET,
         clientIp,
         ...("purpose" in body ? { purpose: body.purpose as string } : {}),
         ...("category" in body ? { category: body.category as string } : {}),

@@ -1,5 +1,5 @@
 // @vitest-environment edge-runtime
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { sha256Hex } from "../../convex/agentKeys";
@@ -7,7 +7,13 @@ import { REQUEST, seededRooms } from "./roomFixture";
 
 let rooms: Awaited<ReturnType<typeof seededRooms>>;
 beforeEach(async () => {
+  vi.stubEnv("AGENT_REGISTRATION_SECRET", undefined);
+  vi.spyOn(console, "warn").mockImplementation(() => {});
   rooms = await seededRooms();
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.useRealTimers();
 });
 const register = (clientIp?: string) =>
   rooms.t.action(api.agentRegistration.register, {
@@ -19,6 +25,51 @@ const owner = () => rooms.t.withIdentity({ subject: "owner" });
 const other = () => rooms.t.withIdentity({ subject: "other" });
 
 describe("agent self-onboarding", () => {
+  it("allows unprotected local registration and warns exactly once per call", async () => {
+    await register();
+    expect(console.warn).toHaveBeenCalledExactlyOnceWith(
+      "AGENT_REGISTRATION_SECRET is not set; registration is unprotected.",
+    );
+    await register();
+    expect(console.warn).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects missing or wrong server credentials without consuming either registration bucket", async () => {
+    const secret = "test-registration-secret";
+    vi.stubEnv("AGENT_REGISTRATION_SECRET", secret);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const attempt = (secret: string | undefined, clientIp: string) =>
+      rooms.t.action(api.agentRegistration.register, {
+        name: "Servicio",
+        description: "Información",
+        secret,
+        clientIp,
+      });
+    const wrong = [
+      undefined,
+      "",
+      "wrong",
+      "test-registration-secreu",
+      `${secret}extra`,
+    ];
+    for (let i = 0; i < 65; i++) {
+      await expect(
+        attempt(wrong[i % wrong.length], i % 2 ? "shared-ip" : `rotating-${i}`),
+      ).rejects.toThrow(/server credential/);
+    }
+    for (let i = 0; i < 5; i++)
+      await expect(attempt(secret, "shared-ip")).resolves.toHaveProperty(
+        "agentId",
+      );
+    await expect(attempt(secret, "shared-ip")).rejects.toThrow(
+      /registration quota exhausted/,
+    );
+    for (let i = 0; i < 55; i++) await attempt(secret, `valid-${i}`);
+    await expect(attempt(secret, "next-ip")).rejects.toThrow(
+      /registration quota exhausted/,
+    );
+    expect(console.warn).not.toHaveBeenCalled();
+  });
   it.each([false, true])(
     "linking backfills old open and closed rooms and preserves future access (publish=%s)",
     async (publish) => {
