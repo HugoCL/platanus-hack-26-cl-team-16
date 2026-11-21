@@ -8,7 +8,7 @@ import { freeSlots } from "../../convex/bookings";
 import schema from "../../convex/schema";
 import { Transaction } from "../../shared/catalog";
 import { CLINIC_AGENT_SLUG, CONSUMER_AGENT_SLUG } from "../../shared/seedData";
-import { agentBySlug, insertRoom } from "./rooms";
+import { agentBySlug, insertRoom, NOW } from "./rooms";
 
 const modules = import.meta.glob("../../convex/**/*.ts");
 const createTest = () => convexTest(schema, modules);
@@ -19,21 +19,25 @@ beforeEach(async () => {
   await t.mutation(internal.seed.ensure, {});
 });
 
+const HOTEL = "hotel-providencia-suites";
+
 const room = (providerSlug = CLINIC_AGENT_SLUG, status?: "closed") =>
   t.run((ctx) => insertRoom(ctx, providerSlug, { status }));
 
 const book = (
   r: { sessionId: Id<"sessions">; providerId: Id<"agents"> },
   availabilityId: Id<"availability">,
+  now = NOW,
 ) =>
   t.mutation(internal.bookings.book, {
     sessionId: r.sessionId,
     agentId: r.providerId,
     availabilityId,
+    now,
   });
 
-const free = (agentId: Id<"agents">) =>
-  t.run(async (ctx) => (await freeSlots(ctx, agentId)).map((s) => s._id));
+const free = (agentId: Id<"agents">, now = NOW) =>
+  t.run(async (ctx) => (await freeSlots(ctx, agentId, now)).map((s) => s._id));
 
 const slot = (id: Id<"availability">) =>
   t.run(async (ctx) => ctx.db.get("availability", id));
@@ -47,13 +51,16 @@ const roomBookings = (sessionId: Id<"sessions">) =>
   );
 
 describe("bookings", () => {
-  it("lists a provider's free slots in start order", async () => {
+  it("lists a provider's future free slots in start order", async () => {
     const r = await room();
-    const slots = await t.run(async (ctx) => freeSlots(ctx, r.providerId));
+    const slots = await t.run((ctx) => freeSlots(ctx, r.providerId, NOW));
     expect(slots).toHaveLength(4);
     expect(slots.map((s) => s.start)).toEqual(
       [...slots.map((s) => s.start)].sort((a, b) => a - b),
     );
+
+    const afterFirst = slots[0].start;
+    expect(await free(r.providerId, afterFirst)).not.toContain(slots[0]._id);
   });
 
   it("booking marks the slot as taken and records the room's booking", async () => {
@@ -74,15 +81,20 @@ describe("bookings", () => {
     expect(Transaction.safeParse(tx).success).toBe(true);
   });
 
-  it("booking the same slot again from the same room returns the same booking", async () => {
+  it("a room holds one booking: booking again returns it, even after the room closed", async () => {
     const r = await room();
-    const [first] = await free(r.providerId);
+    const [first, second] = await free(r.providerId);
 
     const once = await book(r, first);
-    const twice = await book(r, first);
+    expect(await book(r, first)).toEqual(once);
+    expect(await book(r, second)).toEqual(once);
+    await t.run((ctx) =>
+      ctx.db.patch("sessions", r.sessionId, { status: "closed" }),
+    );
+    expect(await book(r, first)).toEqual(once);
 
-    expect(twice).toEqual(once);
     expect((await slot(first))?.booked).toBe(1);
+    expect((await slot(second))?.booked).toBe(0);
     expect(await roomBookings(r.sessionId)).toHaveLength(1);
   });
 
@@ -95,14 +107,27 @@ describe("bookings", () => {
 
     expect(await free(b.providerId)).not.toContain(first);
     expect(await free(b.providerId)).toContain(second);
-    await expect(book(b, first)).resolves.toEqual({ status: "unavailable" });
+    await expect(book(b, first)).resolves.toMatchObject({
+      status: "unavailable",
+    });
     expect((await slot(first))?.booked).toBe(1);
     expect(await roomBookings(b.sessionId)).toEqual([]);
   });
 
+  it("a slot that already started cannot be booked", async () => {
+    const r = await room();
+    const [first] = await free(r.providerId);
+    const started = (await slot(first))?.start ?? 0;
+
+    await expect(book(r, first, started)).resolves.toMatchObject({
+      status: "unavailable",
+    });
+    expect((await slot(first))?.booked).toBe(0);
+  });
+
   it("a slot with spare capacity takes one booking per room", async () => {
-    const a = await room("hotel-providencia-suites");
-    const b = await room("hotel-providencia-suites");
+    const a = await room(HOTEL);
+    const b = await room(HOTEL);
     const [night] = await free(a.providerId);
 
     await book(a, night);
@@ -112,9 +137,9 @@ describe("bookings", () => {
     expect(await free(a.providerId)).toContain(night);
   });
 
-  it("refuses another provider's slot, a room without the provider, and a closed room", async () => {
+  it("refuses what the provider may not book", async () => {
     const clinicRoom = await room();
-    const hotelRoom = await room("hotel-providencia-suites");
+    const hotelRoom = await room(HOTEL);
     const [hotelNight] = await free(hotelRoom.providerId);
     const [clinicSlot] = await free(clinicRoom.providerId);
     const closed = await room(CLINIC_AGENT_SLUG, "closed");
@@ -133,6 +158,27 @@ describe("bookings", () => {
     ).rejects.toThrow("the provider is not in this room");
     await expect(book(closed, clinicSlot)).rejects.toThrow(
       "the room is not open",
+    );
+
+    const infoOnly = await room();
+    await t.run(async (ctx) => {
+      const session = await ctx.db.get("sessions", infoOnly.sessionId);
+      if (!session?.contract) throw new Error("missing contract");
+      await ctx.db.patch("sessions", infoOnly.sessionId, {
+        contract: { ...session.contract, capabilities: ["info"] },
+      });
+    });
+    await expect(book(infoOnly, clinicSlot)).rejects.toThrow(
+      "the room's contract does not allow booking",
+    );
+
+    const offeringId = (await slot(clinicSlot))?.offeringId;
+    await t.run(async (ctx) => {
+      if (offeringId)
+        await ctx.db.patch("offerings", offeringId, { active: false });
+    });
+    await expect(book(clinicRoom, clinicSlot)).rejects.toThrow(
+      "the slot's offering is not bookable",
     );
     expect((await slot(clinicSlot))?.booked).toBe(0);
   });
