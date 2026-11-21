@@ -1,9 +1,16 @@
 import type { Id } from "../../convex/_generated/dataModel";
 import type { MutationCtx } from "../../convex/_generated/server";
 import { effectiveAllowedIntents } from "../../shared/agent";
+import {
+  Message,
+  type Recipient,
+  type SendableContent,
+} from "../../shared/messages";
+import type { Moderator } from "../../shared/moderation";
 import { CONSUMER_AGENT_SLUG } from "../../shared/seedData";
 import {
   DEFAULT_MAX_TURNS,
+  type Participant,
   type SessionContract,
   type SessionStatus,
 } from "../../shared/session";
@@ -20,6 +27,8 @@ export async function agentBySlug(ctx: MutationCtx, slug: string) {
 export type TestRoom = {
   sessionId: Id<"sessions">;
   providerId: Id<"agents">;
+  contract: SessionContract;
+  participants: Participant[];
   initiator: Id<"participants">;
   recipient: Id<"participants">;
   owner: Id<"participants">;
@@ -30,7 +39,10 @@ export type TestRoom = {
 export async function insertRoom(
   ctx: MutationCtx,
   providerSlug: string,
-  { status = "active" }: { status?: SessionStatus } = {},
+  {
+    status = "active",
+    ownerName = "Juan",
+  }: { status?: SessionStatus; ownerName?: string } = {},
 ): Promise<TestRoom> {
   const consumer = await agentBySlug(ctx, CONSUMER_AGENT_SLUG);
   const provider = await agentBySlug(ctx, providerSlug);
@@ -69,10 +81,101 @@ export async function insertRoom(
   const owner = await ctx.db.insert("participants", {
     sessionId,
     kind: "human",
-    tokenIdentifier: "test|Juan",
-    displayName: "Juan",
+    tokenIdentifier: `test|${ownerName}`,
+    displayName: ownerName,
     role: "owner",
     onBehalfOfAgentId: consumer._id,
   });
-  return { sessionId, providerId: provider._id, initiator, recipient, owner };
+  return {
+    sessionId,
+    providerId: provider._id,
+    contract,
+    initiator,
+    recipient,
+    owner,
+    participants: [
+      {
+        participantId: initiator,
+        kind: "agent",
+        agentId: consumer._id,
+        role: "initiator",
+      },
+      {
+        participantId: recipient,
+        kind: "agent",
+        agentId: provider._id,
+        role: "recipient",
+      },
+      {
+        participantId: owner,
+        kind: "human",
+        displayName: ownerName,
+        role: "owner",
+        onBehalfOfAgentId: consumer._id,
+      },
+    ],
+  };
 }
+
+export const allowAll: Moderator = {
+  moderate: async () => ({
+    verdict: { decision: "allow", reason: "Doble que permite todo." },
+    events: [],
+  }),
+};
+
+// The room's message log with E2's allow-all moderator double in front of it: every post is
+// asked to `allowAll` and stored as a shared `Message` with its verdict.
+export function withLog(room: TestRoom) {
+  const history: Message[] = [];
+  const post = async (
+    sender: string,
+    recipient: Recipient,
+    content: SendableContent,
+  ) => {
+    const from = room.participants.find((p) => p.participantId === sender);
+    if (!from) throw new Error(`${sender} is not in the room`);
+    const { verdict } = await allowAll.moderate({
+      content,
+      sender: from,
+      recipient,
+      contract: room.contract,
+      participants: room.participants,
+      history,
+    });
+    const message = Message.parse({
+      messageId: `${room.sessionId}-${history.length + 1}`,
+      sessionId: room.sessionId,
+      senderParticipantId: sender,
+      recipient,
+      content,
+      status: verdict.decision === "allow" ? "allowed" : "blocked",
+      verdict,
+      sentAt: history.length + 1,
+    });
+    history.push(message);
+    return message;
+  };
+  return { ...room, history, post };
+}
+export type LoggedRoom = ReturnType<typeof withLog>;
+
+export function pickerOf(message: Message) {
+  if (
+    message.content.kind !== "ui" ||
+    message.content.spec.type !== "slot_picker"
+  ) {
+    throw new Error(
+      `expected a slot picker, got ${JSON.stringify(message.content)}`,
+    );
+  }
+  return message.content.spec;
+}
+
+// The room's human picks one slot of a picker, as a ui_response to the provider.
+export const choose = (room: LoggedRoom, picker: Message, slotId: string) =>
+  room.post(room.owner, room.recipient, {
+    kind: "ui_response",
+    inReplyTo: picker.messageId,
+    response: { type: "slot_selected", pickerId: pickerOf(picker).id, slotId },
+  });
