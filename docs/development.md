@@ -25,6 +25,15 @@ The directory lives in `convex/directory.ts` and the page at http://localhost:30
 
 Each card is an `AgentDetail` (the full `AgentCard` with purpose and scope) plus `comuna` and `allowedIntents`, so it also validates as an `AgentSummary`. Draft cards are never listed.
 
+## Bookings (E8)
+
+`convex/bookings.ts` holds the booking state of providers with the `booking` capability. It is internal: the provider agent books from inside a room.
+
+| Function | Kind | What it does |
+| --- | --- | --- |
+| `freeSlots(ctx, agentId, now)` | helper | The provider's slots that start after `now` and have `booked < capacity`, in start order (at most 200 rows scanned), so a taken or past slot is never offered. Queries take `now` as an argument because they cannot read the clock. |
+| `bookings.book` | internal mutation | Books one slot for a room where the agent is the provider. A room holds one booking: when it has one, `book` returns it, whatever slot was asked and even after the room closed. Otherwise the room must be open (`active`) with a contract that allows booking, and the slot must belong to a bookable offering of the provider. It creates a confirmed `booking` transaction and raises `booked` in the same mutation, never past `capacity`. A booking names its slot in `slotId`. A full slot, one that starts at or before `now`, or one whose offering the provider turned off returns `{ status: "unavailable" }`. The result type is `Booking` in `lib/agents/booking.ts`. |
+
 ## Test
 
 ```sh
