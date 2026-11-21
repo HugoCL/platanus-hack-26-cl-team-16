@@ -162,7 +162,10 @@ export default defineSchema({
   sessions: defineTable({
     initiatorAgentId: v.id("agents"),
     intent: zodToConvex(SessionIntent),
-    contract: v.union(zodToConvex(SessionContract), v.null()),
+    contract: v.union(
+      zodToConvex(SessionContract.partial({ purpose: true })),
+      v.null(),
+    ),
     mode: zodToConvex(SessionMode),
     status: zodToConvex(SessionStatus),
     turnCount: v.number(),
