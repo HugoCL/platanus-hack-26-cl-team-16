@@ -102,9 +102,9 @@ export function GenUiBlock({
       aria-label={title ?? meta.label}
       data-genui={spec.type}
       data-answered={answer ? "" : undefined}
-      className="w-full max-w-[460px] overflow-hidden rounded-4xl bg-card shadow-card"
+      className="w-full max-w-[520px] overflow-hidden rounded-4xl bg-card shadow-card"
     >
-      <header className="flex items-center gap-2 px-4 pt-4 pb-2">
+      <header className="flex items-center gap-2.5 px-5 pt-5 pb-3">
         <span className="grid size-7 place-items-center rounded-full bg-muted text-subtle-foreground">
           {meta.icon}
         </span>
@@ -122,7 +122,7 @@ export function GenUiBlock({
           </span>
         ) : null}
       </header>
-      <div className="px-4 pb-3">
+      <div className="px-5 pb-5">
         {spec.type === "card" ? <CardBlock spec={spec} {...props} /> : null}
         {spec.type === "form" ? <FormBlock spec={spec} {...props} /> : null}
         {spec.type === "slot_picker" ? (
