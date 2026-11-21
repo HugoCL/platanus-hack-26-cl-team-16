@@ -36,7 +36,7 @@ export function MobileMenu({
         <MenuIcon aria-hidden size={20} />
       </DialogTrigger>
       <DialogBackdrop className="transition-opacity duration-300 ease-[var(--ease-out)] data-ending-style:opacity-0 data-ending-style:duration-200 data-starting-style:opacity-0 motion-reduce:transition-none" />
-      <DialogContent className="inset-y-0 right-0 left-auto m-0 h-dvh max-h-none w-3/4 max-w-sm gap-0 rounded-none border-0 border-l border-border p-0 pt-[env(safe-area-inset-top)] pb-[max(1.5rem,env(safe-area-inset-bottom))] transition-transform duration-300 ease-[var(--ease-out)] data-ending-style:translate-x-full data-ending-style:duration-200 data-starting-style:translate-x-full motion-reduce:transition-none">
+      <DialogContent className="inset-y-0 right-auto left-0 m-0 h-dvh max-h-none w-3/4 max-w-sm gap-0 rounded-none border-0 border-r border-border p-0 pt-[env(safe-area-inset-top)] pb-[max(1.5rem,env(safe-area-inset-bottom))] transition-transform duration-300 ease-[var(--ease-out)] data-ending-style:-translate-x-full data-ending-style:duration-200 data-starting-style:-translate-x-full motion-reduce:transition-none">
         <div className="flex h-15 items-center justify-between border-b border-border pr-2 pl-5">
           <DialogTitle className="m-0 text-base font-medium">Menú</DialogTitle>
           <DialogClose
