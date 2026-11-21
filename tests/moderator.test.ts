@@ -32,6 +32,21 @@ function scriptedJudge() {
         (c) => JSON.stringify(c.message.content) === content,
       );
       if (!c) throw new Error("fake judge: no scripted answer");
+      if (
+        c.id === "clinica-ataque-dividido" &&
+        args.role === "conversation_moderator"
+      ) {
+        const history =
+          args.prompt.split("<historial>\n")[1]?.split("\n</historial>")[0] ??
+          "";
+        if (
+          !c.history?.every((fragment) =>
+            history.includes(JSON.stringify(fragment.content)),
+          )
+        ) {
+          return { decision: "allow", rule: "purpose" };
+        }
+      }
       return c.expected.decision === "allow" ||
         (args.role === "moderator" && c.expected.stage !== "injection")
         ? { decision: "allow", rule: "purpose" }
@@ -117,6 +132,28 @@ describe("parallel judges", () => {
 });
 
 describe("criterion 1: the set with the scripted fake LLM", () => {
+  it("needs both historical fragments to identify the split attack", async () => {
+    const c = caseById("clinica-ataque-dividido");
+    const input = moderationInput(c);
+    const { llm, prompts } = scriptedJudge();
+    expect(
+      (await createModerator({ llm }).moderate(input)).verdict,
+    ).toMatchObject({ decision: "block", rule: "injection" });
+    const messagePrompt = prompts.find(
+      (prompt) => prompt.role === "moderator",
+    )?.prompt;
+    expect(messagePrompt).toBeDefined();
+    for (const fragment of c.history ?? []) {
+      expect(messagePrompt).not.toContain(JSON.stringify(fragment.content));
+    }
+    for (const history of [[], input.history.slice(1)]) {
+      expect(
+        (await createModerator({ llm }).moderate({ ...input, history })).verdict
+          .decision,
+      ).toBe("allow");
+    }
+  });
+
   it.each(MODERATION_CASES.map((c) => [c.id, c] as const))(
     "%s",
     async (_id, c) => {
