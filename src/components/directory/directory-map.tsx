@@ -316,7 +316,7 @@ export function DirectoryMap({
                             key={c.agentId}
                             type="button"
                             onClick={() => select(c.agentId)}
-                            className="cursor-pointer truncate border-0 bg-transparent p-0 text-left text-[13px] font-medium text-foreground underline-offset-3 hover:underline"
+                            className="shrink-0 cursor-pointer truncate border-0 bg-transparent p-0 text-left text-[13px] font-medium text-foreground underline-offset-3 hover:underline"
                           >
                             {c.name}
                           </button>
