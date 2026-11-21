@@ -49,12 +49,13 @@ globalThis.fetch = async (input, init) => {
 };
 
 const env = { ...process.env, LLM_PROVIDER: "openrouter" };
-const provider = createLlmProvider(env);
+if (CONCURRENCY < 2) {
+  throw new Error(
+    "EVAL_CONCURRENCY must be at least 2 for full-moderator samples",
+  );
+}
+const llm = createLlmProvider(env);
 const request = createRequestLimit(CONCURRENCY);
-const llm: typeof provider = {
-  ...provider,
-  generateObject: (args) => request(() => provider.generateObject(args)),
-};
 const model = modelFor("moderator", env);
 const conversationModel = modelFor("conversation_moderator", env);
 const moderator = createModerator({ llm, model, conversationModel });
@@ -108,23 +109,6 @@ async function sample(
   };
 }
 
-async function inPool<T>(
-  tasks: (() => Promise<T>)[],
-  limit: number,
-): Promise<T[]> {
-  const results: T[] = [];
-  let next = 0;
-  await Promise.all(
-    Array.from({ length: limit }, async () => {
-      while (next < tasks.length) {
-        const i = next++;
-        results[i] = await tasks[i]();
-      }
-    }),
-  );
-  return results;
-}
-
 function p95(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.ceil(sorted.length * 0.95) - 1] ?? 0;
@@ -175,10 +159,13 @@ function summarize(samples: Sample[]) {
 it(`moderator against ${model} on OpenRouter, ${RUNS} runs`, async () => {
   const tasks = Array.from({ length: RUNS }, (_, run) =>
     MODERATION_CASES.flatMap((c) =>
-      MODES.map((mode) => () => sample(mode, run, c)),
+      MODES.map(
+        (mode) => () =>
+          request(() => sample(mode, run, c), mode === "moderator" ? 2 : 1),
+      ),
     ),
   ).flat();
-  const samples = await inPool(tasks, CONCURRENCY);
+  const samples = await Promise.all(tasks.map((task) => task()));
   const costs = await Promise.all(usageReads);
   const costUsd = costs.reduce<number>((sum, cost) => sum + (cost ?? 0), 0);
   const unpriced = costs.filter((cost) => cost === undefined).length;
@@ -203,7 +190,7 @@ it(`moderator against ${model} on OpenRouter, ${RUNS} runs`, async () => {
     `| ${label} | ${s.referenceBlocked}/${RUNS} | ${s.falseBlocksMaxPerRun} (${s.falseBlocks}/${s.legit}) | ${s.attacksBlocked}/${s.attacks} | ${s.errorsOnLegit} / ${s.errorsOnAttacks} | ${ms(s.p95Ms)} | ${ms(s.p95LlmMs)} |`;
   console.log(
     [
-      `Modelo ${model}, set v${MODERATION_SET_VERSION} (${MODERATION_CASES.length} casos), ${RUNS} corridas, máximo ${CONCURRENCY} solicitudes LLM simultáneas (no muestras). Las latencias incluyen la espera por cupo.`,
+      `Modelo ${model}, set v${MODERATION_SET_VERSION} (${MODERATION_CASES.length} casos), ${RUNS} corridas, máximo ${CONCURRENCY} solicitudes LLM simultáneas (no muestras). Cada muestra reserva sus cupos antes de empezar (moderador: 2, juez: 1); las latencias excluyen la espera por cupo.`,
       RUNS < CERTIFYING_RUNS
         ? `Corrida exploratoria: con menos de ${CERTIFYING_RUNS} corridas no certifica los criterios de E3.`
         : `Corrida completa: certifica los criterios de E3.`,

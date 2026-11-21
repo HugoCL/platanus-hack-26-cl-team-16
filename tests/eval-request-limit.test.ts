@@ -47,3 +47,44 @@ it("makes no requests for an empty batch", async () => {
 it.each([0, -1, 1.5, Number.NaN])("rejects invalid concurrency %s", (limit) => {
   expect(() => createRequestLimit(limit)).toThrow("positive integer");
 });
+
+it.each([2, 3, 4])(
+  "reserves both judge slots before starting a sample at limit %i",
+  async (limit) => {
+    const run = createRequestLimit(limit);
+    let active = 0;
+    const starts: number[] = [];
+    await Promise.all(
+      [2, 1, 2, 1].map((weight) =>
+        run(async () => {
+          active += weight;
+          starts.push(weight);
+          expect(active).toBeLessThanOrEqual(limit);
+          await Promise.resolve();
+          active -= weight;
+        }, weight),
+      ),
+    );
+    expect(starts).toEqual([2, 1, 2, 1]);
+    expect(active).toBe(0);
+  },
+);
+
+it("releases all reserved slots after a sample fails", async () => {
+  const run = createRequestLimit(2);
+  const failed = run(async () => {
+    throw new Error("sample failed");
+  }, 2);
+  const next = run(async () => "allow", 2);
+  await expect(failed).rejects.toThrow("sample failed");
+  await expect(next).resolves.toBe("allow");
+});
+
+it.each([0, -1, 1.5, Number.NaN, 3])(
+  "rejects invalid sample weight %s",
+  async (weight) => {
+    await expect(
+      createRequestLimit(2)(async () => "allow", weight),
+    ).rejects.toThrow("request weight");
+  },
+);
