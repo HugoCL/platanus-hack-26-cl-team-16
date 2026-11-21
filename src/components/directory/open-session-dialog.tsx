@@ -1,5 +1,6 @@
 "use client";
 
+import { SignInButton } from "@clerk/nextjs";
 import { Button } from "@ui-sdk/react/button";
 import {
   Dialog,
@@ -11,13 +12,15 @@ import {
 } from "@ui-sdk/react/dialog";
 import { Radio, RadioGroup, RadioIndicator } from "@ui-sdk/react/radio";
 import { Textarea } from "@ui-sdk/react/textarea";
-import { useQuery } from "convex/react";
+import { useAction, useConvexAuth, useQuery } from "convex/react";
 import { Check, LoaderCircle, ShieldCheck, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import type { DirectoryCard } from "@/convex/directory";
 import { CONSUMER_AGENT_SLUG } from "@/shared/seed-data";
+import { SessionIntent } from "@/shared/session";
+import { openRoomError } from "../room/live-room";
 import { dataFieldLabel, intentLabel } from "../room/room-format";
 
 const MAX_DESCRIPTION = 500;
@@ -25,12 +28,7 @@ const MAX_VIOLATIONS = 3;
 
 type Step = "intent" | "contract";
 
-/**
- * Opens a moderated room in two visible steps (intent, then contract). Step 1, picking which of
- * your agents talks, is resolved while the demo user has a single agent.
- *
- * There is no `open_session` mutation yet: confirming goes to the room demo.
- */
+/** Opens a moderated room after reviewing its intent and contract; agents are resolved server-side. */
 export function OpenSessionDialog({
   card,
   onClose,
@@ -39,23 +37,50 @@ export function OpenSessionDialog({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const { isLoading, isAuthenticated } = useConvexAuth();
+  const openRoom = useAction(api.rooms.openFromCard);
   const self = useQuery(api.directory.get, { slug: CONSUMER_AGENT_SLUG });
   const [step, setStep] = useState<Step>("intent");
   const [intent, setIntent] = useState<string | null>(null);
   const [description, setDescription] = useState("");
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string>();
+  const opening = useRef(false);
 
   useEffect(() => {
     if (!card) return;
     setStep("intent");
     setIntent(card.allowedIntents[0] ?? null);
     setDescription("");
+    setError(undefined);
   }, [card]);
 
   const selfName = self?.name ?? "Tu agente";
+  const valid =
+    !!intent &&
+    !!card?.allowedIntents.includes(intent) &&
+    SessionIntent.safeParse({ name: intent, description: description.trim() })
+      .success;
 
-  function confirm() {
-    startTransition(() => router.push("/room/demo"));
+  async function confirm() {
+    if (!card || !intent || !valid || opening.current || !isAuthenticated)
+      return;
+    opening.current = true;
+    setPending(true);
+    setError(undefined);
+    try {
+      const { sessionId } = await openRoom({
+        providerSlug: card.slug,
+        intent,
+        description: description.trim(),
+      });
+      router.push(`/room/${sessionId}`);
+    } catch (error) {
+      setError(openRoomError(error));
+    } finally {
+      opening.current = false;
+      setPending(false);
+    }
   }
 
   return (
@@ -72,6 +97,7 @@ export function OpenSessionDialog({
             <div className="flex items-center justify-between gap-3">
               <Steps step={step} />
               <DialogClose
+                disabled={pending}
                 aria-label="Cerrar"
                 data-variant="ghost"
                 className="!size-8 !p-0 text-subtle-foreground"
@@ -138,7 +164,7 @@ export function OpenSessionDialog({
                     rows={2}
                     maxLength={MAX_DESCRIPTION}
                     value={description}
-                    onChange={(event) => setDescription(event.target.value)}
+                    onValueChange={setDescription}
                     placeholder="ej. Hora con cardiólogo esta semana"
                     className="resize-none"
                   />
@@ -154,7 +180,7 @@ export function OpenSessionDialog({
                   <Button
                     data-variant="solid"
                     data-size="lg"
-                    disabled={!intent || description.trim() === ""}
+                    disabled={!valid}
                     onClick={() => setStep("contract")}
                   >
                     Revisar contrato
@@ -206,6 +232,11 @@ export function OpenSessionDialog({
                     </dd>
                   </div>
                 </dl>
+                {error ? (
+                  <p role="alert" className="m-0 text-sm text-destructive">
+                    {error}
+                  </p>
+                ) : null}
                 <div className="flex justify-end gap-2">
                   <Button
                     data-size="lg"
@@ -214,25 +245,37 @@ export function OpenSessionDialog({
                   >
                     Volver
                   </Button>
-                  <Button
-                    data-variant="solid"
-                    data-size="lg"
-                    aria-busy={pending}
-                    disabled={pending}
-                    onClick={confirm}
-                    className="inline-flex items-center gap-2"
-                  >
-                    {pending ? (
-                      <LoaderCircle
-                        aria-hidden
-                        size={16}
-                        className="animate-spin motion-reduce:animate-none"
-                      />
-                    ) : (
-                      <ShieldCheck aria-hidden size={16} />
-                    )}
-                    {pending ? "Negociando contrato…" : "Abrir sala moderada"}
-                  </Button>
+                  {isAuthenticated ? (
+                    <Button
+                      data-variant="solid"
+                      data-size="lg"
+                      aria-busy={pending}
+                      disabled={pending || !valid}
+                      onClick={confirm}
+                      className="inline-flex items-center gap-2"
+                    >
+                      {pending ? (
+                        <LoaderCircle
+                          aria-hidden
+                          size={16}
+                          className="animate-spin motion-reduce:animate-none"
+                        />
+                      ) : (
+                        <ShieldCheck aria-hidden size={16} />
+                      )}
+                      {pending ? "Negociando contrato…" : "Abrir sala moderada"}
+                    </Button>
+                  ) : (
+                    <SignInButton mode="modal">
+                      <Button
+                        data-variant="solid"
+                        data-size="lg"
+                        disabled={isLoading || !valid}
+                      >
+                        Iniciar sesión para abrir sala
+                      </Button>
+                    </SignInButton>
+                  )}
                 </div>
               </>
             )}

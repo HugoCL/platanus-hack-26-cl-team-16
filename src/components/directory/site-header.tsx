@@ -4,7 +4,7 @@ import { ThemeToggle } from "@/components/toggle-theme";
 
 const NAV = [
   { href: "/directory", label: "Directorio", key: "directory" },
-  { href: "/room/demo", label: "Salas", key: "rooms" },
+  { href: "/room", label: "Salas", key: "rooms" },
 ] as const;
 
 export function SiteHeader({

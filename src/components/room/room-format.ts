@@ -166,6 +166,17 @@ export function canAnswerUi(viewer: Viewer) {
   return viewer.role === "owner" || viewer.role === "operator";
 }
 
+export function uiInteractionState(
+  canInteract: boolean,
+  readOnly: boolean,
+  answered: boolean,
+) {
+  return {
+    disabled: !canInteract || readOnly || answered,
+    showOwnerOnly: !canInteract && !answered,
+  };
+}
+
 export function describeUiResponse(response: UiResponse, spec?: UiSpec) {
   switch (response.type) {
     case "slot_selected": {

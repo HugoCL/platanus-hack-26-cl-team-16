@@ -117,7 +117,7 @@ export const MCP_TOOLS = {
   },
   open_session: {
     description:
-      "Open a session with an agent for a declared intent. Moderated sessions get a contract derived from the target's scope. The result lists the participants: address the target by its participantId.",
+      "Open a session with an agent for a declared intent. Moderated sessions get a contract derived from the target's scope. The result lists the participants: address the target by its participantId. For bookings, share /room/<sessionId> on this site with the signed-in human owner so they can choose a slot.",
     input: OpenSessionInput,
     output: OpenSessionOutput,
   },

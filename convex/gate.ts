@@ -26,6 +26,7 @@ import {
   type QueryCtx,
   query,
 } from "./_generated/server";
+import { requireLiveCredential } from "./agentKeys";
 import { type JudgeBuckets, judgeRetryAfter, moderate } from "./moderator";
 import { roomAgentFor } from "./roomAgent";
 import {
@@ -95,6 +96,7 @@ export async function sendThroughGate(
     recipient: Doc<"messages">["recipient"];
     content: unknown;
     hostedReply?: true;
+    credentialId?: Id<"agentApiKeys">;
   },
 ): Promise<Message> {
   const parsed = SendableContent.safeParse(args.content);
@@ -133,6 +135,7 @@ export async function sendThroughGate(
     verdict: outcome.verdict,
     events: outcome.events,
     hostedReply: args.hostedReply,
+    credentialId: args.credentialId,
   });
 }
 
@@ -197,8 +200,9 @@ export const commit = internalMutation({
     verdict: zodToConvex(Verdict),
     events: v.array(eventValidator),
     hostedReply: v.optional(v.literal(true)),
+    credentialId: v.optional(v.id("agentApiKeys")),
   },
-  handler: async (ctx, args): Promise<Message> => {
+  handler: async (ctx, { credentialId, ...args }): Promise<Message> => {
     const { session, sender } = await checkSend(ctx, {
       ...args,
       inReplyTo:
@@ -206,6 +210,13 @@ export const commit = internalMutation({
           ? args.content.inReplyTo
           : undefined,
     });
+    if (credentialId) {
+      await requireLiveCredential(
+        ctx,
+        credentialId,
+        sender.kind === "agent" ? sender.agentId : "",
+      );
+    }
     const { content, verdict } = args;
     if (
       args.hostedReply &&
