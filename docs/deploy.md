@@ -23,7 +23,7 @@ Nothing on Render exists until a person does the [one-time setup](#one-time-setu
 - **Cache:** the pnpm store, keyed by `pnpm-lock.yaml`.
 - **Versions come from the repository:** pnpm from `packageManager` in `package.json`, Node from `.node-version`. Render reads the same two.
 - **The mirror does not run it.** Every commit is also pushed to `platanus-hack/platanus-hack-26-cl-team-16`. The job has an `if:` on the repository name, so on the mirror it is skipped and uses no minutes.
-- **`pnpm smoke` is not in CI.** It starts `next dev`, which relies on Clerk keyless mode to create a temporary Clerk app. On a GitHub runner Clerk did not create one, and the page failed with `Missing publishableKey`. Smoke stays a check you run before opening a pull request, as `AGENTS.md` requires. To run it in CI, claim the Clerk app (step 5 below), add its two development keys as Actions secrets, and add a smoke step that reads them.
+- **`pnpm smoke` is not in CI.** It starts `next dev`, which relies on Clerk keyless mode to create a temporary Clerk app. On a GitHub runner Clerk did not create one, and the page failed with `Missing publishableKey`. Smoke stays a check you run before opening a pull request, as `AGENTS.md` requires. To run it in CI, add the Clerk app's two development keys (step 5 below) as Actions secrets, and add a smoke step that reads them.
 
 ## Production
 
@@ -83,7 +83,7 @@ What changes the bill:
 
 ## One-time setup (human only)
 
-No agent does these steps. None of them has been done yet: the repository still uses a local anonymous Convex deployment and Clerk keyless mode, and `convex/auth.config.ts` has no provider.
+No agent does these steps. The repository records only one of them: `convex/auth.config.ts` names the team's Clerk app (step 6). Check the others in each dashboard.
 
 Clerk keyless mode works only under `next dev`. A deployed build runs `next start`, which answers every request with an error (`Missing publishableKey`) unless `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` are set. The publishable key is compiled into the build, so both must be on the Render service before the first deploy.
 
@@ -97,8 +97,10 @@ Clerk keyless mode works only under `next dev`. A deployed build runs `next star
 ### Clerk
 
 5. Claim the app: run `pnpm dev`, open the page and follow the "Configure your application" prompt. In the [Clerk Dashboard](https://dashboard.clerk.com), API keys, copy the publishable key (`pk_test_...`) and the secret key (`sk_test_...`). These are development-instance keys. Clerk accepts them on a host's own domain such as `onrender.com`, previews included, and caps the instance at 100 users.
-6. Activate the Convex integration in Clerk and copy the Frontend API URL. In `convex/auth.config.ts`, uncomment the provider and paste the URL as a literal `domain`, in a pull request. Until this merges, the deployed app runs but Convex treats every user as signed out, as it does locally today.
+6. Activate the Convex integration in Clerk and copy the Frontend API URL. `convex/auth.config.ts` names it as a literal `domain`: `https://cheerful-cougar-1086.clerk.accounts.dev`. Change it in a pull request only when the Clerk app changes. Convex then gives a signed-in user of that app an identity, in production and in previews.
 7. A Clerk production instance (`pk_live_...`) needs a domain you own and DNS records on it, so it cannot use an `onrender.com` address. Create it only when the app has its own domain. Production and previews would then use different Clerk instances, and `auth.config.ts` would need the `CLERK_JWT_ISSUER_DOMAIN` variable per Convex deployment instead of a literal.
+
+Sign-in and sign-up do not work yet, locally or deployed. Clerk answers both with `action_blocked` ("This app uses an outdated version of Clerk") for clerk-js 5, which `@clerk/nextjs` 6 loads; the same request with clerk-js 6 is accepted. The app renders and works signed out. Signing in needs a Clerk SDK upgrade: the repository has `@clerk/nextjs` 6 and the current major is 7.
 
 ### Render
 
@@ -128,4 +130,5 @@ These could not be tested without creating the service. Check them on the first 
 - How long a Render build takes, and so how many deploys fit in 500 minutes. If a build takes 4 minutes, about 125.
 - Which pnpm Render's Node runtime ships. `scripts/render-build.sh` installs the version pinned in `package.json` when the two differ.
 - That the health check on `/` passes with real Clerk keys.
+- That a signed-in user gets an identity in Convex. It needs the Clerk SDK upgrade first.
 - That Render waits for the `check` job when another app's check, such as GitGuardian's, finishes first.
