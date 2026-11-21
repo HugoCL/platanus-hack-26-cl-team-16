@@ -1,16 +1,19 @@
 import { ConvexError, convexToJson, type ObjectType, v } from "convex/values";
 import { zodToConvex } from "convex-helpers/server/zod4";
 import { effectiveAllowedIntents } from "../shared/agent";
+import { CONSUMER_AGENT_SLUG } from "../shared/seed-data";
 import {
   DEFAULT_MAX_TURNS,
   type Participant,
-  type Session,
+  Session,
   SessionContract,
+  SessionStatus,
 } from "../shared/session";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
   type ActionCtx,
+  action,
   internalAction,
   internalMutation,
   internalQuery,
@@ -29,6 +32,136 @@ import {
 } from "./roomState";
 
 const MAX_VIOLATIONS = 3;
+
+export const openFromCard = action({
+  args: {
+    providerSlug: v.string(),
+    intent: v.string(),
+    description: v.string(),
+  },
+  returns: v.object({ sessionId: v.id("sessions") }),
+  handler: async (
+    ctx,
+    { providerSlug, intent, description },
+  ): Promise<{ sessionId: Id<"sessions"> }> => {
+    const identity = await requireRoomIdentity(ctx);
+    const consumer = await ctx.runQuery(api.directory.get, {
+      slug: CONSUMER_AGENT_SLUG,
+    });
+    const provider = await ctx.runQuery(api.directory.get, {
+      slug: providerSlug,
+    });
+    if (!consumer || !provider) {
+      throw new ConvexError({
+        kind: "NotFound",
+        message: "missing consumer or provider card",
+      });
+    }
+    const room = await openRoom(ctx, {
+      initiatorAgentId: consumer.agentId as Id<"agents">,
+      providerAgentId: provider.agentId as Id<"agents">,
+      request: description,
+      intent,
+      human: { displayName: identity.name ?? identity.email ?? "Tú" },
+    });
+    return { sessionId: room.sessionId as Id<"sessions"> };
+  },
+});
+
+export const mine = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      sessionId: v.id("sessions"),
+      status: zodToConvex(SessionStatus),
+      intent: v.string(),
+      provider: v.object({ name: v.string(), slug: v.string() }),
+      lastActivityTime: v.number(),
+    }),
+  ),
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+    const memberships = await ctx.db
+      .query("participants")
+      .withIndex("by_tokenIdentifier_and_leftAt", (q) =>
+        q
+          .eq("tokenIdentifier", identity.tokenIdentifier)
+          .eq("leftAt", undefined),
+      )
+      .order("desc")
+      .take(100);
+    const rooms = await Promise.all(
+      memberships.map(async (membership) => {
+        if (membership.kind !== "human" || membership.leftAt !== undefined)
+          return null;
+        const session = await ctx.db.get(membership.sessionId);
+        if (!session) return null;
+        const participants = await ctx.db
+          .query("participants")
+          .withIndex("by_sessionId", (q) => q.eq("sessionId", session._id))
+          .take(10);
+        const recipient = participants.find(
+          (p) => p.kind === "agent" && p.role === "recipient",
+        );
+        if (recipient?.kind !== "agent") return null;
+        const provider = await ctx.db.get(recipient.agentId);
+        if (!provider) return null;
+        return {
+          sessionId: session._id,
+          status: session.status,
+          intent: session.intent.name,
+          provider: { name: provider.name, slug: provider.slug },
+          lastActivityTime: session._creationTime,
+        };
+      }),
+    );
+    return rooms
+      .filter((room) => room !== null)
+      .sort((a, b) => b.lastActivityTime - a.lastActivityTime)
+      .slice(0, 20);
+  },
+});
+
+export const view = query({
+  args: { sessionId: v.id("sessions") },
+  returns: v.union(
+    v.null(),
+    v.object({
+      session: zodToConvex(Session),
+      participantNames: v.array(
+        v.object({
+          participantId: v.string(),
+          name: v.string(),
+          slug: v.optional(v.string()),
+        }),
+      ),
+      humanParticipantId: v.id("participants"),
+    }),
+  ),
+  handler: async (ctx, { sessionId }) => {
+    const human = await requireRoomHuman(ctx, sessionId);
+    const session = await loadSession(ctx, sessionId);
+    if (!session) return null;
+    const participantNames = await Promise.all(
+      session.participants.map(async (participant) => {
+        if (participant.kind === "human") {
+          return {
+            participantId: participant.participantId,
+            name: participant.displayName,
+          };
+        }
+        const agent = await ctx.db.get(participant.agentId as Id<"agents">);
+        return {
+          participantId: participant.participantId,
+          name: agent?.name ?? "Agente",
+          ...(agent ? { slug: agent.slug } : {}),
+        };
+      }),
+    );
+    return { session, participantNames, humanParticipantId: human._id };
+  },
+});
 
 function invalidArgument(message: string): never {
   throw new ConvexError({ kind: "InvalidArgument", message });
