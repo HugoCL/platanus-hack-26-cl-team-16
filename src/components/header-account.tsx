@@ -8,9 +8,8 @@ export function HeaderAccount() {
     <>
       <Show when="signed-out">
         <SignInButton mode="modal">
-          <Button data-variant="solid" className="press-blur max-sm:!px-3.5">
-            <span className="sm:hidden">Entrar</span>
-            <span className="max-sm:hidden">Iniciar sesión</span>
+          <Button data-variant="solid" className="press-blur">
+            Iniciar sesión
           </Button>
         </SignInButton>
       </Show>

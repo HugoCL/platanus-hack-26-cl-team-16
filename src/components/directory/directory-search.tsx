@@ -24,6 +24,7 @@ import { ConvexError } from "convex/values";
 import {
   Check,
   List,
+  LoaderCircle,
   LocateFixed,
   Map as MapIcon,
   Search,
@@ -31,7 +32,14 @@ import {
   X,
 } from "lucide-react";
 import dynamic from "next/dynamic";
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type FormEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { api } from "@/convex/_generated/api";
 import type { DirectoryCard, DirectorySearchResult } from "@/convex/directory";
 import type { LatLng } from "@/shared/geo";
@@ -50,12 +58,19 @@ const MAX_INTENT_FILTERS = 6;
 const DEFAULT_RADIUS_KM = 5;
 const PAGE_SIZE = 20;
 const FIRST_PAGE = [0];
+const INVITE_DISMISSED_KEY = "directory:location-invite-dismissed";
+
+function isLocationInviteDismissed() {
+  try {
+    return Boolean(localStorage.getItem(INVITE_DISMISSED_KEY));
+  } catch {
+    return false;
+  }
+}
 
 const GoogleDirectoryMap = dynamic(() => import("./google-directory-map"), {
   ssr: false,
-  loading: () => (
-    <div className="min-h-[520px] flex-1 bg-[var(--sm-map-land)] lg:min-h-0" />
-  ),
+  loading: () => <div className="min-h-0 flex-1 bg-[var(--sm-map-land)]" />,
 });
 const MapView = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
   ? GoogleDirectoryMap
@@ -94,6 +109,7 @@ export function DirectorySearch() {
   const [includeProspects, setIncludeProspects] = useState(true);
   const [geo, setGeo] = useState<Geo>({ state: "off" });
   const [radiusKm, setRadiusKm] = useState(DEFAULT_RADIUS_KM);
+  const [withinRadius, setWithinRadius] = useState(true);
   const [sort, setSort] = useState<Sort>("relevance");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [converse, setConverse] = useState<DirectoryCard | null>(null);
@@ -101,19 +117,25 @@ export function DirectorySearch() {
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [fixture, setFixture] = useFixtureState();
-  const filterKey = `${category}|${comuna}`;
-  const [more, setMore] = useState({ key: filterKey, offsets: FIRST_PAGE });
-  const offsets = more.key === filterKey ? more.offsets : FIRST_PAGE;
-  const { result: liveResult, loadingMore } = usePagedSearch(
-    category,
-    comuna,
-    offsets,
+  const origin = geo.state === "on" ? geo.origin : null;
+  const near = sort === "distance" ? origin : null;
+  // Changing only the order keeps how many pages the visitor loaded.
+  const filterKey = `${category}|${comuna}|${verifiedOnly}|${includeProspects}`;
+  const [more, setMore] = useState({ key: filterKey, pages: 1 });
+  const pages = more.key === filterKey ? more.pages : 1;
+  const {
+    result: liveResult,
+    loadingMore,
+    loadedPages,
+  } = usePagedSearch(
+    { category, comuna, near, verifiedOnly, includeProspects },
+    pages,
   );
   const result =
     fixture === "demo" ? liveResult : fixtureResult(fixture, liveResult);
   const categories = useQuery(api.directory.categories, {});
 
-  const origin = geo.state === "on" ? geo.origin : null;
+  const radiusFilter = origin && withinRadius ? radiusKm : null;
 
   const distances = useMemo(() => {
     const map = new Map<string, number>();
@@ -143,7 +165,8 @@ export function DirectorySearch() {
         (includeProspects || card.status !== "prospect") &&
         (!verifiedOnly || card.verified) &&
         intents.every((i) => card.allowedIntents.includes(i)) &&
-        (!origin || (distances.get(card.agentId) ?? Infinity) <= radiusKm),
+        (radiusFilter === null ||
+          (distances.get(card.agentId) ?? Infinity) <= radiusFilter),
     );
     if (sort === "name")
       return [...list].sort((a, b) => a.name.localeCompare(b.name, "es"));
@@ -159,15 +182,28 @@ export function DirectorySearch() {
     includeProspects,
     verifiedOnly,
     intents,
-    origin,
     distances,
-    radiusKm,
+    radiusFilter,
     sort,
   ]);
 
   const categoryLabel = categories?.find((c) => c.slug === category)?.label;
 
   const isDesktop = useIsDesktop();
+  const [offerLocation, setOfferLocation] = useState(false);
+
+  // Locate right away when the visitor already allowed it; otherwise offer it, never prompt on load.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once on mount
+  useEffect(() => {
+    navigator.permissions
+      ?.query({ name: "geolocation" })
+      .then((status) => {
+        if (status.state === "granted") startLocating(false);
+        else if (status.state === "prompt" && !isLocationInviteDismissed())
+          setOfferLocation(true);
+      })
+      .catch(() => {});
+  }, []);
 
   function locate() {
     if (geo.state === "on" || geo.state === "locating") {
@@ -175,6 +211,13 @@ export function DirectorySearch() {
       if (sort === "distance") setSort("relevance");
       return;
     }
+    startLocating(true);
+  }
+
+  // `filter` false only reorders by distance, as the invite promises; true also applies the radius.
+  function startLocating(filter: boolean) {
+    setOfferLocation(false);
+    setWithinRadius(filter);
     if (!("geolocation" in navigator)) {
       setGeo({
         state: "error",
@@ -208,6 +251,7 @@ export function DirectorySearch() {
     setIncludeProspects(true);
     setGeo({ state: "off" });
     setRadiusKm(DEFAULT_RADIUS_KM);
+    setWithinRadius(true);
     setSort("relevance");
   }
 
@@ -228,8 +272,10 @@ export function DirectorySearch() {
       ? [
           {
             key: "near",
-            label: `A ${radiusKm} km de ti`,
-            remove: () => setGeo({ state: "off" }),
+            label: radiusFilter ? `A ${radiusFilter} km de ti` : "Cerca de ti",
+            remove: radiusFilter
+              ? () => setWithinRadius(false)
+              : () => setGeo({ state: "off" }),
           },
         ]
       : []),
@@ -261,35 +307,51 @@ export function DirectorySearch() {
   const summary = [
     categoryLabel,
     comuna,
-    origin ? `a ${radiusKm} km de ti` : null,
+    radiusFilter ? `a ${radiusFilter} km de ti` : origin ? "cerca de ti" : null,
   ]
     .filter(Boolean)
     .join(" · ");
 
   return (
-    <div className="flex min-h-dvh flex-col bg-background lg:h-dvh lg:min-h-0 lg:overflow-hidden">
+    <div
+      className={`flex min-h-dvh flex-col bg-background lg:h-dvh lg:min-h-0 lg:overflow-hidden ${view === "map" ? "max-lg:h-dvh max-lg:min-h-0 max-lg:overflow-hidden" : ""}`}
+    >
       <SiteHeader current="directory" />
 
       <section
         aria-label="Búsqueda"
-        className="flex flex-col gap-3.5 border-b border-border px-4 py-5 sm:px-6"
+        className={`flex flex-col gap-3.5 border-b border-border px-4 sm:px-6 ${view === "map" ? "py-3 lg:py-5 [&>:not(:first-child)]:max-lg:hidden" : "py-5"}`}
       >
         <TextSearch
           onInterpreted={({ category, comuna }) => {
             setCategory(category);
             setComuna(comuna);
           }}
+          trailing={
+            view === "map" ? null : (
+              <Button
+                data-size="icon"
+                className="relative !size-12 flex-none sm:!hidden"
+                aria-expanded={filtersOpen}
+                aria-controls="directory-filters"
+                onClick={() => setFiltersOpen((open) => !open)}
+              >
+                <SlidersHorizontal aria-hidden size={18} />
+                <span className="sr-only">
+                  Filtros{active.length > 0 ? ` · ${active.length}` : ""}
+                </span>
+                {active.length > 0 ? (
+                  <span
+                    aria-hidden
+                    className="absolute -top-1 -right-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-medium text-primary-foreground tabular-nums"
+                  >
+                    {active.length}
+                  </span>
+                ) : null}
+              </Button>
+            )
+          }
         />
-
-        <Button
-          className="inline-flex items-center gap-1.5 self-start sm:!hidden"
-          aria-expanded={filtersOpen}
-          aria-controls="directory-filters"
-          onClick={() => setFiltersOpen((open) => !open)}
-        >
-          <SlidersHorizontal aria-hidden size={15} />
-          Filtros{active.length > 0 ? ` · ${active.length}` : ""}
-        </Button>
 
         <div
           id="directory-filters"
@@ -367,9 +429,10 @@ export function DirectorySearch() {
                   min={1}
                   max={50}
                   value={radiusKm}
-                  onValueChange={(value) =>
-                    setRadiusKm(Array.isArray(value) ? value[0] : value)
-                  }
+                  onValueChange={(value) => {
+                    setRadiusKm(Array.isArray(value) ? value[0] : value);
+                    setWithinRadius(true);
+                  }}
                   className="w-30"
                 >
                   <SliderControl>
@@ -380,7 +443,7 @@ export function DirectorySearch() {
                   </SliderControl>
                 </Slider>
                 <span className="min-w-12 text-[13px] tabular-nums">
-                  {radiusKm} km
+                  {withinRadius ? `${radiusKm} km` : "Sin límite"}
                 </span>
               </div>
             ) : null}
@@ -437,6 +500,44 @@ export function DirectorySearch() {
             </fieldset>
           ) : null}
         </div>
+
+        {offerLocation && geo.state === "off" ? (
+          <div className="flex items-center gap-x-3 self-start rounded-2xl bg-muted py-1.5 pr-1.5 pl-3.5 text-[13px] max-sm:self-stretch">
+            <LocateFixed aria-hidden size={15} className="flex-none" />
+            <span className="min-w-0 flex-1">
+              <span className="sm:hidden">¿Ver lo cercano?</span>
+              <span className="max-sm:hidden">
+                Comparte tu ubicación y te mostramos primero lo que está cerca.
+              </span>
+            </span>
+            <div className="flex flex-none gap-1">
+              <Button
+                data-variant="solid"
+                data-size="sm"
+                onClick={() => startLocating(false)}
+              >
+                Usar mi ubicación
+              </Button>
+              <Button
+                data-variant="ghost"
+                data-size="sm"
+                aria-label="Ahora no"
+                onClick={() => {
+                  setOfferLocation(false);
+                  try {
+                    localStorage.setItem(INVITE_DISMISSED_KEY, "1");
+                  } catch {
+                    // The invite is dismissed for this visit without storage.
+                  }
+                }}
+                className="max-sm:!w-8 max-sm:!px-0"
+              >
+                <X aria-hidden size={14} className="sm:hidden" />
+                <span className="max-sm:hidden">Ahora no</span>
+              </Button>
+            </div>
+          </div>
+        ) : null}
 
         {geo.state === "error" ? (
           <p role="alert" className="m-0 text-[13px] text-destructive-text">
@@ -523,9 +624,29 @@ export function DirectorySearch() {
 
           <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-24 lg:pb-4">
             {result === undefined || categories === undefined ? (
-              <p className="m-0 text-subtle-foreground" data-testid="loading">
-                Cargando…
-              </p>
+              <div data-testid="loading" className="flex flex-col gap-3">
+                <span className="sr-only">Cargando…</span>
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    aria-hidden
+                    className="flex animate-pulse flex-col gap-3 rounded-3xl bg-card p-4 shadow-card"
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="size-10 flex-none rounded-2xl bg-muted" />
+                      <div className="flex flex-1 flex-col gap-2 pt-1">
+                        <span className="h-4 w-3/5 rounded-full bg-muted" />
+                        <span className="h-3 w-2/5 rounded-full bg-muted" />
+                      </div>
+                    </div>
+                    <span className="h-3 w-full rounded-full bg-muted" />
+                    <div className="flex gap-2">
+                      <span className="h-9 flex-1 rounded-full bg-muted" />
+                      <span className="h-9 flex-1 rounded-full bg-muted" />
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
               <div className="flex flex-col gap-3">
                 {cards.length === 0 ? (
@@ -558,16 +679,26 @@ export function DirectorySearch() {
                     aria-busy={loadingMore}
                     disabled={loadingMore}
                     onClick={() =>
-                      setMore({
-                        key: filterKey,
-                        offsets: [...offsets, result.nextOffset ?? 0],
-                      })
+                      setMore({ key: filterKey, pages: loadedPages + 1 })
                     }
                   >
-                    {loadingMore ? "Cargando…" : "Ver más agentes"}
+                    <span className="grid">
+                      <span
+                        className={`[grid-area:1/1] ${loadingMore ? "invisible" : ""}`}
+                      >
+                        Ver más agentes
+                      </span>
+                      {loadingMore ? (
+                        <LoaderCircle
+                          aria-label="Cargando"
+                          size={16}
+                          className="m-auto animate-spin [grid-area:1/1]"
+                        />
+                      ) : null}
+                    </span>
                   </Button>
                 ) : null}
-                {origin && radiusKm < 50 ? (
+                {radiusFilter && radiusFilter < 50 ? (
                   <p className="m-0 text-center text-xs text-subtle-foreground">
                     No hay más resultados en {radiusKm} km.{" "}
                     <Button
@@ -592,7 +723,7 @@ export function DirectorySearch() {
             selectedId={selectedId}
             onSelect={setSelectedId}
             origin={origin}
-            radiusKm={origin ? radiusKm : null}
+            radiusKm={radiusFilter}
             className="flex-1"
           />
         ) : null}
@@ -622,8 +753,10 @@ type Interpretation = { category: string | null; comuna: string | null };
 
 function TextSearch({
   onInterpreted,
+  trailing,
 }: {
   onInterpreted: (value: Interpretation) => void;
+  trailing?: ReactNode;
 }) {
   const searchText = useAction(api.directory.searchText);
   const [text, setText] = useState("");
@@ -678,27 +811,46 @@ function TextSearch({
           <Search
             aria-hidden
             size={18}
-            className="pointer-events-none absolute left-4 text-muted-foreground"
+            className="pointer-events-none absolute left-4 hidden text-muted-foreground sm:block"
           />
           <Input
             id="dir-q"
             type="search"
+            enterKeyHint="search"
+            aria-busy={busy}
             value={text}
             maxLength={MAX_QUERY_LENGTH}
             onChange={(event) => setText(event.target.value)}
             placeholder="¿Qué necesitas? ej. hora con cardiólogo en Providencia"
-            className="!h-12 w-full !border-ring !pl-11 !text-[15px]"
+            className="!h-12 w-full !border-ring !text-[15px] max-sm:!pr-11 sm:!pl-11"
           />
+          <Button
+            type="submit"
+            data-variant="ghost"
+            data-size="icon"
+            aria-label="Buscar"
+            aria-busy={busy}
+            disabled={busy}
+            className="absolute right-1 !size-10 !p-0 sm:!hidden"
+          >
+            {busy ? (
+              <LoaderCircle aria-hidden size={18} className="animate-spin" />
+            ) : (
+              <Search aria-hidden size={18} />
+            )}
+          </Button>
         </div>
         <Button
           type="submit"
           data-variant="solid"
           data-size="xl"
+          className="max-sm:!hidden"
           aria-busy={busy}
           disabled={busy}
         >
           {busy ? "Buscando…" : "Buscar"}
         </Button>
+        {trailing}
       </form>
       {note ? (
         <p
@@ -713,10 +865,33 @@ function TextSearch({
 }
 
 function usePagedSearch(
-  category: string | null,
-  comuna: string | null,
-  offsets: number[],
+  filters: {
+    category: string | null;
+    comuna: string | null;
+    near: LatLng | null;
+    verifiedOnly: boolean;
+    includeProspects: boolean;
+  },
+  pages: number,
 ) {
+  const { category, comuna, near, verifiedOnly, includeProspects } = filters;
+  const args = useMemo(
+    () => ({
+      ...(category ? { category } : {}),
+      ...(comuna ? { comuna } : {}),
+      ...(near ? { near: { lat: near.lat, lng: near.lng } } : {}),
+      ...(verifiedOnly ? { verifiedOnly } : {}),
+      ...(includeProspects ? {} : { includeProspects }),
+    }),
+    [category, comuna, near, verifiedOnly, includeProspects],
+  );
+  const argsKey = JSON.stringify(args);
+  // Each order pages from its own nextOffset, so the next page is requested once the previous one arrives.
+  const [chain, setChain] = useState({ key: argsKey, offsets: FIRST_PAGE });
+  const offsets = useMemo(
+    () => (chain.key === argsKey ? chain.offsets : FIRST_PAGE).slice(0, pages),
+    [chain, argsKey, pages],
+  );
   const requests = useMemo(
     () =>
       Object.fromEntries(
@@ -724,16 +899,11 @@ function usePagedSearch(
           String(page),
           {
             query: api.directory.search,
-            args: {
-              ...(category ? { category } : {}),
-              ...(comuna ? { comuna } : {}),
-              limit: PAGE_SIZE,
-              offset,
-            },
+            args: { ...args, limit: PAGE_SIZE, offset },
           },
         ]),
       ),
-    [category, comuna, offsets],
+    [args, offsets],
   );
   const results = useQueries(requests);
   const loaded: DirectorySearchResult[] = [];
@@ -763,8 +933,17 @@ function usePagedSearch(
       },
     };
   }
+  const last = loaded.at(-1);
+  const hasNext = last?.nextOffset !== undefined;
+  if (loaded.length === offsets.length && offsets.length < pages && hasNext) {
+    setChain({ key: argsKey, offsets: [...offsets, last?.nextOffset ?? 0] });
+  }
   return {
     result: cache.current.result,
-    loadingMore: loaded.length > 0 && loaded.length < offsets.length,
+    loadedPages: loaded.length,
+    loadingMore:
+      loaded.length > 0 &&
+      loaded.length < pages &&
+      (loaded.length < offsets.length || hasNext),
   };
 }
