@@ -24,7 +24,8 @@
     "smoke": "python3 scripts/smoke.py",
     "browser:install": "agent-browser install",
     "test": "vitest run",
-    "eval:moderator": "vitest run --config vitest.eval.config.mts"
+    "eval:moderator": "vitest run --config vitest.eval.config.mts",
+    "scene:run": "node scripts/scene-run.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "7.7.9",
