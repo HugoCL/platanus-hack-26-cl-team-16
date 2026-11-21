@@ -804,12 +804,15 @@ function SidePanel({
   onJump: (messageId: string) => void;
 }) {
   return (
-    <Tabs defaultValue="contrato" className="flex flex-col gap-3 p-4">
+    <Tabs defaultValue="participantes" className="flex flex-col gap-3 p-4">
       <TabsList aria-label="Detalles de la sala">
+        <TabsTab value="participantes">Participantes</TabsTab>
         <TabsTab value="contrato">Contrato</TabsTab>
         <TabsTab value="auditoria">Auditoría</TabsTab>
-        <TabsTab value="participantes">Participantes</TabsTab>
       </TabsList>
+      <TabsPanel value="participantes">
+        <ParticipantsView participants={participants} role={role} />
+      </TabsPanel>
       <TabsPanel value="contrato">
         <ContractView
           contract={contract}
@@ -826,9 +829,6 @@ function SidePanel({
           maxBlocked={contract.maxViolations}
           onJump={onJump}
         />
-      </TabsPanel>
-      <TabsPanel value="participantes">
-        <ParticipantsView participants={participants} role={role} />
       </TabsPanel>
     </Tabs>
   );
