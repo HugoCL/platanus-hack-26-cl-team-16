@@ -17,9 +17,12 @@ const RUT_FORMATTED =
   /(?<![\d.])(\d{1,2}(?:\.\d{3}){2}|\d{7,8})-([\dk])(?![\dk])/gi;
 const RUT_AFTER_KEYWORD = /\bru[tn]\b[\s:#]*(\d{7,8})([\dk])(?![\dk])/gi;
 // A RUT with no dots, hyphen or label: 7 or 8 digits and the check digit,
-// standing alone, so not part of a longer number, a price or a phone.
+// standing alone, so not part of a longer number, a price or a phone. Prices
+// after "$" and Chilean phones after "+56" are set aside first as whole units.
 const RUT_COMPACT =
   /(?<![\p{L}\d.,+$-])(\d{7,8})([\dk])(?![\p{L}\d]|[.,-]\d)/giu;
+const PRICE = /\$\p{Zs}*\d[\d.,]*/gu;
+const CHILEAN_PHONE = /\+\p{Zs}*56(?:[\p{Zs}()-]*\d){9}(?!\d)/gu;
 const CHILEAN_MOBILE = /^9\d{8}$/;
 // A card number has 13 to 19 digits, unbroken or in groups split either by
 // spaces (any Unicode space) and hyphens, mixed freely, or by dots alone. Every
@@ -136,10 +139,13 @@ function passesLuhn(digits: string): boolean {
 }
 
 function hasRut(text: string): boolean {
+  const withoutPricesOrPhones = text
+    .replace(PRICE, " ")
+    .replace(CHILEAN_PHONE, " ");
   const candidates = [
     ...text.matchAll(RUT_FORMATTED),
     ...text.matchAll(RUT_AFTER_KEYWORD),
-    ...[...text.matchAll(RUT_COMPACT)].filter(
+    ...[...withoutPricesOrPhones.matchAll(RUT_COMPACT)].filter(
       ([compact]) => !CHILEAN_MOBILE.test(compact),
     ),
   ];

@@ -130,6 +130,8 @@ describe("RUT", () => {
     "Ya, es el 12345674.",
     "91234567k",
     "RUT 987654325",
+    "$ 59.990 y 123456785",
+    "+56 223456707 y 123456785",
   ])("finds %s", (value) => {
     const findings = rulesFor("hotel", "consumidor", "proveedor", text(value));
     expect(rulesOf(findings)).toEqual(["sensitive_data"]);
@@ -146,6 +148,13 @@ describe("RUT", () => {
     "+56987654325",
     "$123456785",
     "Total: $12.345.678",
+    "$ 123456785",
+    "$\u00a0123456785",
+    "Total: $ 12345674",
+    "+56 223456707",
+    "+56\u00a0223456707",
+    "+56 2 23456702",
+    "Fono: +56-223456707",
     "123456789",
     "12345678",
     "Pedido 123456789",
