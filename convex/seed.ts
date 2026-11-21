@@ -16,6 +16,7 @@ import {
 import { DEFAULT_MAX_TURNS, type SessionContract } from "../shared/session";
 import type { Id, TableNames } from "./_generated/dataModel";
 import { internalMutation, type MutationCtx } from "./_generated/server";
+import { sha256Hex } from "./agentKeys";
 import { loadSession } from "./roomState";
 
 // Local deployments start empty, so every table needs sample data to develop against.
@@ -77,16 +78,6 @@ async function demoSession(ctx: MutationCtx) {
   const session = await ctx.db.query("sessions").first();
   if (!session) throw new Error("seed: demo session is missing");
   return session;
-}
-
-async function sha256Hex(value: string) {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(value),
-  );
-  return Array.from(new Uint8Array(digest), (b) =>
-    b.toString(16).padStart(2, "0"),
-  ).join("");
 }
 
 export const seeders = {
