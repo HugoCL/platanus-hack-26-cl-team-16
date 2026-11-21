@@ -1,6 +1,6 @@
 import { Show, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
-import { CanaryMark } from "@/components/canary-mark";
+import { AgoraMark } from "@/components/agora-mark";
 import { HeaderAccount } from "@/components/header-account";
 import { ThemeToggle } from "@/components/toggle-theme";
 import { MobileMenu } from "./mobile-menu";
@@ -33,10 +33,10 @@ export function SiteHeader({
         )}
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-xl leading-none font-bold tracking-tight text-foreground no-underline"
+          className="inline-flex items-baseline gap-[0.28cap] font-logo text-2xl leading-none font-semibold text-foreground no-underline"
         >
-          <CanaryMark className="size-6" />
-          Canary Room
+          <AgoraMark className="h-[0.85cap] w-[0.92cap] shrink-0" />
+          agora
         </Link>
       </div>
       <div className="sm:hidden">
