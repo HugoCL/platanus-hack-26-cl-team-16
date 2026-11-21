@@ -171,6 +171,7 @@ export function DemoRoom({
                       room.respond(response, message.messageId)
                     }
                     onShowAudit={setAuditFor}
+                    onReview={room.review}
                   />
                 </Fragment>
               );

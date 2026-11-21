@@ -125,6 +125,30 @@ export function useDemoRoom(script: ScriptStep[], instant = false) {
     [deliver, lastAt],
   );
 
+  // The owner settles a message the moderator escalated.
+  const review = useCallback((messageId: string, approve: boolean) => {
+    setMessages((list) =>
+      list.map((m): RoomMessage => {
+        if (m.messageId !== messageId) return m;
+        return approve
+          ? {
+              ...m,
+              status: "allowed",
+              verdict: { decision: "allow", reason: "Aprobado por el dueño" },
+            }
+          : {
+              ...m,
+              status: "blocked",
+              verdict: {
+                decision: "block",
+                rule: "purpose",
+                reason: "Rechazado por el dueño",
+              },
+            };
+      }),
+    );
+  }, []);
+
   const reset = useCallback(() => {
     const start = instant ? played(script) : EMPTY;
     setMessages(start.messages);
@@ -140,6 +164,7 @@ export function useDemoRoom(script: ScriptStep[], instant = false) {
     typing,
     finished: step >= script.length && !waitingFor,
     respond,
+    review,
     sendText,
     reset,
   };
