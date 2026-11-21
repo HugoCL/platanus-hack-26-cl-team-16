@@ -59,6 +59,14 @@ const DEFAULT_RADIUS_KM = 5;
 const PAGE_SIZE = 20;
 const INVITE_DISMISSED_KEY = "directory:location-invite-dismissed";
 
+function isLocationInviteDismissed() {
+  try {
+    return Boolean(localStorage.getItem(INVITE_DISMISSED_KEY));
+  } catch {
+    return false;
+  }
+}
+
 const GoogleDirectoryMap = dynamic(() => import("./google-directory-map"), {
   ssr: false,
   loading: () => <div className="min-h-0 flex-1 bg-[var(--sm-map-land)]" />,
@@ -183,10 +191,7 @@ export function DirectorySearch() {
       ?.query({ name: "geolocation" })
       .then((status) => {
         if (status.state === "granted") startLocating();
-        else if (
-          status.state === "prompt" &&
-          !localStorage.getItem(INVITE_DISMISSED_KEY)
-        )
+        else if (status.state === "prompt" && !isLocationInviteDismissed())
           setOfferLocation(true);
       })
       .catch(() => {});
@@ -504,8 +509,12 @@ export function DirectorySearch() {
                 data-size="sm"
                 aria-label="Ahora no"
                 onClick={() => {
-                  localStorage.setItem(INVITE_DISMISSED_KEY, "1");
                   setOfferLocation(false);
+                  try {
+                    localStorage.setItem(INVITE_DISMISSED_KEY, "1");
+                  } catch {
+                    // The invite is dismissed for this visit without storage.
+                  }
                 }}
                 className="max-sm:!w-8 max-sm:!px-0"
               >
@@ -788,7 +797,7 @@ function TextSearch({
           <Search
             aria-hidden
             size={18}
-            className="pointer-events-none absolute left-4 text-muted-foreground"
+            className="pointer-events-none absolute left-4 hidden text-muted-foreground sm:block"
           />
           <Input
             id="dir-q"
@@ -799,15 +808,23 @@ function TextSearch({
             maxLength={MAX_QUERY_LENGTH}
             onChange={(event) => setText(event.target.value)}
             placeholder="¿Qué necesitas? ej. hora con cardiólogo en Providencia"
-            className="!h-12 w-full !border-ring !pl-11 !text-[15px] max-sm:!pr-11"
+            className="!h-12 w-full !border-ring !text-[15px] max-sm:!pr-11 sm:!pl-11"
           />
-          {busy ? (
-            <LoaderCircle
-              aria-hidden
-              size={18}
-              className="pointer-events-none absolute right-4 animate-spin text-muted-foreground sm:hidden"
-            />
-          ) : null}
+          <Button
+            type="submit"
+            data-variant="ghost"
+            data-size="icon"
+            aria-label="Buscar"
+            aria-busy={busy}
+            disabled={busy}
+            className="absolute right-1 !size-10 !p-0 sm:!hidden"
+          >
+            {busy ? (
+              <LoaderCircle aria-hidden size={18} className="animate-spin" />
+            ) : (
+              <Search aria-hidden size={18} />
+            )}
+          </Button>
         </div>
         <Button
           type="submit"
