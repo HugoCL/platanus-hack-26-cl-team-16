@@ -6,7 +6,11 @@ import { internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
 import { AgentCard } from "../../shared/agent";
 import { Offering, validateOfferingAttributes } from "../../shared/catalog";
-import { SEED_AGENTS, SEED_CATEGORIES } from "../../shared/seedData";
+import {
+  EXTERNAL_AGENT_SLUG,
+  SEED_AGENTS,
+  SEED_CATEGORIES,
+} from "../../shared/seedData";
 
 const modules = import.meta.glob("../../convex/**/*.ts");
 
@@ -21,6 +25,7 @@ it("seed:ensure loads every table with valid data", async () => {
     availability: await ctx.db.query("availability").collect(),
     messages: await ctx.db.query("messages").collect(),
     sessions: await ctx.db.query("sessions").collect(),
+    agentApiKeys: await ctx.db.query("agentApiKeys").collect(),
   }));
 
   expect(data.agents).toHaveLength(SEED_AGENTS.length);
@@ -45,6 +50,12 @@ it("seed:ensure loads every table with valid data", async () => {
 
   expect(data.sessions[0].contract?.maxTurns).toBe(12);
   expect(data.messages.every((m) => m.recipient !== undefined)).toBe(true);
+
+  const external = data.agents.find((a) => a.slug === EXTERNAL_AGENT_SLUG);
+  expect(external?.kind).toBe("external");
+  expect(data.agentApiKeys).toHaveLength(1);
+  expect(data.agentApiKeys[0]).toMatchObject({ agentId: external?._id });
+  expect(data.agentApiKeys[0].revokedAt).toBeDefined();
 
   const again = await t.mutation(internal.seed.ensure, {});
   expect(again.seeded).not.toContain("agents");

@@ -4,6 +4,7 @@ import type { Capability } from "../shared/scope";
 import {
   CLINIC_AGENT_SLUG,
   CONSUMER_AGENT_SLUG,
+  EXTERNAL_AGENT_SLUG,
   SEED_AGENTS,
   SEED_AVAILABILITY,
   SEED_CATEGORIES,
@@ -138,7 +139,7 @@ export const seeders = {
   },
 
   agentApiKeys: async (ctx) => {
-    const agent = await agentBySlug(ctx, CONSUMER_AGENT_SLUG);
+    const agent = await agentBySlug(ctx, EXTERNAL_AGENT_SLUG);
     const unknowableKey = crypto.randomUUID();
     await ctx.db.insert("agentApiKeys", {
       agentId: agent._id,
