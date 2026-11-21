@@ -27,7 +27,14 @@ import {
   ShieldCheckIcon,
   UserIcon,
 } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { ThemeToggle } from "@/components/toggle-theme";
 import type { UiResponse, UiSpec } from "@/shared/genui";
 import { MAX_TEXT_LENGTH } from "@/shared/messages";
@@ -47,6 +54,7 @@ import {
   type RoomMessage,
   type RoomParticipant,
   SESSION_STATUS_LABELS,
+  sessionEnd,
   type Viewer,
   violationTone,
 } from "./room-format";
@@ -85,14 +93,7 @@ export function DemoRoom({
       participants={fixture.participants}
       viewer={{ ...fixture.viewer, role }}
       contract={fixture.contract}
-      status={
-        room.messages.some(
-          (m) =>
-            m.content.kind === "system" && m.content.code === "session_closed",
-        )
-          ? "closed"
-          : "active"
-      }
+      status={sessionEnd(room.messages)?.status ?? "active"}
       messages={room.messages}
       answers={room.answers}
       typingName={
@@ -101,6 +102,7 @@ export function DemoRoom({
       onRespond={room.respond}
       onSendText={room.sendText}
       onRestart={room.reset}
+      onReview={room.review}
       toolbar={
         <DemoToolbar role={role} onRole={setRole} onReset={room.reset} />
       }
@@ -120,6 +122,7 @@ export function RoomView({
   onSendText,
   onCloseRoom,
   onRestart,
+  onReview,
   toolbar,
   error,
   sessions,
@@ -138,6 +141,7 @@ export function RoomView({
   onSendText: (text: string) => void | Promise<boolean | void>;
   onCloseRoom?: () => void;
   onRestart?: () => void;
+  onReview?: (messageId: string, approve: boolean) => void;
   toolbar?: ReactNode;
   error?: string;
   sending?: boolean;
@@ -217,24 +221,34 @@ export function RoomView({
             </Button>
           ) : null}
           <Thread messages={messages} typingName={typingName}>
-            {messages.map((message) => (
-              <MessageItem
-                key={message.messageId}
-                message={message}
-                sender={
-                  message.senderParticipantId
-                    ? participants.get(message.senderParticipantId)
-                    : undefined
-                }
-                viewer={viewer}
-                answers={answers}
-                readOnly={readOnly || sending || answersReadOnly}
-                uiSpecsByMessage={uiSpecsByMessage}
-                highlighted={highlighted === message.messageId}
-                onRespond={(response) => onRespond(response, message.messageId)}
-                onShowAudit={setAuditFor}
-              />
-            ))}
+            {messages.map((message, i) => {
+              const prev = messages[i - 1];
+              const day = formatLongDay(message.sentAt);
+              const newDay = !prev || formatLongDay(prev.sentAt) !== day;
+              return (
+                <Fragment key={message.messageId}>
+                  {newDay ? <DayDivider label={day} /> : null}
+                  <MessageItem
+                    message={message}
+                    sender={
+                      message.senderParticipantId
+                        ? participants.get(message.senderParticipantId)
+                        : undefined
+                    }
+                    viewer={viewer}
+                    answers={answers}
+                    readOnly={readOnly || sending || answersReadOnly}
+                    uiSpecsByMessage={uiSpecsByMessage}
+                    highlighted={highlighted === message.messageId}
+                    onRespond={(response) =>
+                      onRespond(response, message.messageId)
+                    }
+                    onShowAudit={setAuditFor}
+                    onReview={onReview}
+                  />
+                </Fragment>
+              );
+            })}
           </Thread>
           {error ? (
             <p role="alert" className="m-0 px-4 py-2 text-sm text-destructive">
@@ -244,7 +258,10 @@ export function RoomView({
           <Composer
             readOnly={readOnly}
             sending={sending}
-            closedLabel={onRestart ? undefined : SESSION_STATUS_LABELS[status]}
+            closedLabel={
+              sessionEnd(messages)?.text ??
+              (onRestart ? undefined : SESSION_STATUS_LABELS[status])
+            }
             control={control}
             canControl={canControl}
             selfName={self?.name ?? "tu agente"}
@@ -460,7 +477,7 @@ function SessionHeader({
         <div className="flex min-w-0 flex-col gap-0.5">
           <h1 className="m-0 flex min-w-0 items-center gap-1 text-lg leading-tight font-semibold tracking-tight">
             <span className="truncate">{other?.name}</span>
-            <VerifiedBadge />
+            {other?.verified && <VerifiedBadge />}
           </h1>
           <p className="m-0 truncate text-sm text-subtle-foreground">
             {self?.name} pide: “{contract.intent.description}”
@@ -515,6 +532,16 @@ function SessionHeader({
   );
 }
 
+function DayDivider({ label }: { label: string }) {
+  return (
+    <p className="m-0 flex w-full items-center gap-3 text-xs font-medium text-subtle-foreground">
+      <span aria-hidden="true" className="h-px flex-1 bg-border" />
+      {label}
+      <span aria-hidden="true" className="h-px flex-1 bg-border" />
+    </p>
+  );
+}
+
 function Thread({
   messages,
   typingName,
@@ -565,11 +592,9 @@ function Thread({
         }}
         className="flex h-full flex-col gap-6 overflow-y-auto px-4 py-6"
       >
-        {messages[0] ? (
-          <p className="m-0 mx-auto flex w-full max-w-3xl items-center gap-3 text-xs font-medium text-subtle-foreground">
-            <span aria-hidden="true" className="h-px flex-1 bg-border" />
-            {formatLongDay(messages[0].sentAt)}
-            <span aria-hidden="true" className="h-px flex-1 bg-border" />
+        {messages.length === 0 && !typingName ? (
+          <p className="m-auto text-center text-sm text-subtle-foreground">
+            Esperando el primer mensaje de los agentes…
           </p>
         ) : null}
         <section
@@ -644,9 +669,7 @@ function Composer({
   if (readOnly) {
     return (
       <div className="flex flex-wrap items-center gap-3 border-t border-border bg-muted px-4 py-3 text-sm">
-        <span className="flex-1">
-          {closedLabel ?? "Sala cerrada · objetivo cumplido"}
-        </span>
+        <span className="flex-1">{closedLabel ?? "Sala cerrada"}</span>
         {onRestart ? (
           <Button data-size="sm" onClick={onRestart}>
             Abrir nueva sala
