@@ -3,6 +3,7 @@ import { AgentCard } from "./agent";
 import { LatLng } from "./geo";
 import { Message, Recipient, SendableContent } from "./messages";
 import {
+  Participant,
   SessionContract,
   SessionIntent,
   SessionMode,
@@ -60,6 +61,7 @@ export const OpenSessionOutput = z.object({
   sessionId,
   status: SessionStatus,
   contract: SessionContract.nullable(),
+  participants: z.array(Participant),
   rejectionReason: z.string().optional(),
 });
 
@@ -105,19 +107,19 @@ export const MCP_TOOLS = {
   },
   open_session: {
     description:
-      "Open a session with an agent for a declared intent. Moderated sessions get a contract derived from the target's scope.",
+      "Open a session with an agent for a declared intent. Moderated sessions get a contract derived from the target's scope. The result lists the participants: address the target by its participantId.",
     input: OpenSessionInput,
     output: OpenSessionOutput,
   },
   send_message: {
     description:
-      "Send a message into a session. In moderated sessions it is delivered only after the moderator allows it.",
+      'Send a message into a session. In moderated sessions it is delivered only after the moderator allows it. Address an agent by its participantId to get its reply; "all" asks no agent to answer.',
     input: SendMessageInput,
     output: SendMessageOutput,
   },
   wait_for_messages: {
     description:
-      "Long-poll for messages delivered to you in a session after a cursor.",
+      "Long-poll for messages delivered to you in a session after a cursor. Pass the returned cursor as after on the next call.",
     input: WaitForMessagesInput,
     output: WaitForMessagesOutput,
   },
