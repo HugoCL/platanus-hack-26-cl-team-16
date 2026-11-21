@@ -10,7 +10,7 @@ import {
   type Recipient,
   type SendableContent,
 } from "../../shared/messages";
-import type { Moderator } from "../../shared/moderation";
+import { DELIVERABLE_STATUSES, type Moderator } from "../../shared/moderation";
 import type { LlmProvider } from "../../shared/providers/llm";
 import { CONSUMER_AGENT_SLUG } from "../../shared/seedData";
 import {
@@ -188,8 +188,18 @@ export const choose = (room: LoggedRoom, picker: Message, slotId: string) =>
     response: { type: "slot_selected", pickerId: pickerOf(picker).id, slotId },
   });
 
-// One provider turn as E2's adapter will run it: the context loaded by `providerAgent.context`
-// and the `book` port bound to `bookings.book`, both at `NOW`.
+// What a participant can see of the room, as E2 delivers it: what it sent, and the delivered
+// messages addressed to it or to everyone.
+export const visibleTo = (room: LoggedRoom, self: string) =>
+  room.history.filter(
+    (m) =>
+      m.senderParticipantId === self ||
+      (DELIVERABLE_STATUSES.includes(m.status) &&
+        (m.recipient === self || m.recipient === "all")),
+  );
+
+// One provider turn as E2's adapter will run it: the room as the provider sees it, the context
+// loaded by `providerAgent.context` and the `book` port bound to `bookings.book`, both at `NOW`.
 export async function askProvider(
   t: TestConvex<typeof schema>,
   room: LoggedRoom,
@@ -205,7 +215,7 @@ export async function askProvider(
       self: room.recipient,
       contract: room.contract,
       participants: room.participants,
-      history: [...room.history],
+      history: visibleTo(room, room.recipient),
       incoming,
     },
     context,

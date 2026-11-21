@@ -9,7 +9,6 @@ import type { Booking } from "./booking";
 import {
   type AgentAction,
   type AgentTurn,
-  agentWithRole,
   data,
   delivered,
   describeMessage,
@@ -135,7 +134,8 @@ export async function providerTurn(
   );
 }
 
-// Books the slot a human picked in one of this provider's pickers, once per picker.
+// Books the slot a human picked in one of this provider's pickers, once per picker, and confirms it
+// to the whole room: the human gets the card and the consumer agent the signal that it is done.
 async function bookChoice(
   turn: AgentTurn,
   context: ProviderContext,
@@ -183,10 +183,10 @@ async function bookChoice(
   }
   const when = formatWhen(booking.start);
   const address = context.card.location?.address;
-  const actions: AgentAction[] = [
+  return [
     {
       kind: "send",
-      recipient: human.participantId,
+      recipient: "all",
       content: {
         kind: "ui",
         spec: {
@@ -215,16 +215,6 @@ async function bookChoice(
       },
     },
   ];
-  const initiator = agentWithRole(turn.participants, "initiator");
-  if (initiator) {
-    actions.push(
-      sendText(
-        initiator.participantId,
-        `Reserva confirmada: ${booking.offeringName}, ${when}. Le envié la confirmación a ${human.displayName}.`,
-      ),
-    );
-  }
-  return actions;
 }
 
 function offer(

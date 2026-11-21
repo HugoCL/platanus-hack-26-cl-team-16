@@ -117,15 +117,17 @@ describe("generic provider agent", () => {
     ]);
   });
 
-  it("books the human's choice and confirms it", async () => {
+  it("books the human's choice and confirms it to the whole room", async () => {
     const room = await openRoom();
     const picker = await askForSlots(room);
     const chosen = pickerOf(picker).slots[1].id;
     const choice = await choose(room, picker, chosen);
 
-    const [confirmation, notice] = await providerAnswers(room, choice);
+    const sent = await providerAnswers(room, choice);
 
-    expect(confirmation.recipient).toBe(room.owner);
+    expect(sent).toHaveLength(1);
+    const [confirmation] = sent;
+    expect(confirmation.recipient).toBe("all");
     expect(confirmation.content).toMatchObject({
       kind: "ui",
       spec: {
@@ -139,12 +141,6 @@ describe("generic provider agent", () => {
         ]),
       },
     });
-    expect(notice.recipient).toBe(room.initiator);
-    expect(notice.content).toEqual(
-      text(
-        "Reserva confirmada: Consulta cardiología · Dr. Felipe Rojas, jueves, 26 de noviembre, 10:30. Le envié la confirmación a Juan.",
-      ),
-    );
     expect((await availability(chosen))?.booked).toBe(1);
   });
 
@@ -162,11 +158,9 @@ describe("generic provider agent", () => {
       choice,
       noLlm,
     );
-    expect(retried[0]).toEqual({
-      kind: "send",
-      recipient: room.owner,
-      content: confirmation.content,
-    });
+    expect(retried).toEqual([
+      { kind: "send", recipient: "all", content: confirmation.content },
+    ]);
     expect(await providerAnswers(room, choice)).toEqual([]);
     expect(
       await providerAnswers(room, await choose(room, picker, first)),
