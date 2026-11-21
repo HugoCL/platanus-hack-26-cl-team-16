@@ -182,6 +182,7 @@ async function bookChoice(
       m.senderParticipantId === turn.self &&
       m.recipient === human.participantId &&
       m.content.kind === "ui" &&
+      m.content.spec.type === "confirmation" &&
       m.content.spec.id === confirmationId,
   );
   if (confirmed) return [{ kind: "close" }];
