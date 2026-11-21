@@ -73,6 +73,7 @@ describe("bookings", () => {
       status: "booked",
       offeringName: "Consulta cardiología · Dra. Carolina Muñoz",
       total: { amount: 45000, currency: "CLP" },
+      created: true,
     });
     expect((await slot(first))?.booked).toBe(1);
     const [tx] = await roomBookings(r.sessionId);
@@ -86,12 +87,14 @@ describe("bookings", () => {
     const [first, second] = await free(r.providerId);
 
     const once = await book(r, first);
-    expect(await book(r, first)).toEqual(once);
-    expect(await book(r, second)).toEqual(once);
+    const again = { ...once, created: false };
+    expect(once).toMatchObject({ created: true });
+    expect(await book(r, first)).toEqual(again);
+    expect(await book(r, second)).toEqual(again);
     await t.run((ctx) =>
       ctx.db.patch("sessions", r.sessionId, { status: "closed" }),
     );
-    expect(await book(r, first)).toEqual(once);
+    expect(await book(r, first)).toEqual(again);
 
     expect((await slot(first))?.booked).toBe(1);
     expect((await slot(second))?.booked).toBe(0);
@@ -121,6 +124,43 @@ describe("bookings", () => {
 
     await expect(book(r, first, started)).resolves.toMatchObject({
       status: "unavailable",
+    });
+    expect((await slot(first))?.booked).toBe(0);
+  });
+
+  it("a room's other transactions are not its booking", async () => {
+    const r = await room();
+    const [first] = await free(r.providerId);
+    await t.run((ctx) =>
+      ctx.db.insert("transactions", {
+        sessionId: r.sessionId,
+        agentId: r.providerId,
+        kind: "order",
+        lines: [],
+        total: { amount: 0, currency: "CLP" },
+        status: "confirmed",
+      }),
+    );
+
+    await expect(book(r, first)).resolves.toMatchObject({
+      status: "booked",
+      created: true,
+    });
+    expect((await slot(first))?.booked).toBe(1);
+  });
+
+  it("a slot of an offering the provider turned off cannot be booked", async () => {
+    const r = await room();
+    const [first] = await free(r.providerId);
+    const offeringId = (await slot(first))?.offeringId;
+    if (!offeringId) throw new Error("missing offering");
+    await t.run((ctx) =>
+      ctx.db.patch("offerings", offeringId, { active: false }),
+    );
+
+    await expect(book(r, first)).resolves.toEqual({
+      status: "unavailable",
+      offeringId,
     });
     expect((await slot(first))?.booked).toBe(0);
   });
@@ -170,15 +210,6 @@ describe("bookings", () => {
     });
     await expect(book(infoOnly, clinicSlot)).rejects.toThrow(
       "the room's contract does not allow booking",
-    );
-
-    const offeringId = (await slot(clinicSlot))?.offeringId;
-    await t.run(async (ctx) => {
-      if (offeringId)
-        await ctx.db.patch("offerings", offeringId, { active: false });
-    });
-    await expect(book(clinicRoom, clinicSlot)).rejects.toThrow(
-      "the slot's offering is not bookable",
     );
     expect((await slot(clinicSlot))?.booked).toBe(0);
   });

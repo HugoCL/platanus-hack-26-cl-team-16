@@ -29,6 +29,7 @@ async function describe(
   ctx: QueryCtx,
   slot: Doc<"availability">,
   total: Doc<"transactions">["total"],
+  created: boolean,
 ): Promise<Booking> {
   const offering = await ctx.db.get("offerings", slot.offeringId);
   if (!offering) invalid("the booked offering is missing");
@@ -39,6 +40,7 @@ async function describe(
     start: slot.start,
     end: slot.end,
     total,
+    created,
   };
 }
 
@@ -66,7 +68,13 @@ export const book = internalMutation({
     const existing = await ctx.db
       .query("transactions")
       .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
-      .filter((q) => q.eq(q.field("status"), "confirmed"))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("kind"), "booking"),
+          q.eq(q.field("agentId"), agentId),
+          q.eq(q.field("status"), "confirmed"),
+        ),
+      )
       .first();
     if (existing) {
       const bookedSlotId = existing.lines[0]?.availabilityId;
@@ -74,7 +82,7 @@ export const book = internalMutation({
         ? await ctx.db.get("availability", bookedSlotId)
         : null;
       if (!bookedSlot) invalid("the room's booking has no slot");
-      return describe(ctx, bookedSlot, existing.total);
+      return describe(ctx, bookedSlot, existing.total, false);
     }
 
     const session = await ctx.db.get("sessions", sessionId);
@@ -85,14 +93,10 @@ export const book = internalMutation({
     const slot = await ctx.db.get("availability", availabilityId);
     if (slot?.agentId !== agentId) invalid("the slot is not this provider's");
     const offering = await ctx.db.get("offerings", slot.offeringId);
-    if (
-      offering?.agentId !== agentId ||
-      !offering.active ||
-      offering.kind !== "bookable"
-    ) {
+    if (offering?.agentId !== agentId || offering.kind !== "bookable") {
       invalid("the slot's offering is not bookable");
     }
-    if (slot.start <= now || slot.booked >= slot.capacity) {
+    if (!offering.active || slot.start <= now || slot.booked >= slot.capacity) {
       return { status: "unavailable", offeringId: slot.offeringId };
     }
 
@@ -115,6 +119,6 @@ export const book = internalMutation({
     await ctx.db.patch("availability", availabilityId, {
       booked: slot.booked + 1,
     });
-    return describe(ctx, slot, total);
+    return describe(ctx, slot, total, true);
   },
 });
