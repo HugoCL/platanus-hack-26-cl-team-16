@@ -28,6 +28,11 @@ import {
 import { moderate } from "./moderator";
 import { fakeRoomLlm, testRoomAgent } from "./roomAgent";
 import {
+  HISTORY_BYTE_BUDGET,
+  insertMessage,
+  messageBytes,
+} from "./roomMessages";
+import {
   loadSession,
   requireRoomHuman,
   toMessage,
@@ -36,8 +41,6 @@ import {
 import { visibleTo } from "./visibility";
 
 const HISTORY_LIMIT = 500;
-const HISTORY_BYTE_BUDGET = 4 * 1024 * 1024;
-const encoder = new TextEncoder();
 
 const recipientValidator = v.union(v.literal("all"), v.id("participants"));
 
@@ -163,7 +166,7 @@ export const commit = internalMutation({
     const turnCount = session.turnCount + (agentTurn ? 1 : 0);
     const exhausted = turnCount >= session.contract.maxTurns;
     const { verdict } = args;
-    const messageId = await ctx.db.insert("messages", {
+    const messageId = await insertMessage(ctx, {
       sessionId: args.sessionId,
       senderParticipantId: args.senderParticipantId,
       recipient: args.recipient,
@@ -324,7 +327,7 @@ async function recentMessages(ctx: QueryCtx, sessionId: Id<"sessions">) {
     .query("messages")
     .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
     .order("desc")) {
-    bytes += encoder.encode(JSON.stringify(doc)).length;
+    bytes += messageBytes(doc);
     if (bytes > HISTORY_BYTE_BUDGET && recent.length > 0) break;
     recent.push(toMessage(doc));
     if (recent.length === HISTORY_LIMIT) break;
@@ -442,7 +445,7 @@ async function insertPlatformMessage(
   recipient: Doc<"messages">["recipient"],
   content: MessageContent,
 ) {
-  return ctx.db.insert("messages", {
+  return insertMessage(ctx, {
     sessionId,
     recipient,
     content,

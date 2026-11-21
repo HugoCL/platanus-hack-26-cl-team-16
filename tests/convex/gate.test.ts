@@ -167,7 +167,15 @@ describe("E2 success criteria", () => {
         readFileSync(path, "utf8"),
       ),
     );
-    expect(writers.sort()).toEqual(["convex/gate.ts", "convex/seed.ts"]);
+    expect(writers).toEqual(["convex/roomMessages.ts"]);
+    const inserters = sources.filter((path) =>
+      /\binsertMessage\(/.test(readFileSync(path, "utf8")),
+    );
+    expect(inserters.sort()).toEqual([
+      "convex/gate.ts",
+      "convex/roomMessages.ts",
+      "convex/seed.ts",
+    ]);
 
     const committers = sources.filter((path) =>
       readFileSync(path, "utf8").includes("gate.commit"),
