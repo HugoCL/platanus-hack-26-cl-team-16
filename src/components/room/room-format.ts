@@ -144,7 +144,12 @@ export function violationTone(count: number, max: number) {
 }
 
 export function primaryReason(reasons: ModerationReason[] = []) {
-  return reasons.reduce<ModerationReason | undefined>(
+  const confirmed = reasons.filter(
+    (reason) => reason.code !== "moderator_error",
+  );
+  return (confirmed.length > 0 ? confirmed : reasons).reduce<
+    ModerationReason | undefined
+  >(
     (best, reason) =>
       (reason.score ?? 0) > (best?.score ?? -1) ? reason : best,
     undefined,
