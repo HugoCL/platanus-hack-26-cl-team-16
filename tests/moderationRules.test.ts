@@ -124,6 +124,27 @@ describe("RUT", () => {
     ["rut: 123456785", true, "label"],
     ["RUN 100000040", true, "label RUN"],
     ["RUT 987654325", true, "a label beats the mobile shape"],
+    ["RUT $123456785", true, "a label beats the price shape"],
+    ["rut: $ 12345674", true, "a label beats the price shape"],
+    ["RUT: +56 223456707", true, "a label beats the phone shape"],
+    ["RUN +56223456707", true, "a label beats the phone shape"],
+    ["Mi RUT es $123456785", true, "the word RUT turns off the price shape"],
+    ["mi run: +56 123456785", true, "the word RUN turns off the phone shape"],
+    [
+      "RUT pendiente, llámame al 987654325",
+      true,
+      "the word RUT turns off the mobile shape",
+    ],
+    [
+      "Por la ruta 68, peaje $123456785",
+      false,
+      "rut inside another word is no label",
+    ],
+    [
+      "Trutro de pollo, pedidos al +56 223456707",
+      false,
+      "rut inside another word is no label",
+    ],
     ["12.345.678-9", false, "wrong check digit"],
     ["2026-11-24T09:00:00-03:00", false, "timestamp"],
     ["123456785", true, "compact, 9 characters"],
@@ -164,6 +185,11 @@ describe("RUT", () => {
     ["+56 123456785", true, "a token starting with 1 is never a phone"],
     ["+56123456785", true, "a token starting with 1 is never a phone"],
     ["+56 91234567k", true, "a token ending in k is never a phone"],
+    ["+56-123456785", true, "a dropped +56 takes its hyphen along"],
+    ["+56 -123456785", true, "a dropped +56 takes its separators along"],
+    ["+56.123456785", true, "a dropped +56 takes its dot along"],
+    ["+56-223456707", false, "landline after a hyphen"],
+    ["+56.223456707", false, "landline after a dot"],
   ])("reads %j as a RUT: %s (%s)", (value, isRut) => {
     const findings = rulesFor("hotel", "consumidor", "proveedor", text(value));
     expect(findings).toEqual(
