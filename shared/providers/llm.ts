@@ -1,4 +1,5 @@
-import { createGateway, embed, generateText, Output } from "ai";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { embed, generateText, Output } from "ai";
 import type { z } from "zod";
 import {
   EMBEDDING_DIMENSIONS,
@@ -16,7 +17,7 @@ export type LlmPrompt = {
 };
 
 export interface LlmProvider {
-  readonly name: "gateway" | "fake";
+  readonly name: "openrouter" | "fake";
   generateText(args: LlmPrompt): Promise<string>;
   generateObject<T>(args: LlmPrompt & { schema: z.ZodType<T> }): Promise<T>;
   embed(text: string): Promise<number[]>;
@@ -25,20 +26,18 @@ export interface LlmProvider {
 export function createLlmProvider(env: Env = process.env): LlmProvider {
   const kind = env.LLM_PROVIDER ?? "fake";
   if (kind === "fake") return createFakeLlmProvider();
-  if (kind === "gateway") return createGatewayLlmProvider(env);
-  throw new Error(`unknown LLM_PROVIDER "${kind}" (use fake or gateway)`);
-}
-
-export function createGatewayLlmProvider(env: Env = process.env): LlmProvider {
-  const apiKey = env.AI_GATEWAY_API_KEY;
-  if (!apiKey) {
-    throw new Error("AI_GATEWAY_API_KEY is not set");
+  if (kind !== "openrouter") {
+    throw new Error(`unknown LLM_PROVIDER "${kind}" (use fake or openrouter)`);
   }
-  const gateway = createGateway({ apiKey });
-  const model = (role: LlmRole) => gateway(modelFor(role, env));
+  const apiKey = env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENROUTER_API_KEY is not set");
+  }
+  const openrouter = createOpenRouter({ apiKey });
+  const model = (role: LlmRole) => openrouter.chat(modelFor(role, env));
 
   return {
-    name: "gateway",
+    name: "openrouter",
     async generateText({ role, system, prompt, abortSignal }) {
       const { text } = await generateText({
         model: model(role),
@@ -60,7 +59,7 @@ export function createGatewayLlmProvider(env: Env = process.env): LlmProvider {
     },
     async embed(text) {
       const { embedding } = await embed({
-        model: gateway.embeddingModel(EMBEDDING_MODEL),
+        model: openrouter.textEmbeddingModel(EMBEDDING_MODEL),
         value: text,
       });
       if (embedding.length !== EMBEDDING_DIMENSIONS) {

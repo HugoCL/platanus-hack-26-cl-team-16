@@ -19,11 +19,11 @@ Nothing on Render exists until a person does the [one-time setup](#one-time-setu
 
 - **One job, one install.** The checks themselves take seconds, so separate jobs would spend more time on installs than on checks.
 - **A newer push cancels the run it supersedes**, per branch or pull request.
-- **Changes that only touch Markdown or `.scratch/` start no run.** The vendored skills and `docs/skills.md` are the exception, because `pnpm skills:check` verifies them.
+- **Every push runs it, Markdown or not.** A path filter that skipped Markdown left a commit with no check at all, so its pull request showed a head nothing had verified. A run is under a minute and free here, and `buildFilter` in `render.yaml`, not CI, decides what spends build minutes.
 - **Cache:** the pnpm store, keyed by `pnpm-lock.yaml`.
 - **Versions come from the repository:** pnpm from `packageManager` in `package.json`, Node from `.node-version`. Render reads the same two.
 - **The mirror does not run it.** Every commit is also pushed to `platanus-hack/platanus-hack-26-cl-team-16`. The job has an `if:` on the repository name, so on the mirror it is skipped and uses no minutes.
-- **`pnpm smoke` is not in CI.** It starts `next dev`, which relies on Clerk keyless mode to create a temporary Clerk app. On a GitHub runner Clerk did not create one, and the page failed with `Missing publishableKey`. Smoke stays a check you run before opening a pull request, as `AGENTS.md` requires. To run it in CI, claim the Clerk app (step 5 below), add its two development keys as Actions secrets, and add a smoke step that reads them.
+- **`pnpm smoke` is not in CI.** It starts `next dev`, which relies on Clerk keyless mode to create a temporary Clerk app. On a GitHub runner Clerk did not create one, and the page failed with `Missing publishableKey`. Smoke stays a check you run before opening a pull request, as `AGENTS.md` requires. To run it in CI, add the Clerk app's two development keys (step 5 below) as Actions secrets, and add a smoke step that reads them.
 
 ## Production
 
@@ -34,11 +34,11 @@ Nothing on Render exists until a person does the [one-time setup](#one-time-setu
 3. Render runs `scripts/render-build.sh`, which installs dependencies and runs `convex deploy --cmd 'pnpm build'`. That one command builds the Next.js app with `NEXT_PUBLIC_CONVEX_URL` set to the production Convex deployment, then pushes the Convex functions and schema to that same deployment. If the build or the push fails, the deploy fails and the previous version keeps serving.
 4. Render starts `next start` and switches traffic once `/` answers.
 
-The `buildFilter` in `render.yaml` keeps deploys from spending build minutes on changes that cannot alter the app: Render skips a commit that only touches Markdown, `.agents/`, `.capy/`, `.github/`, `.scratch/`, `licenses/` or `tests/`. Every commit that Render does build has had a CI run, because CI skips only Markdown and `.scratch/`.
+The `buildFilter` in `render.yaml` keeps deploys from spending build minutes on changes that cannot alter the app: Render skips a commit that only touches Markdown, `.agents/`, `.capy/`, `.github/`, `.scratch/`, `licenses/` or `tests/`. Every commit that Render builds has had a CI run.
 
 The Free instance stops after 15 minutes without traffic, and the next request waits about a minute while it starts. That is the price of $0. For a demo, change `plan` in `render.yaml` to `0.5c-512mb` (see [Costs](#costs)). Do not add a service that pings the app to keep it awake: it uses up the month's free instance hours, and when they run out Render suspends every Free service in the workspace.
 
-Seed data is not loaded in production. `pnpm seed` runs `seed:ensure` against the deployment a person has selected.
+Seed data is not loaded in production. `pnpm seed` runs `seed:ensure` against the deployment a person has selected. On 2026-11-21 production showed no agent cards on `/directorio`.
 
 ## PR previews
 
@@ -49,11 +49,13 @@ A preview is a second, temporary copy of the web service at its own `onrender.co
 - **Remove it:** take the label off, or merge or close the pull request. Render deletes the preview instance.
 - **Idle cost:** none. A preview is a Free instance too, so it stops after 15 minutes without traffic.
 - **Convex deletes a preview deployment 5 days after it was created.** The Render preview then shows errors until the next push or a manual deploy from the Render Dashboard, which creates a new deployment.
-- A pull request that only changes files ignored by `buildFilter` gets no preview.
+- Render creates the preview when the label goes on, whatever the branch's last commit changed: on 2026-11-21 the label on a Markdown-only head commit still produced a preview service. `buildFilter` decides which later pushes rebuild it.
 
 Things to know:
 
 - A preview instance copies the variables of the base service when it is created, including the production deploy key. The build script therefore picks the key from `IS_PULL_REQUEST` and refuses a preview build with a production key and a production build with a preview key. Later changes to the base service's variables do not reach previews that already exist.
+- That guard works and fails fast: on 2026-11-21 the first preview build stopped 30 s after the label went on with `This is a preview build, but its Convex deploy key is not a preview key`, and the preview service was deleted within a minute of the label coming off.
+- **Saving a variable on the base service redeploys production.** Render redeploys the current `main` commit as soon as a variable changes, with trigger `service_updated`; on 2026-11-21 that put production through a 69 s deploy although no code had changed.
 - Convex functions in a preview read their variables from the project's default environment variables for preview deployments, not from Render.
 - Previews need the Hobby workspace plan only. Render's full "preview environments" need the Pro plan ($25/month) and are for projects with several Render services or Render databases, which this app does not have.
 - The repository is public. A Render employee wrote in 2021 that a pull request from a fork does not create a preview, and the current docs do not mention forks. Check it before you rely on it: a preview build runs the pull request's code with the service's secrets.
@@ -79,11 +81,11 @@ What changes the bill:
 - **Bandwidth above 5 GB.** Render bills the extra, or suspends the Free services when the workspace has no payment method.
 - **A new entry in `render.yaml`.** Render creates it on the next sync. Review changes to that file as a cost decision.
 - **Convex above the Free limits.** Nothing is billed: new writes start to fail.
-- **Real LLM or business providers.** `LLM_PROVIDER=gateway` and the other variables in `docs/development.md` spend those providers' credits. The defaults are offline and free.
+- **Real LLM or business providers.** `LLM_PROVIDER=openrouter` and the other variables in `docs/development.md` spend those providers' credits. The defaults are offline and free.
 
 ## One-time setup (human only)
 
-No agent does these steps. None of them has been done yet: the repository still uses a local anonymous Convex deployment and Clerk keyless mode, and `convex/auth.config.ts` has no provider.
+No agent does these steps. The repository records only one of them: `convex/auth.config.ts` names the team's Clerk app (step 6). Check the others in each dashboard.
 
 Clerk keyless mode works only under `next dev`. A deployed build runs `next start`, which answers every request with an error (`Missing publishableKey`) unless `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` are set. The publishable key is compiled into the build, so both must be on the Render service before the first deploy.
 
@@ -91,14 +93,16 @@ Clerk keyless mode works only under `next dev`. A deployed build runs `next star
 
 1. In a terminal, `npx convex login`, then `npx convex dev --configure=new` to create the cloud project. Stop it once it runs. This is step 1 of "Switch to real accounts" in `AGENTS.md`.
 2. In the [Convex Dashboard](https://dashboard.convex.dev), create the project's production deployment if it has none. On that deployment's Deployment Settings page, General tab, click "Generate Production Deploy Key" and enable the `deployment:deploy` permission. The key starts with `prod:`. It becomes `CONVEX_DEPLOY_KEY` on Render.
-3. On the project's Settings page, click "Generate Preview Deploy Key". The key starts with `preview:`. It becomes `CONVEX_PREVIEW_DEPLOY_KEY` on Render.
-4. Only when the app should use real providers: set the variables from `docs/development.md` (for example `LLM_PROVIDER` and `AI_GATEWAY_API_KEY`) on the production deployment (Settings, Environment Variables), and as default environment variables for preview deployments (Project Settings).
+3. On the project's Settings page (not a deployment's), section Preview Deploy Keys, click "Generate Preview Deploy Key". The key starts with `preview:team-slug:project-slug|`. It becomes `CONVEX_PREVIEW_DEPLOY_KEY` on Render. A `dev:`, `prod:` or `project:` key fails the preview build: the Dev deployment's Deployment Settings page generates the first of those.
+4. Only when the app should use real providers: set the variables from `docs/development.md` (for example `LLM_PROVIDER=openrouter` and `OPENROUTER_API_KEY`) on the production deployment (Settings, Environment Variables), and as default environment variables for preview deployments (Project Settings).
 
 ### Clerk
 
 5. Claim the app: run `pnpm dev`, open the page and follow the "Configure your application" prompt. In the [Clerk Dashboard](https://dashboard.clerk.com), API keys, copy the publishable key (`pk_test_...`) and the secret key (`sk_test_...`). These are development-instance keys. Clerk accepts them on a host's own domain such as `onrender.com`, previews included, and caps the instance at 100 users.
-6. Activate the Convex integration in Clerk and copy the Frontend API URL. In `convex/auth.config.ts`, uncomment the provider and paste the URL as a literal `domain`, in a pull request. Until this merges, the deployed app runs but Convex treats every user as signed out, as it does locally today.
+6. Activate the Convex integration in Clerk and copy the Frontend API URL. `convex/auth.config.ts` names it as a literal `domain`: `https://cheerful-cougar-1086.clerk.accounts.dev`. Change it in a pull request only when the Clerk app changes. Convex then gives a signed-in user of that app an identity, in production and in previews.
 7. A Clerk production instance (`pk_live_...`) needs a domain you own and DNS records on it, so it cannot use an `onrender.com` address. Create it only when the app has its own domain. Production and previews would then use different Clerk instances, and `auth.config.ts` would need the `CLERK_JWT_ISSUER_DOMAIN` variable per Convex deployment instead of a literal.
+
+Sign-in and sign-up do not work yet, locally or deployed. Clerk answers both with `action_blocked` ("This app uses an outdated version of Clerk") for clerk-js 5, which `@clerk/nextjs` 6 loads; the same request with clerk-js 6 is accepted. The app renders and works signed out. Signing in needs a Clerk SDK upgrade: the repository has `@clerk/nextjs` 6 and the current major is 7.
 
 ### Render
 
@@ -121,11 +125,21 @@ Clerk keyless mode works only under `next dev`. A deployed build runs `next star
 13. GitHub Actions needs no secrets. CI is offline and the deploy runs on Render. Only a future smoke step would need the Clerk development keys.
 14. Put the production URL in `deploy-url` in `platanus-hack-project.jsonc`.
 
-## Not verified until the first deploy
+## The first working preview
 
-These could not be tested without creating the service. Check them on the first deploy and correct this page.
+On 2026-11-21 the label on PR #5, head `1350ced`, produced a preview that went live 67 s after the service was created:
 
-- How long a Render build takes, and so how many deploys fit in 500 minutes. If a build takes 4 minutes, about 125.
-- Which pnpm Render's Node runtime ships. `scripts/render-build.sh` installs the version pinned in `package.json` when the two differ.
-- That the health check on `/` passes with real Clerk keys.
-- That Render waits for the `check` job when another app's check, such as GitGuardian's, finishes first.
+- It deployed to the Convex preview deployment `preview/feat-clerk-convex-auth`, `fine-caterpillar-547.convex.cloud`, and `seed:ensure` filled 12 tables.
+- From outside, `/` answered 200 and showed the 5 seeded numbers, `/directorio` listed 15 agents, and `/server` redirected to Clerk's sign-in page.
+- The two apps keep their data apart: the preview's WebSocket pointed at `fine-caterpillar-547`, production's at the production deployment `courteous-gnu-824`, which still had no agent cards.
+- Removing the label deleted the preview service within a minute and its URL answers 404. The Convex preview deployment stays until Convex expires it, 5 days after creation, or a person deletes it in the dashboard.
+
+## Measured on the first deploy
+
+The first production deploy ran on 2026-11-21 for commit `7afbeee`, triggered by the Blueprint sync.
+
+- **88 seconds end to end**, 09:14:23 to 09:15:51 UTC: clone 4 s, install 15 s, `convex deploy` and `next build` 34 s, start and the health check on `/` 32 s. A deploy spends about one build minute, so 500 minutes carry roughly 500 deploys.
+- **pnpm already matched.** The Node 24.22.3 runtime reported `pnpm --version` as 11.22.0, the version in `package.json`, so `scripts/render-build.sh` skipped its global install and installed the 164 lockfile packages in 12 s.
+- **The health check on `/` passed with real Clerk keys.** The service went live at 09:15:51. From outside, `/` answers 200, loads Clerk from the development instance, and opens a WebSocket to the production Convex deployment; `/server` redirects to Clerk's sign-in page.
+- **Render does wait for CI.** The merge commit `6e44f8a` put the `check` job in progress at 09:51:45 UTC and Render created no deploy while it ran; the job passed at 09:52:44 and the deploy appeared two seconds later, live after 68 s. The first deploy of the service came from the Blueprint sync, so only a push to `main` could show this.
+- **Not verified yet:** that a signed-in user gets an identity in Convex. Clerk refuses sign-in and sign-up from the clerk-js build this app loads, so until the SDK is upgraded (see `AGENTS.md`) there is no session to test with.

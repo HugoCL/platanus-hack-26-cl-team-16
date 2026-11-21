@@ -46,10 +46,10 @@ Everything has an offline default. You set these variables only to use real serv
 
 | Variable | Default | Use |
 | --- | --- | --- |
-| `LLM_PROVIDER` | `fake` | `gateway` uses Vercel AI Gateway. |
+| `LLM_PROVIDER` | `fake` | `openrouter` uses OpenRouter through the AI SDK. |
 | `AGENT_MODEL` | `anthropic/claude-sonnet-5.5` | The agents' model. |
 | `MODERATOR_MODEL` | `anthropic/claude-haiku-5.5` | The moderator's model. |
-| `AI_GATEWAY_API_KEY` | none | Required with `LLM_PROVIDER=gateway`. |
+| `OPENROUTER_API_KEY` | none | Required with `LLM_PROVIDER=openrouter`. |
 | `BUSINESS_SOURCES` | `fixture` | Comma list of `fixture`, `osm` and `google_places`. |
 | `BUSINESS_ENRICHER` | `none` | `firecrawl` scrapes business websites. |
 | `FIRECRAWL_API_KEY` | none | Required with `BUSINESS_ENRICHER=firecrawl`. |
@@ -57,3 +57,16 @@ Everything has an offline default. You set these variables only to use real serv
 | `OVERPASS_URL` | `overpass-api.de` | Another Overpass endpoint. |
 
 Code in Convex reads these variables from the deployment's environment. A human sets them with `npx convex env set`. Next.js reads them from `.env.local`.
+
+### Try Claude through OpenRouter locally
+
+1. Create a test key in [OpenRouter → Keys](https://openrouter.ai/keys). You don't need an Anthropic key for standard OpenRouter billing.
+2. Start `pnpm dev`. In a second terminal, confirm the Convex target is local or dev, then run:
+
+   ```sh
+   pnpm exec convex env set OPENROUTER_API_KEY
+   pnpm exec convex env set LLM_PROVIDER openrouter
+   pnpm exec convex run directory:searchText '{"query":"me duele el pecho en Providencia"}'
+   ```
+
+   Enter the key at the prompt, not on the command line. A response with `interpretation.source: "llm"` confirms the directory used the model. Run `pnpm exec convex env set LLM_PROVIDER fake` to switch back. `pnpm test` always runs offline.

@@ -15,7 +15,7 @@ Un "Google / páginas amarillas de agentes" con cuatro vertientes:
 
 Next.js 16 (App Router) + Convex + Clerk + Tailwind 4 + UI SDK, más AI SDK para los LLM. Convex calza bien con el problema: las salas de chat son queries reactivas (sin montar websockets), `scheduler` y `workpool` corren el moderador, los agentes hospedados y los jobs de scraping, y trae búsqueda full-text y vectorial.
 
-- **LLM**: detrás de la interfaz `LlmProvider` (`shared/providers/llm.ts`), con dos implementaciones elegidas por `LLM_PROVIDER`: `fake` (por defecto y en las pruebas: determinista, sin red ni key) y `gateway` (Vercel AI Gateway con `AI_GATEWAY_API_KEY`, y la key de Anthropic conectada en el gateway, BYOK). Los modelos se configuran fuera del código: `AGENT_MODEL` para los agentes y `MODERATOR_MODEL` para el moderador, con valores por defecto en `shared/models.ts`.
+- **LLM**: detrás de la interfaz `LlmProvider` (`shared/providers/llm.ts`), con dos implementaciones elegidas por `LLM_PROVIDER`: `fake` (por defecto y en las pruebas: determinista, sin red ni key) y `openrouter` (OpenRouter mediante el AI SDK, con `OPENROUTER_API_KEY`). Los modelos se configuran fuera del código: `AGENT_MODEL` para los agentes y `MODERATOR_MODEL` para el moderador, con valores por defecto en `shared/models.ts`.
 - **Deploy**: Next.js como Web Service en Render + Convex cloud. Los pasos de deploy los hace un humano: `docs/deploy.md`.
 
 ```mermaid
@@ -149,7 +149,15 @@ Los datos semilla (`shared/seedData.ts`, cargados por `convex/seed.ts` al arranc
 
 ## 5. Plan de trabajo
 
-El orden lo fijan las épicas: E0 (base, contratos y semilla) → E1 (directorio) → E2 (salas) → E3 (moderador) y E4 (UI humana y GenUI) en paralelo → E8 (agentes de referencia y escenario de punta a punta). Después vienen E5 (MCP), E7 (agentes pre-hechos) y E6 (relay: indicador y nota de diseño). Lo que este documento trae de más (redact/escalate/terminate, form, map_pin, ciphertext, Overpass, Firecrawl, comercio) queda en el código, pero nada nuevo se construye encima hasta que E8 pase.
+La fase 1 sigue este orden: E0 (base, contratos y semilla) → E1 (directorio) → E2 (salas) → E3 (moderador) y E4 (UI humana y GenUI) en paralelo → E8 (agentes de referencia y escenario de punta a punta).
+
+E5 (MCP), E7 (agentes pre-hechos) y E6 (indicador de modo y nota de diseño) pueden adelantar trabajo en paralelo sin esperar a E8:
+
+- **E5:** servidor MCP y credenciales sobre E0, búsqueda sobre E1 y herramientas de sala sobre E2 y E3. La prueba de aceptación usa el proveedor y el escenario de E8 desde un cliente MCP.
+- **E7:** fuente local, fichas y borradores sobre E1. La prueba en sala usa el proveedor genérico de E8.
+- **E6:** nota de diseño desde ya e indicador cuando exista la vista de sala (E2 y E4). No implementa cifrado ni relay.
+
+Antes de integrar cualquiera de las tres a `main`, E8 tiene que estar integrado y su prueba de punta a punta debe seguir pasando en la rama. Lo que queda fuera del alcance acordado (redact/escalate/terminate, form, map_pin, ciphertext, Overpass, Firecrawl y comercio) no se adelanta con este cambio.
 
 ## 6. Variables de entorno
 
@@ -157,10 +165,10 @@ Ninguna es necesaria para `pnpm dev`, `pnpm build` ni `pnpm smoke`: cada proveed
 
 | Variable | Uso |
 | --- | --- |
-| `LLM_PROVIDER` | `fake` (por defecto) o `gateway`. |
+| `LLM_PROVIDER` | `fake` (por defecto) o `openrouter`. |
 | `AGENT_MODEL` | Modelo de los agentes. Por defecto `anthropic/claude-sonnet-5.5`. |
 | `MODERATOR_MODEL` | Modelo del moderador (uno rápido). Por defecto `anthropic/claude-haiku-5.5`. |
-| `AI_GATEWAY_API_KEY` | Vercel AI Gateway (LLM y embeddings), solo con `LLM_PROVIDER=gateway`. La key de Anthropic se configura en el gateway, no aquí. |
+| `OPENROUTER_API_KEY` | OpenRouter (LLM y embeddings), solo con `LLM_PROVIDER=openrouter`. |
 | `BUSINESS_SOURCES` | Lista separada por comas: `fixture` (por defecto), `osm`, `google_places`. |
 | `BUSINESS_ENRICHER` | `none` (por defecto) o `firecrawl`. |
 | `FIRECRAWL_API_KEY` | Solo con `BUSINESS_ENRICHER=firecrawl`. |

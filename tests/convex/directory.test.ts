@@ -249,8 +249,8 @@ describe("directory search", () => {
   });
 
   it("returns unresolved with a fixed diagnostic when the provider cannot start", async () => {
-    vi.stubEnv("LLM_PROVIDER", "gateway");
-    vi.stubEnv("AI_GATEWAY_API_KEY", "");
+    vi.stubEnv("LLM_PROVIDER", "openrouter");
+    vi.stubEnv("OPENROUTER_API_KEY", "");
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       const result = await t.action(api.directory.searchText, {

@@ -2,18 +2,13 @@
 name: CI
 
 on:
+  # Every push is checked, Markdown included. A path filter left a Markdown-only commit with no
+  # status at all, so its pull request showed a head that had never been verified. A run is under a
+  # minute and free on a public repository; `buildFilter` in render.yaml is what keeps a docs change
+  # from spending build minutes.
   pull_request:
-    # Skip changes that only touch Markdown or tickets. The vendored skills and docs/skills.md are
-    # Markdown that `pnpm skills:check` verifies, so they stay in.
-    paths: &paths
-      - "**"
-      - "!**/*.md"
-      - "!.scratch/**"
-      - ".agents/**"
-      - "docs/skills.md"
   push:
     branches: [main]
-    paths: *paths
 
 # A newer push to the same branch or pull request cancels the run it supersedes.
 concurrency:

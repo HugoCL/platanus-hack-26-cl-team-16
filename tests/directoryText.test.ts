@@ -149,7 +149,7 @@ describe("LLM fallback", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const failures: Array<() => LlmProvider> = [
       () => {
-        throw new Error("AI_GATEWAY_API_KEY is not set");
+        throw new Error("OPENROUTER_API_KEY is not set");
       },
       () =>
         createFakeLlmProvider({
