@@ -87,7 +87,7 @@ What changes the bill:
 
 No agent does these steps. The repository records only one of them: `convex/auth.config.ts` names the team's Clerk app (step 6). Check the others in each dashboard.
 
-Clerk keyless mode works only under `next dev`. A deployed build runs `next start`, which answers every request with an error (`Missing publishableKey`) unless `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` are set. The publishable key is compiled into the build, so both must be on the Render service before the first deploy.
+Clerk keyless mode works only under `next dev`. A deployed build runs `next start`, which answers every request with an error ("Clerk keys are missing from your environment") unless `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` are set. The publishable key is compiled into the build, so both must be on the Render service before the first deploy.
 
 ### Convex
 
@@ -102,7 +102,7 @@ Clerk keyless mode works only under `next dev`. A deployed build runs `next star
 6. Activate the Convex integration in Clerk and copy the Frontend API URL. `convex/auth.config.ts` names it as a literal `domain`: `https://cheerful-cougar-1086.clerk.accounts.dev`. Change it in a pull request only when the Clerk app changes. Convex then gives a signed-in user of that app an identity, in production and in previews.
 7. A Clerk production instance (`pk_live_...`) needs a domain you own and DNS records on it, so it cannot use an `onrender.com` address. Create it only when the app has its own domain. Production and previews would then use different Clerk instances, and `auth.config.ts` would need the `CLERK_JWT_ISSUER_DOMAIN` variable per Convex deployment instead of a literal.
 
-`@clerk/nextjs` 7 loads Clerk JS 6, replacing the version that Clerk rejected with `action_blocked`. To verify the team's integration, run with the existing Clerk development instance and a Convex dev deployment. Sign in as a test user and check that the home page says “Welcome” followed by the user's name rather than “Anonymous”; the name comes from Convex's authenticated identity. Sign out and confirm that opening `/server` redirects to sign-in. Keyless mode cannot verify the team's Convex identity.
+`@clerk/nextjs` 7 loads Clerk JS 6, replacing the version that Clerk rejected with `action_blocked`. To verify the team's integration, run with the existing Clerk development instance and a Convex dev deployment. Sign up a test user with a first and last name, sign in, and check that the home page says “Welcome” followed by that name rather than “Anonymous”; the name comes from Convex's authenticated identity, and a user without a name also shows “Anonymous”. Sign out and confirm that opening `/server` redirects to sign-in. Keyless mode cannot verify the team's Convex identity.
 
 ### Render
 

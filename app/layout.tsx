@@ -18,6 +18,8 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Clerk 7's `dynamic` no longer opts out of prerendering, and prerendering `/` without
+  // NEXT_PUBLIC_CONVEX_URL fails the credential-free build.
   await connection();
 
   return (
