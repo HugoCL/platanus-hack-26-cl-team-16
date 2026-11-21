@@ -58,6 +58,8 @@ The landing sells the product, so it is the one place with a brand voice: the ph
 * **Phone-book yellow** (`--sm-yellow`) is the brand color: the glow rising behind the hero, the call to action, highlighted listings, and the footer. Text on yellow is always ink (`--landing-ink`); never yellow text on a light surface.
 * **Sections alternate** between the page background (`--landing-bg`) and a second surface (`--landing-alt`: phone-book paper in light, a lifted ink in dark), with hairline rules and listings with dot leaders. Never mix a light section into the dark theme or the other way around.
 * **The listing wall** behind the hero is decoration: a dense field of tiny listings, lit around the pointer, its columns sliding slowly up and down. It is drawn into one canvas image per column (`src/components/landing/listing-wall.tsx`), hidden from assistive tech, paused off-screen, and still under `prefers-reduced-motion`.
+* **Order:** hero, then the product demo (the moderated room replaying a booking), then how it works, then the closing call to action. The demo comes first so a visitor sees the product working before reading about it.
+* **Scroll reveal.** Content fades in from a blur and rises slightly as it enters the viewport, staggered in reading order, and hides again once it leaves, so scrolling back replays it. The hero title reveals word by word on load. Mark an element with `revealAt(i)` (`src/components/landing/reveal.tsx`); `ScrollReveal` observes them. Content is hidden only when scripts run and is shown at once under `prefers-reduced-motion`.
 * **Headlines are two-tone:** the first line in muted gray, the second in the foreground.
 
 ---

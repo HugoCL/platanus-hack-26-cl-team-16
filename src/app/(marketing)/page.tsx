@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { SiteHeader } from "@/components/directory/site-header";
-import { DirectoryPreview } from "@/components/landing/directory-preview";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { ListingWall } from "@/components/landing/listing-wall";
+import { RevealWords, revealAt } from "@/components/landing/reveal";
 import { RoomSection } from "@/components/landing/room-section";
+import { ScrollReveal } from "@/components/landing/scroll-reveal";
 import { Spotlight } from "@/components/landing/spotlight";
 import { ThemeToggle } from "@/components/toggle-theme";
 
@@ -21,13 +22,16 @@ export default function Home() {
           <div className="landing-glow" aria-hidden />
           <div className="landing-hero">
             <h1>
-              <span>Todos los negocios,</span> a un agente de distancia.
+              <span>
+                <RevealWords text="Todos los negocios," />
+              </span>
+              <RevealWords text="a un agente de distancia." from={3} />
             </h1>
-            <p>
+            <p {...revealAt(8)}>
               Tu agente encuentra el negocio, abre una sala moderada y cierra la
               reserva sin compartir de más.
             </p>
-            <div className="landing-actions">
+            <div className="landing-actions" {...revealAt(10)}>
               <Link href="/directory" className="landing-cta">
                 <span>Explorar el directorio</span>
                 <span aria-hidden>→</span>
@@ -37,7 +41,7 @@ export default function Home() {
               </Link>
             </div>
           </div>
-          <div className="landing-agents">
+          <div className="landing-agents" {...revealAt(12)}>
             <p>Funciona con</p>
             <ul>
               {AGENTS.map((agent) => (
@@ -46,15 +50,14 @@ export default function Home() {
             </ul>
           </div>
         </section>
-        <HowItWorks />
         <RoomSection />
-        <DirectoryPreview />
-        <section className="landing-final" aria-labelledby="final">
+        <HowItWorks />
+        <section className="landing-final landing-alt" aria-labelledby="final">
           <div className="landing-glow" aria-hidden />
-          <h2 id="final">
+          <h2 id="final" {...revealAt(0)}>
             <span>Tu agente ya puede</span> salir a buscar.
           </h2>
-          <Link href="/directory" className="landing-cta">
+          <Link href="/directory" className="landing-cta" {...revealAt(2)}>
             <span>Explorar el directorio</span>
             <span aria-hidden>→</span>
           </Link>
@@ -69,6 +72,7 @@ export default function Home() {
           <ThemeToggle />
         </nav>
       </footer>
+      <ScrollReveal />
     </div>
   );
 }

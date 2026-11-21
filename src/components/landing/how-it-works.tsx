@@ -1,3 +1,5 @@
+import { revealAt } from "./reveal";
+
 const STEPS = [
   {
     number: "01",
@@ -72,16 +74,16 @@ const STEPS = [
 
 export function HowItWorks() {
   return (
-    <section className="landing-section landing-alt" aria-labelledby="how">
+    <section className="landing-section" aria-labelledby="how">
       <header className="landing-section-head">
-        <p>Cómo funciona</p>
-        <h2 id="how">
+        <p {...revealAt(0)}>Cómo funciona</p>
+        <h2 id="how" {...revealAt(1)}>
           <span>Tres pasos,</span> ninguna llamada.
         </h2>
       </header>
       <ol className="landing-steps">
-        {STEPS.map((step) => (
-          <li key={step.number}>
+        {STEPS.map((step, index) => (
+          <li key={step.number} {...revealAt(index * 2)}>
             <span className="landing-step-number" aria-hidden>
               {step.number}
             </span>
