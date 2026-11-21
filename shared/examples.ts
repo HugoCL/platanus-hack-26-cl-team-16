@@ -3,7 +3,7 @@ import { AgentCard } from "./agent";
 import { Availability, Offering, Transaction } from "./catalog";
 import { REFERENCE_ATTACK } from "./fixtures/moderationSet";
 import { Phase1UiSpec, UiSpec } from "./genui";
-import { GetAgentInput } from "./mcp";
+import { GetAgentInput, SearchAgentsOutput } from "./mcp";
 import { Message, SendableContent, UiResponseContent } from "./messages";
 import { Verdict } from "./moderation";
 import { SEED_AGENTS } from "./seedData";
@@ -526,6 +526,23 @@ export const CONTRACT_EXAMPLES: Record<string, ContractExamples> = {
       {
         why: "both agentId and slug",
         value: { agentId: "a1", slug: "clinica-providencia-agenda" },
+      },
+    ],
+  },
+  searchAgentsOutput: {
+    schema: SearchAgentsOutput,
+    valid: [
+      { agents: [], truncated: false, unresolved: [] },
+      { agents: [], truncated: false, unresolved: ["comuna"] },
+    ],
+    invalid: [
+      {
+        why: "says nothing about truncation or unresolved text",
+        value: { agents: [] },
+      },
+      {
+        why: "an unresolved field the search does not have",
+        value: { agents: [], truncated: true, unresolved: ["near"] },
       },
     ],
   },
