@@ -15,6 +15,8 @@ async function getConvexToken() {
 }
 
 export default async function ServerPage() {
+  const { isAuthenticated, redirectToSignIn } = await auth();
+  if (!isAuthenticated) return redirectToSignIn();
   const token = await getConvexToken();
   const preloaded = await preloadQuery(
     api.myFunctions.listNumbers,
