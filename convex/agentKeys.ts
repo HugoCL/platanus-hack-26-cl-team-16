@@ -85,6 +85,12 @@ export const store = internalMutation({
         message: `no agent with slug ${slug}`,
       });
     }
+    if (agent.status !== "active") {
+      throw new ConvexError({
+        kind: "InvalidArgument",
+        message: `agent ${slug} is ${agent.status}, not active`,
+      });
+    }
     await ctx.db.insert("agentApiKeys", { agentId: agent._id, ...key });
     return agent._id;
   },

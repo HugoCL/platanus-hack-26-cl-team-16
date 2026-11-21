@@ -339,8 +339,8 @@ async function askLlm(
   }
 }
 
-// `known` names the fields the caller already supplied: they never count as unresolved, so they
-// never make the parser ask the LLM.
+// `known` names the fields the caller already supplied. The text is not read for them, so they stay
+// null here, never count as unresolved and never make the parser ask the LLM.
 export async function interpretDirectoryText(
   text: string,
   categories: readonly Category[],
@@ -355,8 +355,12 @@ export async function interpretDirectoryText(
     category: open.includes("category") ? (answer?.category ?? null) : null,
     comuna: open.includes("comuna") ? (answer?.comuna ?? null) : null,
   };
-  const category = parsed.category ?? fromLlm.category;
-  const comuna = parsed.comuna ?? fromLlm.comuna;
+  const category = known.includes("category")
+    ? null
+    : (parsed.category ?? fromLlm.category);
+  const comuna = known.includes("comuna")
+    ? null
+    : (parsed.comuna ?? fromLlm.comuna);
   return {
     category,
     comuna,
