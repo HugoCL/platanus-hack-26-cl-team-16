@@ -1,4 +1,5 @@
 import { ConvexError, v } from "convex/values";
+import { formatKnowledge } from "../lib/agent-knowledge";
 import type { ProviderContext } from "../lib/agents/provider";
 import { internalQuery } from "./_generated/server";
 import { freeSlots } from "./bookings";
@@ -30,6 +31,12 @@ export const context = internalQuery({
       )
       .take(OFFERING_LIMIT);
     const active = new Set(offerings.map((o) => o._id));
+    const knowledge = formatKnowledge(
+      await ctx.db
+        .query("agentSources")
+        .withIndex("by_agentId", (q) => q.eq("agentId", agentId))
+        .take(10),
+    );
     const categories = await ctx.db
       .query("categories")
       .take(CATEGORY_LIMIT + 1);
@@ -49,6 +56,7 @@ export const context = internalQuery({
         location: agent.location,
       },
       instructions: config?.systemPrompt ?? null,
+      ...(knowledge ? { knowledge } : {}),
       categories: categories.map(
         ({ slug, parent, label, attributeSchema }) => ({
           slug,

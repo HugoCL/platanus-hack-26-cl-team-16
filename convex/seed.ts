@@ -416,6 +416,7 @@ export const seeders = {
 
   // Starts empty on purpose: every seeded availability must stay bookable.
   transactions: async () => {},
+  agentSources: async () => {},
 
   prospectingJobs: async (ctx) => {
     const found = await createFixtureSource().discover(PROSPECTING_SCOPE);
