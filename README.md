@@ -1,8 +1,6 @@
-# team-16 Platanus Hack 26: Santiago ft. Buk Project
+<img src="./project-logo.png" alt="Agora" width="200" />
 
-**Current project logo:** project-logo.png
-
-<img src="./project-logo.png" alt="Project Logo" width="200" />
+# Agora
 
 Track: 🔗 Multiplayer
 
