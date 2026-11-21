@@ -432,3 +432,27 @@ describe("participants who left", () => {
     );
   });
 });
+
+describe("redacted messages", () => {
+  it("delivers the redacted text instead of the original body", async () => {
+    await rooms.t.run((ctx) =>
+      ctx.db.insert("messages", {
+        sessionId: room.sessionId,
+        senderParticipantId: room.consumer,
+        recipient: room.provider,
+        content: { kind: "text", text: "Mi RUT es 12.345.678-9" },
+        moderation: {
+          status: "redacted",
+          redactedText: "Mi RUT es [retirado]",
+          reasons: [],
+        },
+      }),
+    );
+    for (const viewer of [room.consumer, room.provider, room.human]) {
+      expect((await history(viewer)).at(-1)?.content).toEqual({
+        kind: "text",
+        text: "Mi RUT es [retirado]",
+      });
+    }
+  });
+});
