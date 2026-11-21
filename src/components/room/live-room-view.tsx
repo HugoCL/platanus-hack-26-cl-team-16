@@ -97,7 +97,7 @@ function ConnectedRoom({ sessionId }: { sessionId: Id<"sessions"> }) {
     content: SendableContent,
     recipient: "all" | Id<"participants">,
   ) {
-    if (!view || sending.current || view.session.status !== "active") return;
+    if (!view || sending.current || view.session.status !== "active") return false;
     sending.current = true;
     setError(undefined);
     setPending({
@@ -112,8 +112,10 @@ function ConnectedRoom({ sessionId }: { sessionId: Id<"sessions"> }) {
     });
     try {
       await send({ sessionId, recipient, content });
+      return true;
     } catch (error) {
       setError(sendError(error));
+      return false;
     } finally {
       sending.current = false;
       setPending(null);
@@ -132,7 +134,7 @@ function ConnectedRoom({ sessionId }: { sessionId: Id<"sessions"> }) {
         name: s.provider.name,
         intent: s.intent,
       }))}
-      onSendText={(text) => void sendContent({ kind: "text", text }, "all")}
+      onSendText={(text) => sendContent({ kind: "text", text }, "all")}
       onRespond={(response, inReplyTo) => {
         const target = history.find((m) => m.messageId === inReplyTo);
         if (!target?.senderParticipantId || target.content.kind !== "ui") {
