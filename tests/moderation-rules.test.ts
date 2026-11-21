@@ -71,11 +71,14 @@ describe("RUT", () => {
     ["123456785", "consumidor"],
     ["123456785", "humano"],
   ] as const)(
-    "passes %j only from the %s to a provider that asks for it",
+    "passes %j from the %s only on permitted consumer-to-provider routes",
     (value, from) => {
       const rut = text(value);
       expect(rulesFor("clinica", from, "proveedor", rut)).toEqual([]);
-      expect(rulesOf(rulesFor("clinica", from, "all", rut))).toEqual([
+      expect(rulesOf(rulesFor("clinica", from, "all", rut))).toEqual(
+        from === "humano" ? [] : ["sensitive_data"],
+      );
+      expect(rulesOf(rulesFor("hotel", from, "all", rut))).toEqual([
         "sensitive_data",
       ]);
       expect(rulesOf(rulesFor("hotel", from, "proveedor", rut))).toEqual([
@@ -88,6 +91,28 @@ describe("RUT", () => {
       expect(rulesOf(rulesFor("clinica", "proveedor", from, rut))).toEqual([
         "sensitive_data",
       ]);
+    },
+  );
+
+  it.each(["observer", "operator"] as const)(
+    "blocks a broadcast from a human %s",
+    (role) => {
+      const input = moderationInput({
+        id: "prueba",
+        room: "clinica",
+        description: "",
+        message: {
+          from: "humano",
+          to: "all",
+          content: text("RUT 12.345.678-5"),
+        },
+        expected: { decision: "allow" },
+      });
+      if (input.sender.kind !== "human")
+        throw new Error("expected a human sender");
+      expect(
+        rulesOf(checkRules({ ...input, sender: { ...input.sender, role } })),
+      ).toEqual(["sensitive_data"]);
     },
   );
 

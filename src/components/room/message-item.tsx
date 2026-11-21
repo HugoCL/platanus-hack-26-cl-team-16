@@ -33,6 +33,7 @@ type MessageItemProps = {
   // UI specs by the id of the message that carried them; `ui_response.inReplyTo` points there.
   uiSpecsByMessage: Record<string, UiSpec>;
   highlighted?: boolean;
+  readOnly?: boolean;
   onRespond: (response: UiResponse) => void;
   onShowAudit: (messageId: string) => void;
   onReview?: (messageId: string, approve: boolean) => void;
@@ -62,13 +63,15 @@ function Bubble({
   onRespond,
   onShowAudit,
   onReview,
+  readOnly,
 }: MessageItemProps) {
   const self = sender?.side === "self";
   const { content, status } = message;
   const isUi = content.kind === "ui";
   const visible = canSeeContent(status, message.senderParticipantId, viewer);
   const reason = primaryReason(message.reasons);
-  const canAct = viewer.role === "owner" || viewer.role === "operator";
+  const canAct =
+    !readOnly && (viewer.role === "owner" || viewer.role === "operator");
 
   const frame =
     status === "blocked"
