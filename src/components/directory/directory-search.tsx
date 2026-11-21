@@ -30,7 +30,8 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { type FormEvent, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import type { DirectoryCard, DirectorySearchResult } from "@/convex/directory";
 import type { LatLng } from "@/shared/geo";
@@ -48,6 +49,28 @@ const ALL = "all";
 const MAX_INTENT_FILTERS = 6;
 const DEFAULT_RADIUS_KM = 5;
 const PAGE_SIZE = 20;
+
+const GoogleDirectoryMap = dynamic(() => import("./google-directory-map"), {
+  ssr: false,
+  loading: () => (
+    <div className="min-h-[520px] flex-1 bg-[var(--sm-map-land)] lg:min-h-0" />
+  ),
+});
+const MapView = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+  ? GoogleDirectoryMap
+  : DirectoryMap;
+
+function useIsDesktop() {
+  const [desktop, setDesktop] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 1024px)");
+    setDesktop(query.matches);
+    const onChange = () => setDesktop(query.matches);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+  return desktop;
+}
 
 type Sort = "relevance" | "distance" | "name";
 type Geo =
@@ -142,6 +165,8 @@ export function DirectorySearch() {
   ]);
 
   const categoryLabel = categories?.find((c) => c.slug === category)?.label;
+
+  const isDesktop = useIsDesktop();
 
   function locate() {
     if (geo.state === "on" || geo.state === "locating") {
@@ -556,15 +581,17 @@ export function DirectorySearch() {
           </div>
         </main>
 
-        <DirectoryMap
-          cards={cards}
-          categories={categories ?? []}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-          origin={origin}
-          radiusKm={origin ? radiusKm : null}
-          className={`${view === "map" ? "block" : "hidden"} flex-1 lg:block`}
-        />
+        {view === "map" || isDesktop ? (
+          <MapView
+            cards={cards}
+            categories={categories ?? []}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            origin={origin}
+            radiusKm={origin ? radiusKm : null}
+            className="flex-1"
+          />
+        ) : null}
       </div>
 
       <Button
