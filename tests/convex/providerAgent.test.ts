@@ -84,6 +84,106 @@ const availability = (id: string) =>
   t.run((ctx) => ctx.db.get("availability", id as Id<"availability">));
 
 describe("generic provider agent", () => {
+  it.each([
+    { offerings: [] },
+    { offerings: ["o1"] },
+    { offerings: ["unknown"] },
+  ])(
+    "does not substitute cardiology for unavailable medicina general (model picks $offerings)",
+    async ({ offerings }) => {
+      const room = await openRoom();
+      room.contract.intent.description =
+        "Quiero una hora con medicina general esta semana";
+      const ask = await room.post(
+        room.owner,
+        "all",
+        text("Hola, ¿qué horas tienen disponibles?"),
+      );
+
+      const replies = await providerAnswers(
+        room,
+        ask,
+        decide({ action: "offer_slots", offerings }),
+      );
+
+      expect(replies.map((m) => m.content)).toEqual([
+        { kind: "text", text: "No me quedan horarios libres para eso." },
+      ]);
+    },
+  );
+
+  it("offers only medicina general when matching appointments exist", async () => {
+    const room = await openRoom();
+    room.contract.intent.description =
+      "Quiero una hora con medicina general esta semana";
+    await t.run(async (ctx) => {
+      const offerings = await ctx.db
+        .query("offerings")
+        .withIndex("by_agentId_and_active", (q) =>
+          q.eq("agentId", room.providerId).eq("active", true),
+        )
+        .collect();
+      await ctx.db.patch("offerings", offerings[1]._id, {
+        category: "medicina_general",
+        name: "Consulta medicina general · Dr. Felipe Rojas",
+        attributes: { practitioner: "Dr. Felipe Rojas" },
+      });
+    });
+    const ask = await room.post(
+      room.owner,
+      "all",
+      text("Hola, ¿qué horas tienen disponibles?"),
+    );
+
+    const [picker] = await providerAnswers(room, ask, offerAny);
+
+    expect(pickerOf(picker).slots.map((slot) => slot.detail)).toEqual([
+      "Consulta medicina general · Dr. Felipe Rojas",
+      "Consulta medicina general · Dr. Felipe Rojas",
+    ]);
+    const [confirmation] = await providerAnswers(
+      room,
+      await choose(room, picker, pickerOf(picker).slots[0].id),
+    );
+    expect(confirmation.content).toMatchObject({
+      kind: "ui",
+      spec: {
+        type: "confirmation",
+        summary: expect.stringContaining("Consulta medicina general"),
+      },
+    });
+  });
+
+  it.each(["cardiología", "cardiólogo", "salud"])(
+    "keeps matching appointments for %s, including category descendants",
+    async (service) => {
+      const room = await openRoom();
+      room.contract.intent.description = `Quiero una hora de ${service}`;
+      const picker = await askForSlots(room);
+      expect(pickerOf(picker).slots).toHaveLength(SLOT_OPTIONS);
+    },
+  );
+
+  it("fails closed when the category catalog exceeds its matching budget", async () => {
+    const room = await openRoom();
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 201; i++) {
+        await ctx.db.insert("categories", {
+          slug: `extra-${i}`,
+          label: `Extra ${i}`,
+          parent: null,
+          attributeSchema: [],
+        });
+      }
+    });
+    await expect(
+      t.query(internal.providerAgent.context, {
+        agentId: room.providerId,
+        now: NOW,
+      }),
+    ).rejects.toThrow("too many categories to match the requested service");
+  });
+
   it("offers the human two free slots in a slot picker", async () => {
     const room = await openRoom();
 
