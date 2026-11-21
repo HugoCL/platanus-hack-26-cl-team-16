@@ -1,6 +1,7 @@
 // @vitest-environment edge-runtime
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import { sha256Hex } from "../../convex/agentKeys";
 import { REQUEST, seededRooms } from "./roomFixture";
 
@@ -18,6 +19,174 @@ const owner = () => rooms.t.withIdentity({ subject: "owner" });
 const other = () => rooms.t.withIdentity({ subject: "other" });
 
 describe("agent self-onboarding", () => {
+  it.each([false, true])(
+    "linking backfills old open and closed rooms and preserves future access (publish=%s)",
+    async (publish) => {
+      const agent = await register();
+      const caller = rooms.t.withIdentity({ subject: "owner", name: "Ana" });
+      const open = () =>
+        rooms.t.action(api.mcpRooms.open, {
+          apiKey: agent.apiKey,
+          targetAgentId: rooms.clinicId,
+          intent: "book",
+          request: REQUEST,
+        });
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        const first = await open();
+        vi.advanceTimersByTime(1000);
+        const second = await open();
+        await rooms.t.action(api.mcpRooms.close, {
+          apiKey: agent.apiKey,
+          sessionId: second.sessionId,
+        });
+        await expect(
+          caller.query(api.rooms.view, {
+            sessionId: first.sessionId as Id<"sessions">,
+          }),
+        ).rejects.toThrow(/not a participant/);
+        await caller.mutation(api.agentRegistration.link, {
+          code: agent.linkCode,
+          ...(publish
+            ? { publish: { purpose: "Ayudar", category: "asistente_personal" } }
+            : {}),
+        });
+        for (const room of [first, second]) {
+          const sessionId = room.sessionId as Id<"sessions">;
+          await expect(
+            caller.query(api.rooms.view, { sessionId }),
+          ).resolves.toMatchObject({
+            session: {
+              status: room === first ? "active" : "closed",
+              participants: expect.arrayContaining([
+                expect.objectContaining({
+                  kind: "human",
+                  role: "owner",
+                  displayName: "Ana",
+                  onBehalfOfAgentId: agent.agentId,
+                }),
+              ]),
+            },
+          });
+          expect(
+            await rooms.t.run((ctx) =>
+              ctx.db
+                .query("participants")
+                .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+                .collect(),
+            ),
+          ).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({
+                tokenIdentifier: (
+                  await caller.run((ctx) => ctx.auth.getUserIdentity())
+                )?.tokenIdentifier,
+              }),
+            ]),
+          );
+        }
+        const page = await caller.query(api.agentRegistration.rooms, {
+          agentId: agent.agentId,
+          paginationOpts: { numItems: 1, cursor: null },
+        });
+        expect(page.page).toMatchObject([
+          { sessionId: second.sessionId, status: "closed" },
+        ]);
+        expect(page.isDone).toBe(false);
+        expect(
+          (
+            await caller.query(api.agentRegistration.rooms, {
+              agentId: agent.agentId,
+              paginationOpts: { numItems: 1, cursor: page.continueCursor },
+            })
+          ).page,
+        ).toMatchObject([{ sessionId: first.sessionId, status: "active" }]);
+        for (const client of [rooms.t, other()])
+          await expect(
+            client.query(api.agentRegistration.rooms, {
+              agentId: agent.agentId,
+              paginationOpts: { numItems: 20, cursor: null },
+            }),
+          ).rejects.toThrow(/only the owner/);
+        vi.advanceTimersByTime(1000);
+        const future = await open();
+        await expect(
+          caller.query(api.rooms.view, {
+            sessionId: future.sessionId as Id<"sessions">,
+          }),
+        ).resolves.toMatchObject({
+          session: {
+            participants: expect.arrayContaining([
+              expect.objectContaining({
+                kind: "human",
+                role: "owner",
+                onBehalfOfAgentId: agent.agentId,
+              }),
+            ]),
+          },
+        });
+        expect(
+          (
+            await caller.query(api.agentRegistration.rooms, {
+              agentId: agent.agentId,
+              paginationOpts: { numItems: 20, cursor: null },
+            })
+          ).page.map((room) => room.sessionId),
+        ).toEqual([future.sessionId, second.sessionId, first.sessionId]);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it("lists no rooms for a newly linked agent and never replaces an existing room owner", async () => {
+    const agent = await register();
+    const first = await rooms.t.action(api.mcpRooms.open, {
+      apiKey: agent.apiKey,
+      targetAgentId: rooms.clinicId,
+      intent: "book",
+      request: REQUEST,
+    });
+    const sessionId = first.sessionId as Id<"sessions">;
+    await rooms.t.run((ctx) =>
+      ctx.db.insert("participants", {
+        sessionId,
+        kind: "human",
+        role: "owner",
+        tokenIdentifier: "existing-owner",
+        displayName: "Titular original",
+        onBehalfOfAgentId: agent.agentId,
+      }),
+    );
+    await owner().mutation(api.agentRegistration.link, {
+      code: agent.linkCode,
+    });
+    const humans = await rooms.t.run(async (ctx) =>
+      (
+        await ctx.db
+          .query("participants")
+          .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+          .collect()
+      ).filter((p) => p.kind === "human"),
+    );
+    expect(humans).toHaveLength(1);
+    expect(humans[0]).toMatchObject({
+      tokenIdentifier: "existing-owner",
+      displayName: "Titular original",
+    });
+    const empty = await register();
+    await owner().mutation(api.agentRegistration.link, {
+      code: empty.linkCode,
+    });
+    expect(
+      (
+        await owner().query(api.agentRegistration.rooms, {
+          agentId: empty.agentId,
+          paginationOpts: { numItems: 20, cursor: null },
+        })
+      ).page,
+    ).toEqual([]);
+  });
   it("registers an agent with its own declared purpose and category", async () => {
     const { t } = rooms;
     const agent = await t.action(api.agentRegistration.register, {

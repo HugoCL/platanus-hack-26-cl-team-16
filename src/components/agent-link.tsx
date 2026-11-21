@@ -12,7 +12,12 @@ import {
   SelectValue,
 } from "@ui-sdk/react/select";
 import { Textarea } from "@ui-sdk/react/textarea";
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import {
+  useConvexAuth,
+  useMutation,
+  usePaginatedQuery,
+  useQuery,
+} from "convex/react";
 import Link from "next/link";
 import { useState } from "react";
 import { api } from "@/convex/_generated/api";
@@ -143,12 +148,57 @@ export function AgentLink({ code }: { code: string }) {
               category={info.category}
             />
           )}
+          <AgentRooms agentId={info.agentId} />
         </div>
       )}
       {error && (
         <p role="alert" className="mt-4 text-destructive">
           {error}
         </p>
+      )}
+    </section>
+  );
+}
+
+function AgentRooms({ agentId }: { agentId: Id<"agents"> }) {
+  const { results, status, loadMore } = usePaginatedQuery(
+    api.agentRegistration.rooms,
+    { agentId },
+    { initialNumItems: 20 },
+  );
+  return (
+    <section className="space-y-4" aria-label="Salas del agente">
+      <h3 className="text-lg font-semibold">Salas de tu agente</h3>
+      {status === "LoadingFirstPage" ? (
+        <p role="status">Cargando salas…</p>
+      ) : results.length === 0 ? (
+        <p>Tu agente todavía no ha abierto salas.</p>
+      ) : (
+        <ul className="space-y-3">
+          {results.map((room) => (
+            <li
+              key={room.sessionId}
+              className="flex flex-wrap items-center gap-3"
+            >
+              <Button render={<Link href={`/room/${room.sessionId}`} />}>
+                {room.description}
+              </Button>
+              <span className="text-sm text-subtle-foreground">
+                {room.status === "active" || room.status === "requested"
+                  ? "Abierta"
+                  : "Cerrada"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {(status === "CanLoadMore" || status === "LoadingMore") && (
+        <Button
+          disabled={status === "LoadingMore"}
+          onClick={() => loadMore(20)}
+        >
+          {status === "LoadingMore" ? "Cargando…" : "Ver más salas"}
+        </Button>
       )}
     </section>
   );

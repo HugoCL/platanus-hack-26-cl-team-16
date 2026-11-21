@@ -182,6 +182,7 @@ export default defineSchema({
     closedReason: v.optional(v.string()),
   })
     .index("by_initiatorAgentId_and_status", ["initiatorAgentId", "status"])
+    .index("by_initiatorAgentId", ["initiatorAgentId"])
     .index("by_status", ["status"]),
 
   participants: defineTable(

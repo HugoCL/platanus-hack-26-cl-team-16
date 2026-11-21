@@ -1,7 +1,13 @@
 import { HOUR, RateLimiter } from "@convex-dev/rate-limiter";
+import {
+  paginationOptsValidator,
+  paginationResultValidator,
+} from "convex/server";
 import { ConvexError, v } from "convex/values";
+import { zodToConvex } from "convex-helpers/server/zod4";
 import { AgentCard } from "../shared/agent";
 import { EXTERNAL_AGENT_SLUG, SEED_AGENTS } from "../shared/seed-data";
+import { SessionStatus } from "../shared/session";
 import { components, internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
@@ -256,12 +262,50 @@ export const link = mutation({
       ownerTokenIdentifier: identity.tokenIdentifier,
     });
     await ctx.db.patch(row._id, { usedAt: Date.now() });
+    const displayName = (
+      identity.name?.trim() ||
+      identity.givenName?.trim() ||
+      "Tú"
+    ).slice(0, 120);
+    for await (const session of ctx.db
+      .query("sessions")
+      .withIndex("by_initiatorAgentId_and_status", (q) =>
+        q.eq("initiatorAgentId", agent._id),
+      )) {
+      const participants = await ctx.db
+        .query("participants")
+        .withIndex("by_sessionId", (q) => q.eq("sessionId", session._id))
+        .take(10);
+      if (participants.some((p) => p.kind === "human" && p.role === "owner"))
+        continue;
+      const human = participants.find(
+        (p) =>
+          p.kind === "human" && p.tokenIdentifier === identity.tokenIdentifier,
+      );
+      const ownership = {
+        role: "owner" as const,
+        onBehalfOfAgentId: agent._id,
+        displayName,
+      };
+      if (human)
+        await ctx.db.patch(human._id, { ...ownership, leftAt: undefined });
+      else
+        await ctx.db.insert("participants", {
+          sessionId: session._id,
+          kind: "human",
+          tokenIdentifier: identity.tokenIdentifier,
+          ...ownership,
+        });
+    }
     if (publish) await publishCard(ctx, { agentId: agent._id, ...publish });
     return null;
   },
 });
 
-async function owned(ctx: MutationCtx, agentId: Id<"agents">) {
+async function owned(
+  ctx: Pick<QueryCtx, "auth" | "db">,
+  agentId: Id<"agents">,
+) {
   const identity = await ctx.auth.getUserIdentity();
   const agent = await ctx.db.get(agentId);
   if (
@@ -277,6 +321,37 @@ async function owned(ctx: MutationCtx, agentId: Id<"agents">) {
     );
   return agent;
 }
+
+export const rooms = query({
+  args: { agentId: v.id("agents"), paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(
+    v.object({
+      sessionId: v.id("sessions"),
+      description: v.string(),
+      status: zodToConvex(SessionStatus),
+      createdAt: v.number(),
+    }),
+  ),
+  handler: async (ctx, { agentId, paginationOpts }) => {
+    await owned(ctx, agentId);
+    const result = await ctx.db
+      .query("sessions")
+      .withIndex("by_initiatorAgentId", (q) =>
+        q.eq("initiatorAgentId", agentId),
+      )
+      .order("desc")
+      .paginate(paginationOpts);
+    return {
+      ...result,
+      page: result.page.map((session) => ({
+        sessionId: session._id,
+        description: session.intent.description,
+        status: session.status,
+        createdAt: session._creationTime,
+      })),
+    };
+  },
+});
 
 async function publishCard(
   ctx: MutationCtx,

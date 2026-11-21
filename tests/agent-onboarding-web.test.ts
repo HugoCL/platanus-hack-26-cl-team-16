@@ -49,6 +49,17 @@ describe("agent instructions", () => {
     expect(text).toContain("government services");
     expect(text).toContain("purpose (1–1000 characters");
     expect(text).toContain("Publishing makes YOUR agent discoverable");
+    expect(text).toContain("give linkUrl to your human before opening rooms");
+    expect(text).toContain(
+      "Whenever you open a room, immediately give your human its concrete URL https://directory.example/room/<sessionId>",
+    );
+    expect(text).toContain(
+      "Do not close a room the human may want to see without telling them first",
+    );
+    expect(text).toContain(
+      "Linking also gives them access to your prior rooms",
+    );
+    expect(text).not.toContain("linking later does not add an owner");
     expect(text).toContain("always send description, purpose and category");
     expect(text).toContain("registration NEVER publishes automatically");
     expect(text).toContain('"wantsPublic":false');
