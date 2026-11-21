@@ -3,6 +3,7 @@ import rateLimiter from "@convex-dev/rate-limiter/test";
 import type { FunctionArgs } from "convex/server";
 import { convexTest } from "convex-test";
 import { api, internal } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import schema from "../../convex/schema";
 import { CLINIC_AGENT_SLUG, CONSUMER_AGENT_SLUG } from "../../shared/seedData";
 
@@ -35,6 +36,22 @@ export async function seededRooms() {
       ...overrides,
     });
   return { t, consumerId, clinicId, open };
+}
+
+export async function roomWithHuman(
+  rooms: Awaited<ReturnType<typeof seededRooms>>,
+) {
+  const room = await rooms.open({ human: { displayName: "Juan" } });
+  const id = (role: string) =>
+    room.participants.find((p) => p.role === role)
+      ?.participantId as Id<"participants">;
+  return {
+    room,
+    sessionId: room.sessionId as Id<"sessions">,
+    consumer: id("initiator"),
+    provider: id("recipient"),
+    human: id("owner"),
+  };
 }
 
 export async function errorKind(promise: Promise<unknown>) {

@@ -2,16 +2,15 @@ import { ConvexError, v } from "convex/values";
 import { effectiveAllowedIntents } from "../shared/agent";
 import {
   DEFAULT_MAX_TURNS,
-  type Participant,
   type Session,
   SessionContract,
 } from "../shared/session";
-import type { Doc, Id } from "./_generated/dataModel";
-import { mutation, type QueryCtx, query } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { listedCard } from "./directory";
+import { publishNotice } from "./gate";
+import { loadSession } from "./roomState";
 
 const MAX_VIOLATIONS = 3;
-const MAX_PARTICIPANTS = 10;
 
 function invalidArgument(message: string): never {
   throw new ConvexError({ kind: "InvalidArgument", message });
@@ -106,6 +105,15 @@ export const open = mutation({
         onBehalfOfAgentId: args.initiatorAgentId,
       });
     }
+    await publishNotice(
+      ctx,
+      sessionId,
+      "session_opened",
+      `Sala abierta con ${card.name}. Petición: ${contract.intent.description}`.slice(
+        0,
+        4000,
+      ),
+    );
     const session = await loadSession(ctx, sessionId);
     if (!session) throw new Error("room vanished right after it was opened");
     return session;
@@ -117,42 +125,3 @@ export const get = query({
   handler: (ctx, { sessionId }): Promise<Session | null> =>
     loadSession(ctx, sessionId),
 });
-
-export async function loadSession(
-  ctx: QueryCtx,
-  sessionId: Id<"sessions">,
-): Promise<Session | null> {
-  const session = await ctx.db.get(sessionId);
-  if (!session) return null;
-  const participants = await ctx.db
-    .query("participants")
-    .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
-    .take(MAX_PARTICIPANTS);
-  return {
-    sessionId: session._id,
-    status: session.status,
-    mode: session.mode,
-    intent: session.intent,
-    contract: session.contract,
-    participants: participants.map(toParticipant),
-    turnCount: session.turnCount,
-  };
-}
-
-function toParticipant(p: Doc<"participants">): Participant {
-  if (p.kind === "agent") {
-    return {
-      participantId: p._id,
-      kind: "agent",
-      agentId: p.agentId,
-      role: p.role,
-    };
-  }
-  return {
-    participantId: p._id,
-    kind: "human",
-    displayName: p.displayName,
-    role: p.role,
-    onBehalfOfAgentId: p.onBehalfOfAgentId,
-  };
-}
