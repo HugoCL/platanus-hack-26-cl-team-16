@@ -3,12 +3,13 @@ import {
   MINUTE,
   RateLimiter,
 } from "@convex-dev/rate-limiter";
+import { type ObjectType, v } from "convex/values";
 import { modelFor } from "../shared/models";
 import type { ModerationInput, ModerationOutcome } from "../shared/moderation";
 import { createModerator } from "../shared/moderator/moderator";
 import { createLlmProvider } from "../shared/providers/llm";
-import { components } from "./_generated/api";
-import type { ActionCtx } from "./_generated/server";
+import { components, internal } from "./_generated/api";
+import { type ActionCtx, internalMutation } from "./_generated/server";
 
 const MODERATOR_FAILED: ModerationOutcome = {
   verdict: {
@@ -31,7 +32,7 @@ const MODERATOR_FAILED: ModerationOutcome = {
   ],
 };
 
-const rateLimiter = new RateLimiter(components.rateLimiter, {
+export const judgeRateLimiter = new RateLimiter(components.rateLimiter, {
   roomJudgeSender: {
     kind: "token bucket",
     rate: 10,
@@ -46,29 +47,35 @@ const rateLimiter = new RateLimiter(components.rateLimiter, {
   },
 });
 
-export type JudgeBuckets = { sender: string; room: string };
+const judgeBuckets = { sender: v.string(), room: v.string() };
+export type JudgeBuckets = ObjectType<typeof judgeBuckets>;
+
+export const takeJudgeTokens = internalMutation({
+  args: judgeBuckets,
+  handler: async (ctx, { sender, room }) => {
+    await judgeRateLimiter.limit(ctx, "roomJudgeSender", {
+      key: sender,
+      throws: true,
+    });
+    await judgeRateLimiter.limit(ctx, "roomJudgeRoom", {
+      key: room,
+      throws: true,
+    });
+  },
+});
 
 export async function moderate(
   ctx: ActionCtx,
   input: ModerationInput,
   buckets: JudgeBuckets,
 ): Promise<ModerationOutcome> {
-  const limits = [
-    ["roomJudgeSender", buckets.sender],
-    ["roomJudgeRoom", buckets.room],
-  ] as const;
   try {
     const llm = createLlmProvider();
     return await createModerator({
       llm,
       model: llm.name === "fake" ? "fake" : modelFor("moderator"),
       beforeJudge: async () => {
-        for (const [name, key] of limits) {
-          await rateLimiter.check(ctx, name, { key, throws: true });
-        }
-        for (const [name, key] of limits) {
-          await rateLimiter.limit(ctx, name, { key, throws: true });
-        }
+        await ctx.runMutation(internal.moderator.takeJudgeTokens, buckets);
       },
     }).moderate(input);
   } catch (error) {

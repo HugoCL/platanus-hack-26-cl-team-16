@@ -70,7 +70,7 @@ export async function openRoom(
     },
     {
       sender: `agent:${args.initiatorAgentId}`,
-      room: `open:${args.providerAgentId}`,
+      room: `open:${args.initiatorAgentId}:${args.providerAgentId}`,
     },
   );
   if (verdict.decision === "block") {

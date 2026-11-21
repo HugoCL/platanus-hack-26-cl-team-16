@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
+import { judgeRateLimiter } from "../../convex/moderator";
 import { errorKind, roomWithHuman, seededRooms } from "./roomFixture";
 
 let rooms: Awaited<ReturnType<typeof seededRooms>>;
@@ -37,31 +38,36 @@ const storedMessages = () =>
 
 describe("the judge's rate limit", () => {
   it("rejects a sender whose bucket is empty without calling the judge or storing anything", async () => {
-    for (let i = 0; i < 10; i++) await send(room.consumer);
+    for (let i = 0; i < 10; i++) await send(room.provider);
     const stored = await storedMessages();
     rooms.judge.mockClear();
 
-    expect(await errorKind(send(room.consumer))).toBe("RateLimited");
+    expect(await errorKind(send(room.provider))).toBe("RateLimited");
     expect(rooms.judge).not.toHaveBeenCalled();
     expect(await storedMessages()).toBe(stored);
-    expect(await send(room.provider)).toMatchObject({ status: "allowed" });
+    expect(await send(room.human)).toMatchObject({ status: "allowed" });
   });
 
   it("rejects every sender once the room's bucket is empty", async () => {
-    for (let i = 0; i < 10; i++) {
-      await send(room.consumer);
-      await send(room.provider);
-    }
+    const other = await roomWithHuman(rooms, 40);
+    for (let i = 0; i < 10; i++) await send(room.provider);
+    for (let i = 0; i < 8; i++) await send(room.consumer);
+    for (let i = 0; i < 2; i++) await send(room.human);
     const stored = await storedMessages();
     rooms.judge.mockClear();
 
     expect(await errorKind(send(room.human))).toBe("RateLimited");
     expect(rooms.judge).not.toHaveBeenCalled();
     expect(await storedMessages()).toBe(stored);
-    const other = await roomWithHuman(rooms, 40);
     expect(await send(other.human, undefined, other)).toMatchObject({
       status: "allowed",
     });
+  });
+
+  it("shares an agent's bucket between opening rooms and sending in them", async () => {
+    for (let i = 0; i < 9; i++) await send(room.consumer);
+    expect(await errorKind(send(room.consumer))).toBe("RateLimited");
+    expect(await errorKind(rooms.open())).toBe("RateLimited");
   });
 
   it("rate limits opening rooms per initiator before the judge runs", async () => {
@@ -79,7 +85,83 @@ describe("the judge's rate limit", () => {
   });
 });
 
+describe("the judge's rate limit under concurrency", () => {
+  it("does not spend a sender's token when the room bucket rejects the send", async () => {
+    for (let i = 0; i < 10; i++) await send(room.provider);
+    for (let i = 0; i < 9; i++) await send(room.consumer);
+    const results = await Promise.allSettled([
+      send(room.human),
+      send(room.human),
+      send(room.human),
+    ]);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const tokens = await rooms.t.run((ctx) =>
+      judgeRateLimiter.getValue(ctx, "roomJudgeSender", {
+        key: `participant:${room.human}`,
+      }),
+    );
+    expect(Math.floor(tokens.value)).toBe(9);
+  });
+});
+
 describe("maxViolations", () => {
+  it("does not count a moderator failure as a violation", async () => {
+    rooms.judge.mockImplementation(() => {
+      throw new Error("openrouter 503");
+    });
+    for (let i = 0; i < 3; i++) {
+      expect(await send(room.human)).toMatchObject({ status: "blocked" });
+    }
+    expect(
+      await rooms.t.run((ctx) => ctx.db.get(room.sessionId)),
+    ).toMatchObject({ status: "active", violationCount: 0 });
+  });
+
+  it("rejects a reply to a UI block broadcast to the room instead of counting a violation", async () => {
+    const picker = await rooms.t.action(internal.gate.sendAsParticipant, {
+      sessionId: room.sessionId,
+      senderParticipantId: room.provider,
+      recipient: "all",
+      content: {
+        kind: "ui",
+        spec: {
+          type: "slot_picker",
+          id: "horarios",
+          title: "Elige un horario",
+          timezone: "America/Santiago",
+          slots: [
+            {
+              id: "lunes-0900",
+              start: "2026-11-24T09:00:00-03:00",
+              end: "2026-11-24T09:30:00-03:00",
+            },
+          ],
+        },
+      },
+    });
+    const reply = () =>
+      rooms.t.action(internal.gate.sendAsParticipant, {
+        sessionId: room.sessionId,
+        senderParticipantId: room.human,
+        recipient: room.provider,
+        content: {
+          kind: "ui_response",
+          inReplyTo: picker.messageId,
+          response: {
+            type: "slot_selected",
+            pickerId: "horarios",
+            slotId: "lunes-0900",
+          },
+        },
+      });
+    for (let i = 0; i < 3; i++) {
+      expect(await errorKind(reply())).toBe("InvalidArgument");
+    }
+    expect(
+      await rooms.t.run((ctx) => ctx.db.get(room.sessionId)),
+    ).toMatchObject({ status: "active", violationCount: 0 });
+  });
+
   it("terminates the room when blocked messages reach the contract's limit", async () => {
     const { maxViolations } = room.room.contract ?? { maxViolations: 0 };
     expect(maxViolations).toBe(3);

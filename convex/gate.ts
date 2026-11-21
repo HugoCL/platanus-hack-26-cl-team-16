@@ -1,3 +1,4 @@
+import { isRateLimitError } from "@convex-dev/rate-limiter";
 import { type PaginationOptions, paginationOptsValidator } from "convex/server";
 import { ConvexError, v } from "convex/values";
 import { zodToConvex } from "convex-helpers/server/zod4";
@@ -108,7 +109,10 @@ export async function sendThroughGate(
       history: room.history,
     },
     {
-      sender: `participant:${args.senderParticipantId}`,
+      sender:
+        room.sender.kind === "agent"
+          ? `agent:${room.sender.agentId}`
+          : `participant:${args.senderParticipantId}`,
       room: `session:${args.sessionId}`,
     },
   );
@@ -222,7 +226,12 @@ export const commit = internalMutation({
         },
       );
     }
-    if (verdict.decision === "block") {
+    if (
+      verdict.decision === "block" &&
+      !args.events.some((event) =>
+        event.reasons.some((reason) => reason.code === "moderator_error"),
+      )
+    ) {
       const stored = await ctx.db.get("sessions", args.sessionId);
       const violationCount = (stored?.violationCount ?? 0) + 1;
       const terminated = violationCount >= session.contract.maxViolations;
@@ -345,6 +354,16 @@ export const reply = internalAction({
           content,
         });
       } catch (error) {
+        if (isRateLimitError(error)) {
+          await ctx.scheduler.runAfter(
+            error.data.retryAfter,
+            internal.gate.reply,
+            {
+              messageId,
+            },
+          );
+          return null;
+        }
         if (
           !(error instanceof ConvexError) ||
           (error.data?.kind !== "RoomClosed" &&
@@ -555,9 +574,8 @@ async function replyTarget(
     !target ||
     target.sessionId !== sessionId ||
     target.content.kind !== "ui" ||
-    (target.moderation.status !== "allowed" &&
-      target.moderation.status !== "redacted") ||
-    (target.recipient !== "all" && target.recipient !== sender.participantId)
+    target.moderation.status !== "allowed" ||
+    target.recipient !== sender.participantId
   ) {
     gateError(
       "InvalidArgument",
