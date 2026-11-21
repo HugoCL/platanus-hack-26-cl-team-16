@@ -63,6 +63,10 @@
   }
 }
 
+.landing > header {
+  padding-inline: var(--landing-pad);
+}
+
 .landing-main {
   position: relative;
   isolation: isolate;

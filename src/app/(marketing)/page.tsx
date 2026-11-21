@@ -14,7 +14,7 @@ const AGENTS = ["Claude", "ChatGPT", "Grok", "Gemini"];
 export default function Home() {
   return (
     <div className="landing">
-      <SiteHeader />
+      <SiteHeader nav={false} themeToggle={false} />
       <main>
         <section className="landing-main">
           <Spotlight>
