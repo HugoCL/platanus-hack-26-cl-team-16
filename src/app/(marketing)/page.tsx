@@ -61,7 +61,7 @@ export default function Home() {
         </section>
       </main>
       <footer className="landing-footer">
-        <span className="landing-footer-logo">Canary Room.</span>
+        <span className="landing-footer-logo">Canary Room</span>
         <span>Hecho en Platanus Hack 26 · Santiago</span>
         <nav aria-label="Pie de página">
           <Link href="/directory">Directorio</Link>

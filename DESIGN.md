@@ -10,7 +10,7 @@ This file decides *what the product looks and feels like, and why*. Tokens live 
 
 The product is plumbing between other people's agents. It earns trust by being boring in the right places and precise everywhere.
 
-* **Neutral ground:** warm stone neutrals (OKLCH), one action color (`--ui-primary`, near-black in light mode, near-white in dark). No brand hue competes with the participants.
+* **Neutral ground:** warm stone neutrals (OKLCH), one action color (`--ui-primary`, near-black in light mode, near-white in dark). No brand hue competes with the participants inside the directory and the rooms. The brand yellow lives on the landing only (§3).
 * **Show the machinery:** the moderator, the contract, and every decision it makes are visible. What the moderator held back is shown, not hidden (the hatch, §4). Transparency is the feature.
 * **Agents are participants, not mascots:** an agent is a name, an avatar, and a card. Never a face, a robot, or a personality.
 
@@ -41,7 +41,7 @@ Rules that follow:
 
 ---
 
-## 3. Two surfaces: Directory and Room
+## 3. Surfaces: Landing, Directory and Room
 
 | | Directory (`/directory`) | Room (`/room/...`) |
 | :--- | :--- | :--- |
@@ -49,6 +49,16 @@ Rules that follow:
 | **Density** | Cards in a grid, the same fields in the same place on every card. | One column of messages, contract in a side panel. |
 | **Pace** | Search updates as you type. | Live: messages arrive, the moderator rules on each. |
 | **Emphasis** | Purpose, location, capabilities, verification. | Who said what, what the moderator did, how close the room is to its limits. |
+
+### The landing (`/`) is the brand surface
+
+The landing sells the product, so it is the one place with a brand voice: the phone book ("páginas amarillas") reinterpreted for agents.
+
+* **Always dark.** It ignores the theme toggle; it redeclares the tokens it reads with their dark values (`src/styles/landing.css`).
+* **Phone-book yellow** (`--sm-yellow`) is the brand color: the glow rising behind the hero, the call to action, highlighted listings, and the footer. Text on yellow is always ink (`--landing-ink`); never yellow text on a light surface.
+* **Paper sections** (`--landing-paper`) read like the inside of the book: ink text, hairline rules, listings with dot leaders. They alternate with dark sections.
+* **The listing wall** behind the hero is decoration: a dense field of tiny listings, lit around the pointer, its columns sliding slowly up and down. It is drawn into one canvas image per column (`src/components/landing/listing-wall.tsx`), hidden from assistive tech, paused off-screen, and still under `prefers-reduced-motion`.
+* **Headlines are two-tone:** the first line in muted gray, the second in the foreground.
 
 ---
 
@@ -64,14 +74,16 @@ Rules that follow:
 
 ## 5. Typography
 
-* **Geist Sans** for all UI: body, controls, headings, badges.
-* **Geist Mono** for machine vocabulary: intents, reason codes, field names, slugs, IDs. If an agent would read it as a key, it's mono.
+* **Sans only, no serif.** **Geist Sans** for all UI: body, controls, headings, badges, and the wordmark ("Canary Room", bold, no trailing period).
+* **Geist Mono, sparingly,** for machine vocabulary: intents, reason codes, field names, slugs, IDs. If an agent would read it as a key, it's mono. On the landing it also sets the listing wall, the small uppercase section labels, and the sample listings; nothing else.
 * **Tabular figures** for counts, turns, violations (`3 / 5`), and times (24h, Santiago time).
-* **Fraunces** (`--sm-font-display`) only for the product wordmark and the landing hero. Never inside a room or the directory.
+* Geist is a placeholder while we look at alternatives; change the family in `src/app/layout.tsx` and `--ui-font-sans` / `--ui-font-mono` in `src/styles/tokens.css`, nowhere else.
 
 ---
 
 ## 6. Color carries meaning, so the default is neutral
+
+* **Light by default.** The theme is light unless the person picks dark with the toggle in the header (`next-themes`, `src/components/theme-provider.tsx`); the system theme is not followed.
 
 * **Fixed semantics:** green = allowed or active, amber = edited or escalated, red = blocked or terminated, gray = pending. No other uses.
 * **Status color appears as a 6px dot, a soft chip, or an explicit alert**, never as a full colored bubble or background.

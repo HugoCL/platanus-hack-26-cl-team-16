@@ -106,8 +106,6 @@
   --sm-radius-4xl: 19px; /* cards */
   --sm-radius-full: 999px; /* pill buttons, badges, dots */
 
-  --sm-font-display: var(--font-fraunces), Georgia, serif;
-
   /* Moderator hatch: what the moderator held back. CSS pattern, laid over muted or destructive-soft */
   --sm-hatch: repeating-linear-gradient(
     -45deg,

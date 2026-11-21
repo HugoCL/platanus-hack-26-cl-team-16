@@ -61,7 +61,6 @@
   --shadow-card: var(--ui-shadow);
   --font-sans: var(--ui-font-sans);
   --font-mono: var(--ui-font-mono);
-  --font-display: var(--sm-font-display);
 }
 
 body {

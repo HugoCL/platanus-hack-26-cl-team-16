@@ -126,7 +126,7 @@ function Detail({
             >
               Propósito
             </h2>
-            <p className="m-0 font-display text-[26px] leading-snug tracking-tight">
+            <p className="m-0 text-[26px] leading-snug font-medium tracking-tight">
               {card.purpose}
             </p>
           </section>

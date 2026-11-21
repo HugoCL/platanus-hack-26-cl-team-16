@@ -18,9 +18,9 @@ export function SiteHeader({
     <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-border px-4 py-3 sm:px-6">
       <Link
         href="/"
-        className="font-display text-2xl leading-none font-extrabold italic tracking-tight text-foreground no-underline"
+        className="text-xl leading-none font-bold tracking-tight text-foreground no-underline"
       >
-        Canary Room.
+        Canary Room
       </Link>
       <div className="flex flex-wrap items-center gap-2">
         <nav
