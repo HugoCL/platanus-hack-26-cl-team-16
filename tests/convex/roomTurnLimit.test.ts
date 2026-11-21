@@ -1,11 +1,16 @@
 // @vitest-environment edge-runtime
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { api } from "../../convex/_generated/api";
+import { api, internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import { allowAllModerator } from "../../convex/moderator";
 import { testRoomAgent } from "../../convex/roomAgent";
+import * as rules from "../../shared/moderator/rules";
 import { DEFAULT_MAX_TURNS, Session } from "../../shared/session";
-import { errorKind, roomWithHuman, seededRooms } from "./roomFixture";
+import {
+  errorKind,
+  ROOM_OWNER,
+  roomWithHuman,
+  seededRooms,
+} from "./roomFixture";
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => {
@@ -28,15 +33,18 @@ async function setup(maxTurns?: number) {
       senderParticipantId: Id<"participants">,
       recipient: Id<"participants"> | "all",
     ) =>
-      t.action(api.gate.send, {
+      t.action(internal.gate.sendAsParticipant, {
         sessionId,
         senderParticipantId,
         recipient,
         content: { kind: "text", text: "Tell me more." },
       }),
     history: () =>
-      t.query(api.gate.history, { sessionId, viewerParticipantId: human }),
-    room: () => t.query(api.rooms.get, { sessionId }),
+      t.query(internal.gate.historyForParticipant, {
+        sessionId,
+        viewerParticipantId: human,
+      }),
+    room: () => t.withIdentity(ROOM_OWNER).query(api.rooms.get, { sessionId }),
     finishReplies: () => t.finishAllScheduledFunctions(vi.runAllTimers),
   };
 }
@@ -49,10 +57,15 @@ it.each([
   async (_name, maxTurns, expectedTurns) => {
     const { consumer, provider, human, send, history, room, finishReplies } =
       await setup(maxTurns);
-    const reply = vi.spyOn(testRoomAgent, "reply").mockResolvedValue({
-      kind: "text",
-      text: "Tell me more.",
-    });
+    const reply = vi
+      .spyOn(testRoomAgent, "reply")
+      .mockImplementation(async ({ message }) => [
+        {
+          kind: "send",
+          recipient: message.senderParticipantId as Id<"participants">,
+          content: { kind: "text", text: "Tell me more." },
+        },
+      ]);
 
     await send(consumer, provider);
     await finishReplies();
@@ -84,7 +97,7 @@ it.each([
 
 it("only admits one agent send when two compete for the last turn", async () => {
   const { consumer, provider, send, history, room } = await setup(1);
-  const moderate = vi.spyOn(allowAllModerator, "moderate");
+  const moderate = vi.spyOn(rules, "checkRules");
   const results = await Promise.allSettled([
     send(consumer, "all"),
     send(provider, "all"),

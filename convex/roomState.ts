@@ -1,9 +1,48 @@
+import { ConvexError } from "convex/values";
 import type { Message } from "../shared/messages";
 import type { Participant, Session } from "../shared/session";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 
 const MAX_PARTICIPANTS = 10;
+
+export async function requireRoomIdentity(ctx: Pick<QueryCtx, "auth">) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) {
+    throw new ConvexError({
+      kind: "Unauthorized",
+      message: "sign in to use this room",
+    });
+  }
+  return identity;
+}
+
+export async function requireRoomHuman(
+  ctx: QueryCtx,
+  sessionId: Id<"sessions">,
+) {
+  const { tokenIdentifier } = await requireRoomIdentity(ctx);
+  const rows = await ctx.db
+    .query("participants")
+    .withIndex("by_tokenIdentifier_and_sessionId", (q) =>
+      q.eq("tokenIdentifier", tokenIdentifier).eq("sessionId", sessionId),
+    )
+    .take(2);
+  if (rows.length > 1) {
+    throw new ConvexError({
+      kind: "DuplicateParticipant",
+      message: "you have more than one membership in this room",
+    });
+  }
+  const [participant] = rows;
+  if (participant?.kind !== "human" || participant.leftAt !== undefined) {
+    throw new ConvexError({
+      kind: "NotParticipant",
+      message: "you are not a participant in this room",
+    });
+  }
+  return participant;
+}
 
 export async function loadSession(
   ctx: QueryCtx,
@@ -30,7 +69,7 @@ export async function loadSession(
   };
 }
 
-function toParticipant(p: Doc<"participants">): Participant {
+export function toParticipant(p: Doc<"participants">): Participant {
   if (p.kind === "agent") {
     return {
       participantId: p._id,

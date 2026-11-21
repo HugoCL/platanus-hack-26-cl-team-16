@@ -8,10 +8,13 @@ import {
   SessionContract,
 } from "../shared/session";
 import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import {
-  action,
+  type ActionCtx,
+  internalAction,
   internalMutation,
   internalQuery,
+  type MutationCtx,
   mutation,
   type QueryCtx,
   query,
@@ -19,7 +22,11 @@ import {
 import { listedCard } from "./directory";
 import { eventValidator, publishNotice } from "./gate";
 import { moderate } from "./moderator";
-import { loadSession } from "./roomState";
+import {
+  loadSession,
+  requireRoomHuman,
+  requireRoomIdentity,
+} from "./roomState";
 
 const MAX_VIOLATIONS = 3;
 
@@ -36,36 +43,42 @@ const openArgs = {
   human: v.optional(v.object({ displayName: v.string() })),
 };
 
-export const open = action({
+export const open = internalAction({
   args: openArgs,
-  handler: async (ctx, args): Promise<Session> => {
-    const { contract, participants } = await ctx.runQuery(
-      internal.rooms.plan,
-      args,
-    );
-    const [initiator] = participants;
-    const { verdict, events } = await moderate({
-      content: { kind: "text", text: contract.intent.description },
-      sender: initiator,
-      recipient: "all",
-      participants,
-      contract,
-      history: [],
-    });
-    if (verdict.decision === "block") {
-      throw new ConvexError({
-        kind: "RequestBlocked",
-        message: verdict.reason,
-        rule: verdict.rule,
-      });
-    }
-    return ctx.runMutation(internal.rooms.create, {
-      ...args,
-      contract,
-      events,
-    });
-  },
+  handler: openRoom,
 });
+
+export async function openRoom(
+  ctx: ActionCtx,
+  args: ObjectType<typeof openArgs>,
+): Promise<Session> {
+  if (args.human) await requireRoomIdentity(ctx);
+  const { contract, participants } = await ctx.runQuery(
+    internal.rooms.plan,
+    args,
+  );
+  const [initiator] = participants;
+  const { verdict, events } = await moderate({
+    content: { kind: "text", text: contract.intent.description },
+    sender: initiator,
+    recipient: "all",
+    participants,
+    contract,
+    history: [],
+  });
+  if (verdict.decision === "block") {
+    throw new ConvexError({
+      kind: "RequestBlocked",
+      message: verdict.reason,
+      rule: verdict.rule,
+    });
+  }
+  return ctx.runMutation(internal.rooms.create, {
+    ...args,
+    contract,
+    events,
+  });
+}
 
 export const plan = internalQuery({
   args: openArgs,
@@ -141,11 +154,11 @@ export const create = internalMutation({
       role: "recipient",
     });
     if (humanName) {
-      const identity = await ctx.auth.getUserIdentity();
+      const { tokenIdentifier } = await requireRoomIdentity(ctx);
       await ctx.db.insert("participants", {
         sessionId,
         kind: "human",
-        tokenIdentifier: identity?.tokenIdentifier ?? "anonymous",
+        tokenIdentifier,
         displayName: humanName,
         role: "owner",
         onBehalfOfAgentId: args.initiatorAgentId,
@@ -177,6 +190,15 @@ async function planRoom(ctx: QueryCtx, args: ObjectType<typeof openArgs>) {
   const initiator = await ctx.db.get(args.initiatorAgentId);
   if (!initiator || !listedCard(initiator)) {
     invalidArgument("the initiator agent does not exist or is not listed");
+  }
+  if (args.human && initiator.ownerTokenIdentifier !== undefined) {
+    const { tokenIdentifier } = await requireRoomIdentity(ctx);
+    if (initiator.ownerTokenIdentifier !== tokenIdentifier) {
+      throw new ConvexError({
+        kind: "NotOwner",
+        message: "you can only open a room on behalf of an agent you own",
+      });
+    }
   }
   const provider = await ctx.db.get(args.providerAgentId);
   const listed = provider && listedCard(provider);
@@ -222,45 +244,66 @@ async function planRoom(ctx: QueryCtx, args: ObjectType<typeof openArgs>) {
 
 export const get = query({
   args: { sessionId: v.id("sessions") },
-  handler: (ctx, { sessionId }): Promise<Session | null> =>
-    loadSession(ctx, sessionId),
+  handler: async (ctx, { sessionId }): Promise<Session | null> => {
+    await requireRoomHuman(ctx, sessionId);
+    return loadSession(ctx, sessionId);
+  },
 });
 
 export const close = mutation({
+  args: { sessionId: v.id("sessions") },
+  handler: async (ctx, { sessionId }) => {
+    const participant = await requireRoomHuman(ctx, sessionId);
+    return closeRoom(ctx, { sessionId, participantId: participant._id });
+  },
+});
+
+export const closeAsParticipant = internalMutation({
   args: {
     sessionId: v.id("sessions"),
     participantId: v.id("participants"),
   },
-  handler: async (ctx, { sessionId, participantId }) => {
-    const session = await ctx.db.get(sessionId);
-    if (!session) {
-      throw new ConvexError({
-        kind: "NotFound",
-        message: "the room does not exist",
-      });
-    }
-    const participant = await ctx.db.get(participantId);
-    if (
-      participant?.sessionId !== sessionId ||
-      participant.leftAt !== undefined
-    ) {
-      throw new ConvexError({
-        kind: "NotParticipant",
-        message: "only a participant can close the room",
-      });
-    }
-    if (session.status === "active") {
-      await ctx.db.patch("sessions", sessionId, {
-        status: "closed",
-        closedReason: `closed_by_${participant.role}`,
-      });
-      await publishNotice(ctx, sessionId, "session_closed", "Sala cerrada.");
-    } else if (session.status !== "closed") {
-      throw new ConvexError({
-        kind: "RoomClosed",
-        message: "the room is not open",
-      });
-    }
-    return { sessionId, status: "closed" as const };
-  },
+  handler: closeRoom,
 });
+
+export async function closeRoom(
+  ctx: MutationCtx,
+  {
+    sessionId,
+    participantId,
+  }: {
+    sessionId: Id<"sessions">;
+    participantId: Id<"participants">;
+  },
+) {
+  const session = await ctx.db.get(sessionId);
+  if (!session) {
+    throw new ConvexError({
+      kind: "NotFound",
+      message: "the room does not exist",
+    });
+  }
+  const participant = await ctx.db.get(participantId);
+  if (
+    participant?.sessionId !== sessionId ||
+    participant.leftAt !== undefined
+  ) {
+    throw new ConvexError({
+      kind: "NotParticipant",
+      message: "only a participant can close the room",
+    });
+  }
+  if (session.status === "active") {
+    await ctx.db.patch("sessions", sessionId, {
+      status: "closed",
+      closedReason: `closed_by_${participant.role}`,
+    });
+    await publishNotice(ctx, sessionId, "session_closed", "Sala cerrada.");
+  } else if (session.status !== "closed") {
+    throw new ConvexError({
+      kind: "RoomClosed",
+      message: "the room is not open",
+    });
+  }
+  return { sessionId, status: "closed" as const };
+}

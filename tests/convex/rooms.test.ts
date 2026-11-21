@@ -2,13 +2,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import { allowAllModerator } from "../../convex/moderator";
+import { testRoomAgent } from "../../convex/roomAgent";
 import { effectiveAllowedIntents } from "../../shared/agent";
-import { createModerator } from "../../shared/moderator/moderator";
-import { createFakeLlmProvider } from "../../shared/providers/llm";
+import * as rules from "../../shared/moderator/rules";
 import { CLINIC_AGENT_SLUG, SEED_AGENTS } from "../../shared/seedData";
 import { Session } from "../../shared/session";
-import { errorKind, REQUEST, seededRooms } from "./roomFixture";
+import { errorKind, REQUEST, ROOM_OWNER, seededRooms } from "./roomFixture";
 
 const clinicCard = SEED_AGENTS.find((a) => a.card.slug === CLINIC_AGENT_SLUG)
   ?.card as (typeof SEED_AGENTS)[number]["card"];
@@ -59,7 +58,7 @@ describe("E2 success criteria", () => {
 describe("opening a room", () => {
   it("reads back as a valid shared Session with both agents and the human", async () => {
     const opened = await open({ human: { displayName: "Juan" } });
-    const room = await rooms.t.query(api.rooms.get, {
+    const room = await rooms.t.withIdentity(ROOM_OWNER).query(api.rooms.get, {
       sessionId: opened.sessionId as Id<"sessions">,
     });
 
@@ -137,7 +136,7 @@ describe("opening a room", () => {
 
 describe("the request passes the moderator before the room opens", () => {
   it("asks the moderator about the request as a broadcast from the initiator", async () => {
-    const moderate = vi.spyOn(allowAllModerator, "moderate");
+    const moderate = vi.spyOn(rules, "checkRules");
 
     await open({ human: { displayName: "Juan" } });
 
@@ -182,13 +181,6 @@ describe("the request passes the moderator before the room opens", () => {
   ])(
     "refuses a request carrying %s under E3's rules and stores nothing",
     async (_why, request, rule) => {
-      vi.spyOn(allowAllModerator, "moderate").mockImplementation((input) =>
-        createModerator({
-          llm: createFakeLlmProvider({
-            object: () => ({ decision: "allow", rule: "purpose" }),
-          }),
-        }).moderate(input),
-      );
       const before = await stored();
 
       expect(await errorData(open({ request }))).toMatchObject({
@@ -200,30 +192,49 @@ describe("the request passes the moderator before the room opens", () => {
   );
 
   it("refuses the request when the moderator throws", async () => {
-    vi.spyOn(allowAllModerator, "moderate").mockRejectedValue(
-      new Error("moderator down"),
-    );
+    rooms.judge.mockImplementationOnce(() => {
+      throw new Error("moderator down");
+    });
     const before = await stored();
 
     expect(await errorKind(open())).toBe("RequestBlocked");
     expect(await stored()).toEqual(before);
   });
 
+  it("does not publish an opening notice or notify the provider when the judge blocks", async () => {
+    vi.useFakeTimers();
+    try {
+      const agent = vi.spyOn(testRoomAgent, "reply");
+      rooms.judge.mockReturnValueOnce({ decision: "block", rule: "purpose" });
+      const before = await stored();
+      expect(
+        await errorData(open({ request: "¿Hablamos del clima?" })),
+      ).toMatchObject({
+        kind: "RequestBlocked",
+        rule: "purpose",
+        message: "El mensaje no sirve al propósito de la sala.",
+      });
+      await rooms.t.finishAllScheduledFunctions(vi.runAllTimers);
+      expect(await stored()).toEqual(before);
+      expect(agent).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("refuses to open if the card changes the contract during moderation", async () => {
     const before = await stored();
-    const moderate = vi
-      .spyOn(allowAllModerator, "moderate")
-      .mockImplementation(async () => {
-        await rooms.t.run((ctx) =>
-          ctx.db.patch(rooms.clinicId, {
-            purpose: "Provide general office information.",
-          }),
-        );
-        return {
-          verdict: { decision: "allow", reason: "Sirve al propósito." },
-          events: [],
-        };
-      });
+    const moderate = vi.spyOn(rules, "checkRules");
+    const llm = rooms.llm;
+    const generateObject = llm.generateObject.bind(llm);
+    vi.spyOn(llm, "generateObject").mockImplementationOnce(async (args) => {
+      await rooms.t.run((ctx) =>
+        ctx.db.patch(rooms.clinicId, {
+          purpose: "Provide general office information.",
+        }),
+      );
+      return generateObject(args);
+    });
 
     expect(await errorKind(open())).toBe("RoomContractChanged");
     const moderated = moderate.mock.calls[0][0].contract;
@@ -232,11 +243,6 @@ describe("the request passes the moderator before the room opens", () => {
   });
 
   it("keeps the request's moderation events with the opening notice", async () => {
-    vi.spyOn(allowAllModerator, "moderate").mockResolvedValue({
-      verdict: { decision: "allow", reason: "Sirve al propósito." },
-      events: [{ stage: "deterministic", action: "allow", reasons: [] }],
-    });
-
     const room = await open();
 
     const { notice, events } = await rooms.t.run(async (ctx) => {
@@ -257,6 +263,11 @@ describe("the request passes the moderator before the room opens", () => {
       expect.objectContaining({
         messageId: notice?._id,
         stage: "deterministic",
+        action: "allow",
+      }),
+      expect.objectContaining({
+        messageId: notice?._id,
+        stage: "purpose",
         action: "allow",
       }),
     ]);

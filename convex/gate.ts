@@ -1,4 +1,4 @@
-import { paginationOptsValidator } from "convex/server";
+import { type PaginationOptions, paginationOptsValidator } from "convex/server";
 import { ConvexError, v } from "convex/values";
 import { zodToConvex } from "convex-helpers/server/zod4";
 import {
@@ -26,8 +26,13 @@ import {
   query,
 } from "./_generated/server";
 import { moderate } from "./moderator";
-import { fakeRoomLlm, testRoomAgent } from "./roomAgent";
-import { loadSession, toMessage } from "./roomState";
+import { roomAgentFor } from "./roomAgent";
+import {
+  loadSession,
+  requireRoomHuman,
+  toMessage,
+  toParticipant,
+} from "./roomState";
 import { visibleTo } from "./visibility";
 
 const HISTORY_LIMIT = 500;
@@ -40,13 +45,31 @@ function gateError(kind: string, message: string): never {
   throw new ConvexError({ kind, message });
 }
 
+const sendArgs = {
+  sessionId: v.id("sessions"),
+  recipient: recipientValidator,
+  content: zodToConvex(SendableContent),
+};
+
 export const send = action({
-  args: {
-    sessionId: v.id("sessions"),
-    senderParticipantId: v.id("participants"),
-    recipient: recipientValidator,
-    content: zodToConvex(SendableContent),
+  args: sendArgs,
+  handler: async (ctx, args): Promise<Message> => {
+    const senderParticipantId: Id<"participants"> = await ctx.runQuery(
+      internal.gate.humanSender,
+      { sessionId: args.sessionId },
+    );
+    return sendThroughGate(ctx, { ...args, senderParticipantId });
   },
+});
+
+export const humanSender = internalQuery({
+  args: { sessionId: v.id("sessions") },
+  handler: async (ctx, { sessionId }) =>
+    (await requireRoomHuman(ctx, sessionId))._id,
+});
+
+export const sendAsParticipant = internalAction({
+  args: { ...sendArgs, senderParticipantId: v.id("participants") },
   handler: (ctx, args): Promise<Message> => sendThroughGate(ctx, args),
 });
 
@@ -57,6 +80,7 @@ export async function sendThroughGate(
     senderParticipantId: Id<"participants">;
     recipient: Doc<"messages">["recipient"];
     content: unknown;
+    hostedReply?: true;
   },
 ): Promise<Message> {
   const parsed = SendableContent.safeParse(args.content);
@@ -90,6 +114,7 @@ export async function sendThroughGate(
     content,
     verdict: outcome.verdict,
     events: outcome.events,
+    hostedReply: args.hostedReply,
   });
 }
 
@@ -134,6 +159,17 @@ export const eventValidator = v.object({
   latencyMs: v.optional(v.number()),
 });
 
+const canonical = (value: unknown) =>
+  JSON.stringify(value, (_key, field) =>
+    field && typeof field === "object" && !Array.isArray(field)
+      ? Object.fromEntries(
+          Object.entries(field).sort(([a], [b]) =>
+            a < b ? -1 : a > b ? 1 : 0,
+          ),
+        )
+      : field,
+  );
+
 export const commit = internalMutation({
   args: {
     sessionId: v.id("sessions"),
@@ -142,6 +178,7 @@ export const commit = internalMutation({
     content: zodToConvex(SendableContent),
     verdict: zodToConvex(Verdict),
     events: v.array(eventValidator),
+    hostedReply: v.optional(v.literal(true)),
   },
   handler: async (ctx, args): Promise<Message> => {
     const { session, sender } = await checkSend(ctx, {
@@ -151,10 +188,37 @@ export const commit = internalMutation({
           ? args.content.inReplyTo
           : undefined,
     });
+    const { content, verdict } = args;
+    if (
+      args.hostedReply &&
+      verdict.decision === "allow" &&
+      sender.kind === "agent" &&
+      content.kind === "ui" &&
+      content.spec.type === "confirmation"
+    ) {
+      const confirmationId = content.spec.id;
+      const previous = await ctx.db
+        .query("messages")
+        .withIndex("by_sessionId_and_moderation_status", (q) =>
+          q.eq("sessionId", args.sessionId).eq("moderation.status", "allowed"),
+        )
+        .filter((q) =>
+          q.and(
+            q.eq(q.field("senderParticipantId"), args.senderParticipantId),
+            q.eq(q.field("recipient"), args.recipient),
+            q.eq(q.field("content.kind"), "ui"),
+            q.eq(q.field("content.spec.type"), "confirmation"),
+            q.eq(q.field("content.spec.id"), confirmationId),
+          ),
+        )
+        .first();
+      if (previous && canonical(previous.content) === canonical(content)) {
+        return toMessage(previous);
+      }
+    }
     const agentTurn = sender.kind === "agent";
     const turnCount = session.turnCount + (agentTurn ? 1 : 0);
     const exhausted = turnCount >= session.contract.maxTurns;
-    const { verdict } = args;
     const messageId = await ctx.db.insert("messages", {
       sessionId: args.sessionId,
       senderParticipantId: args.senderParticipantId,
@@ -203,15 +267,13 @@ export const commit = internalMutation({
         );
       }
     }
-    if (
-      !exhausted &&
-      verdict.decision === "allow" &&
-      args.recipient !== args.senderParticipantId &&
-      session.participants.some(
-        (p) => p.kind === "agent" && p.participantId === args.recipient,
-      )
-    ) {
-      await ctx.scheduler.runAfter(0, internal.gate.reply, { messageId });
+    if (!exhausted && verdict.decision === "allow") {
+      for (const responder of responders(session.participants, sender, args)) {
+        await ctx.scheduler.runAfter(0, internal.gate.reply, {
+          messageId,
+          participantId: responder.participantId as Id<"participants">,
+        });
+      }
     }
     const stored = await ctx.db.get(messageId);
     if (!stored) throw new Error("message vanished right after it was stored");
@@ -220,27 +282,52 @@ export const commit = internalMutation({
 });
 
 type ReplyContext = {
+  agent: Doc<"agents">;
+  self: Id<"participants">;
+  sessionId: Id<"sessions">;
   message: Message;
   contract: SessionContract;
+  participants: Participant[];
   history: Message[];
-  senderParticipantId: Id<"participants">;
-  recipientParticipantId: Id<"participants">;
-  sessionId: Id<"sessions">;
 };
 
+// The agents that get a turn for an allowed message: the agent it is addressed to, or, for a
+// human's message to everyone, every agent in the room. An agent's message to everyone gets no
+// turn, so two agents can never keep each other talking through broadcasts.
+function responders(
+  participants: Participant[],
+  sender: Participant,
+  { recipient }: { recipient: Doc<"messages">["recipient"] },
+) {
+  return participants.filter(
+    (p) =>
+      p.kind === "agent" &&
+      p.participantId !== sender.participantId &&
+      (p.participantId === recipient ||
+        (recipient === "all" && sender.kind === "human")),
+  );
+}
+
 export const replyContext = internalQuery({
-  args: { messageId: v.id("messages") },
-  handler: async (ctx, { messageId }): Promise<ReplyContext | null> => {
+  args: { messageId: v.id("messages"), participantId: v.id("participants") },
+  handler: async (
+    ctx,
+    { messageId, participantId },
+  ): Promise<ReplyContext | null> => {
     const source = await ctx.db.get("messages", messageId);
     if (
       !source?.senderParticipantId ||
       source.moderation.status !== "allowed" ||
-      source.recipient === "all"
+      (source.recipient !== participantId && source.recipient !== "all")
     ) {
       return null;
     }
-    const recipient = await ctx.db.get("participants", source.recipient);
-    if (recipient?.kind !== "agent" || recipient.leftAt !== undefined)
+    const recipient = await ctx.db.get("participants", participantId);
+    if (
+      recipient?.kind !== "agent" ||
+      recipient.sessionId !== source.sessionId ||
+      recipient.leftAt !== undefined
+    )
       return null;
     const agent = await ctx.db.get("agents", recipient.agentId);
     if (agent?.kind !== "hosted") return null;
@@ -258,43 +345,54 @@ export const replyContext = internalQuery({
     if (!viewer) return null;
     const recent = await recentMessages(ctx, source.sessionId);
     return {
+      agent,
+      self: recipient._id,
+      sessionId: source.sessionId,
       message: toMessage(source),
       contract: room.contract,
+      participants: room.participants,
       history: recent.filter((message) => visibleTo(message, viewer)),
-      senderParticipantId: recipient._id,
-      recipientParticipantId: source.senderParticipantId,
-      sessionId: source.sessionId,
     };
   },
 });
 
 export const reply = internalAction({
-  args: { messageId: v.id("messages") },
-  handler: async (ctx, { messageId }): Promise<null> => {
-    const input = await ctx.runQuery(internal.gate.replyContext, { messageId });
+  args: { messageId: v.id("messages"), participantId: v.id("participants") },
+  handler: async (ctx, args): Promise<null> => {
+    const input = await ctx.runQuery(internal.gate.replyContext, args);
     if (!input) return null;
-    const {
-      message,
-      contract,
-      history,
-      senderParticipantId,
-      recipientParticipantId,
-      sessionId,
-    } = input;
-    const content = await testRoomAgent.reply({
-      message,
-      contract,
-      history,
-      llm: fakeRoomLlm,
-    });
-    if (content) {
+    const { agent, self, sessionId, ...room } = input;
+    const { agent: roomAgent, llm } = roomAgentFor(agent, ctx);
+    const actions = await roomAgent.reply({ self, ...room, llm });
+    const strangers = actions.filter(
+      (action) =>
+        action.kind === "send" &&
+        action.recipient !== "all" &&
+        !room.participants.some((p) => p.participantId === action.recipient),
+    );
+    if (strangers.length > 0) {
+      console.error(
+        `gate.reply: dropped the reply of ${self}, which addressed someone outside the room`,
+      );
+      return null;
+    }
+    for (const action of actions) {
       try {
-        await sendThroughGate(ctx, {
-          sessionId,
-          senderParticipantId,
-          recipient: recipientParticipantId,
-          content,
-        });
+        if (action.kind === "close") {
+          await ctx.runMutation(internal.rooms.closeAsParticipant, {
+            sessionId,
+            participantId: self,
+          });
+        } else {
+          const sent = await sendThroughGate(ctx, {
+            sessionId,
+            senderParticipantId: self,
+            recipient: action.recipient as Doc<"messages">["recipient"],
+            content: action.content,
+            hostedReply: true,
+          });
+          if (sent.status !== "allowed") return null;
+        }
       } catch (error) {
         if (
           !(error instanceof ConvexError) ||
@@ -303,6 +401,7 @@ export const reply = internalAction({
         ) {
           throw error;
         }
+        return null;
       }
     }
     return null;
@@ -324,58 +423,95 @@ async function recentMessages(ctx: QueryCtx, sessionId: Id<"sessions">) {
   return recent.reverse();
 }
 
-const historyArgs = {
-  sessionId: v.id("sessions"),
+const sessionArgs = { sessionId: v.id("sessions") };
+const participantHistoryArgs = {
+  ...sessionArgs,
   viewerParticipantId: v.id("participants"),
 };
 
 export const history = query({
-  args: historyArgs,
+  args: sessionArgs,
+  handler: async (ctx, { sessionId }): Promise<Message[]> =>
+    historyForViewer(
+      ctx,
+      sessionId,
+      toParticipant(await requireRoomHuman(ctx, sessionId)),
+    ),
+});
+
+export const historyForParticipant = internalQuery({
+  args: participantHistoryArgs,
   handler: async (
     ctx,
     { sessionId, viewerParticipantId },
   ): Promise<Message[]> => {
     const viewer = await roomViewer(ctx, sessionId, viewerParticipantId);
-    const messages = await recentMessages(ctx, sessionId);
-    return messages.filter((message) => visibleTo(message, viewer));
+    return historyForViewer(ctx, sessionId, viewer);
   },
 });
 
+async function historyForViewer(
+  ctx: QueryCtx,
+  sessionId: Id<"sessions">,
+  viewer: Participant,
+) {
+  const messages = await recentMessages(ctx, sessionId);
+  return messages.filter((message) => visibleTo(message, viewer));
+}
+
 export const historyPage = query({
-  args: { ...historyArgs, paginationOpts: paginationOptsValidator },
-  handler: async (ctx, { sessionId, viewerParticipantId, paginationOpts }) => {
-    const viewer = await roomViewer(ctx, sessionId, viewerParticipantId);
-    const result = await ctx.db
-      .query("messages")
-      .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
-      .paginate({
-        ...paginationOpts,
-        maximumBytesRead: Math.min(
-          paginationOpts.maximumBytesRead ?? HISTORY_BYTE_BUDGET,
-          HISTORY_BYTE_BUDGET,
-        ),
-      });
-    return {
-      ...result,
-      page: result.page
-        .map(toMessage)
-        .filter((message) => visibleTo(message, viewer)),
-    };
+  args: { ...sessionArgs, paginationOpts: paginationOptsValidator },
+  handler: async (ctx, { sessionId, paginationOpts }) => {
+    const viewer = toParticipant(await requireRoomHuman(ctx, sessionId));
+    return historyPageForViewer(ctx, sessionId, viewer, paginationOpts);
   },
 });
+
+export const historyPageForParticipant = internalQuery({
+  args: { ...participantHistoryArgs, paginationOpts: paginationOptsValidator },
+  handler: async (ctx, { sessionId, viewerParticipantId, paginationOpts }) => {
+    const viewer = await roomViewer(ctx, sessionId, viewerParticipantId);
+    return historyPageForViewer(ctx, sessionId, viewer, paginationOpts);
+  },
+});
+
+async function historyPageForViewer(
+  ctx: QueryCtx,
+  sessionId: Id<"sessions">,
+  viewer: Participant,
+  paginationOpts: PaginationOptions,
+) {
+  const result = await ctx.db
+    .query("messages")
+    .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+    .paginate({
+      ...paginationOpts,
+      maximumBytesRead: Math.min(
+        paginationOpts.maximumBytesRead ?? HISTORY_BYTE_BUDGET,
+        HISTORY_BYTE_BUDGET,
+      ),
+    });
+  return {
+    ...result,
+    page: result.page
+      .map(toMessage)
+      .filter((message) => visibleTo(message, viewer)),
+  };
+}
 
 async function roomViewer(
   ctx: QueryCtx,
   sessionId: Id<"sessions">,
   viewerParticipantId: Id<"participants">,
 ) {
-  const room = await loadSession(ctx, sessionId);
-  if (!room) gateError("NotFound", "the room does not exist");
-  const viewer = room.participants.find(
-    (p) => p.participantId === viewerParticipantId,
-  );
-  if (!viewer) gateError("NotParticipant", "the viewer is not in this room");
-  return viewer;
+  if (!(await ctx.db.get(sessionId))) {
+    gateError("NotFound", "the room does not exist");
+  }
+  const viewer = await ctx.db.get(viewerParticipantId);
+  if (viewer?.sessionId !== sessionId || viewer.leftAt !== undefined) {
+    gateError("NotParticipant", "the viewer is not in this room");
+  }
+  return toParticipant(viewer);
 }
 
 export async function publishNotice(
@@ -424,27 +560,28 @@ async function checkSend(
   if (session.status !== "active" || !session.contract) {
     gateError("RoomClosed", "the room is closed and accepts no new messages");
   }
-  const sender = session.participants.find(
-    (p) => p.participantId === args.senderParticipantId,
-  );
+  const senderRow = await ctx.db.get(args.senderParticipantId);
   if (
-    !sender ||
-    (await ctx.db.get(sender.participantId as Id<"participants">))?.leftAt !==
-      undefined
+    senderRow?.sessionId !== args.sessionId ||
+    senderRow.leftAt !== undefined
   ) {
     gateError("NotParticipant", "the sender is not in this room");
   }
+  const sender = toParticipant(senderRow);
   if (
     sender.kind === "agent" &&
     session.turnCount >= session.contract.maxTurns
   ) {
     gateError("TurnLimitReached", "the room has reached its agent turn limit");
   }
-  if (
-    args.recipient !== "all" &&
-    !session.participants.some((p) => p.participantId === args.recipient)
-  ) {
-    gateError("InvalidArgument", "the recipient is not in this room");
+  if (args.recipient !== "all") {
+    const recipientRow = await ctx.db.get(args.recipient);
+    if (
+      recipientRow?.sessionId !== args.sessionId ||
+      recipientRow.leftAt !== undefined
+    ) {
+      gateError("InvalidArgument", "the recipient is not in this room");
+    }
   }
   return {
     session: { ...session, contract: session.contract },

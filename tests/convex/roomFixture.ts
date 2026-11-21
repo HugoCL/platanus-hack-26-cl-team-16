@@ -2,22 +2,32 @@
 import rateLimiter from "@convex-dev/rate-limiter/test";
 import type { FunctionArgs } from "convex/server";
 import { convexTest } from "convex-test";
-import { api, internal } from "../../convex/_generated/api";
+import { afterEach, vi } from "vitest";
+import { internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import schema from "../../convex/schema";
+import * as providers from "../../shared/providers/llm";
 import { CLINIC_AGENT_SLUG, CONSUMER_AGENT_SLUG } from "../../shared/seedData";
 
 const modules = import.meta.glob("../../convex/**/*.ts");
 
-export const REQUEST = "Necesito hora con un cardiólogo en Providencia";
+afterEach(() => vi.restoreAllMocks());
 
-export type OpenArgs = FunctionArgs<typeof api.rooms.open>;
+export const REQUEST = "Necesito hora con un cardiólogo en Providencia";
+export const ROOM_OWNER = { subject: "room-owner" };
+
+export type OpenArgs = FunctionArgs<typeof internal.rooms.open>;
 
 export async function seededRooms({
   transactionLimits = false,
 }: {
   transactionLimits?: boolean;
 } = {}) {
+  const judge = vi.fn((): unknown => ({ decision: "allow", rule: "purpose" }));
+  const llm = providers.createFakeLlmProvider({ object: judge });
+  const createLlm = vi
+    .spyOn(providers, "createLlmProvider")
+    .mockReturnValue(llm);
   const t = convexTest({ schema, modules, transactionLimits });
   rateLimiter.register(t);
   await t.mutation(internal.seed.ensure, {});
@@ -33,13 +43,13 @@ export async function seededRooms({
   const consumerId = await agentId(CONSUMER_AGENT_SLUG);
   const clinicId = await agentId(CLINIC_AGENT_SLUG);
   const open = (overrides: Partial<OpenArgs> = {}) =>
-    t.action(api.rooms.open, {
+    t.withIdentity(ROOM_OWNER).action(internal.rooms.open, {
       initiatorAgentId: consumerId,
       providerAgentId: clinicId,
       request: REQUEST,
       ...overrides,
     });
-  return { t, consumerId, clinicId, open };
+  return { t, consumerId, clinicId, open, judge, llm, createLlm };
 }
 
 export async function roomWithHuman(
