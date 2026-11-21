@@ -12,7 +12,6 @@ import {
 } from "@ui-sdk/react/meter";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-sdk/react/tooltip";
 import {
-  BanIcon,
   CheckIcon,
   ClockIcon,
   PencilIcon,
@@ -23,7 +22,7 @@ import type { ModerationReason, ModerationStatus } from "@/shared/moderation";
 import { REASON_LABELS, STAGE_LABELS } from "./room-format";
 
 const BADGES: Record<
-  Exclude<ModerationStatus, "allowed">,
+  Exclude<ModerationStatus, "allowed" | "blocked">,
   { label: string; icon: ReactNode; className: string }
 > = {
   pending: {
@@ -37,11 +36,6 @@ const BADGES: Record<
     label: "Editado",
     icon: <PencilIcon size={14} />,
     className: "bg-warning/15 text-foreground",
-  },
-  blocked: {
-    label: "Bloqueado",
-    icon: <BanIcon size={14} />,
-    className: "bg-destructive-soft text-destructive-text",
   },
   escalated: {
     label: "Requiere tu aprobación",
@@ -72,6 +66,8 @@ export function ModerationBadge({
       </Tooltip>
     );
   }
+
+  if (status === "blocked") return null;
 
   const badge = BADGES[status];
   const pill = (

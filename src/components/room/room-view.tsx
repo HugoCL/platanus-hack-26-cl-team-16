@@ -432,14 +432,14 @@ function SessionList({
   return (
     <nav
       aria-label="Salas"
-      className="hidden w-[260px] shrink-0 flex-col gap-1 px-3 py-4 xl:flex"
+      className="hidden w-[260px] shrink-0 flex-col gap-1 py-4 xl:flex"
     >
-      <h2 className="m-0 px-3 pb-2 text-sm font-semibold">Salas</h2>
+      <h2 className="m-0 px-6 pb-2 text-sm font-semibold">Salas</h2>
       {sessions?.map((session) => (
         <a
           key={session.sessionId}
           href={`/room/${session.sessionId}`}
-          className="px-3 py-2"
+          className="px-6 py-2"
         >
           {session.name} · {intentLabel(session.intent)}
         </a>
@@ -447,7 +447,7 @@ function SessionList({
       <a
         href="#thread"
         aria-current="page"
-        className="relative flex items-start gap-3 rounded-2xl bg-muted px-3 py-2.5 !text-foreground !no-underline before:absolute before:inset-y-3 before:left-0 before:w-[3px] before:rounded-full before:bg-foreground"
+        className="relative flex items-start gap-3 bg-muted px-6 py-3 !text-foreground !no-underline before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-foreground"
       >
         <span className="flex -space-x-2">
           <Avatar participant={self} size={28} />
@@ -468,7 +468,7 @@ function SessionList({
           />
         </span>
       </a>
-      <p className="m-0 mt-2 px-3 text-xs text-pretty text-subtle-foreground">
+      <p className="m-0 mt-2 px-6 text-xs text-pretty text-subtle-foreground">
         Las salas que abra tu agente aparecen aquí.
       </p>
     </nav>
