@@ -50,7 +50,7 @@ export default function GoogleDirectoryMap({
   return (
     <section
       aria-label="Mapa de resultados"
-      className={`relative min-h-[520px] overflow-hidden bg-[var(--sm-map-land)] lg:min-h-0 ${className}`}
+      className={`relative min-h-0 overflow-hidden bg-[var(--sm-map-land)] ${className}`}
     >
       <APIProvider apiKey={API_KEY} language="es" region="CL">
         <GoogleMap

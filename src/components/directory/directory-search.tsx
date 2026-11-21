@@ -50,12 +50,11 @@ const ALL = "all";
 const MAX_INTENT_FILTERS = 6;
 const DEFAULT_RADIUS_KM = 5;
 const PAGE_SIZE = 20;
+const INVITE_DISMISSED_KEY = "directory:location-invite-dismissed";
 
 const GoogleDirectoryMap = dynamic(() => import("./google-directory-map"), {
   ssr: false,
-  loading: () => (
-    <div className="min-h-[520px] flex-1 bg-[var(--sm-map-land)] lg:min-h-0" />
-  ),
+  loading: () => <div className="min-h-0 flex-1 bg-[var(--sm-map-land)]" />,
 });
 const MapView = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
   ? GoogleDirectoryMap
@@ -177,7 +176,11 @@ export function DirectorySearch() {
       ?.query({ name: "geolocation" })
       .then((status) => {
         if (status.state === "granted") startLocating();
-        else if (status.state === "prompt") setOfferLocation(true);
+        else if (
+          status.state === "prompt" &&
+          !localStorage.getItem(INVITE_DISMISSED_KEY)
+        )
+          setOfferLocation(true);
       })
       .catch(() => {});
   }, []);
@@ -285,12 +288,14 @@ export function DirectorySearch() {
     .join(" · ");
 
   return (
-    <div className="flex min-h-dvh flex-col bg-background lg:h-dvh lg:min-h-0 lg:overflow-hidden">
+    <div
+      className={`flex min-h-dvh flex-col bg-background lg:h-dvh lg:min-h-0 lg:overflow-hidden ${view === "map" ? "max-lg:h-dvh max-lg:min-h-0 max-lg:overflow-hidden" : ""}`}
+    >
       <SiteHeader current="directory" />
 
       <section
         aria-label="Búsqueda"
-        className="flex flex-col gap-3.5 border-b border-border px-4 py-5 sm:px-6"
+        className={`flex flex-col gap-3.5 border-b border-border px-4 sm:px-6 ${view === "map" ? "py-3 lg:py-5 [&>:not(:first-child)]:max-lg:hidden" : "py-5"}`}
       >
         <TextSearch
           onInterpreted={({ category, comuna }) => {
@@ -457,12 +462,15 @@ export function DirectorySearch() {
         </div>
 
         {offerLocation && geo.state === "off" ? (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 self-start rounded-2xl bg-muted py-2 pr-2 pl-3.5 text-[13px]">
-            <LocateFixed aria-hidden size={15} />
-            <span>
-              Comparte tu ubicación y te mostramos primero lo que está cerca.
+          <div className="flex items-center gap-x-3 self-start rounded-2xl bg-muted py-1.5 pr-1.5 pl-3.5 text-[13px] max-sm:self-stretch">
+            <LocateFixed aria-hidden size={15} className="flex-none" />
+            <span className="min-w-0 flex-1">
+              <span className="sm:hidden">¿Ver lo cercano?</span>
+              <span className="max-sm:hidden">
+                Comparte tu ubicación y te mostramos primero lo que está cerca.
+              </span>
             </span>
-            <div className="flex gap-1">
+            <div className="flex flex-none gap-1">
               <Button
                 data-variant="solid"
                 data-size="sm"
@@ -473,9 +481,15 @@ export function DirectorySearch() {
               <Button
                 data-variant="ghost"
                 data-size="sm"
-                onClick={() => setOfferLocation(false)}
+                aria-label="Ahora no"
+                onClick={() => {
+                  localStorage.setItem(INVITE_DISMISSED_KEY, "1");
+                  setOfferLocation(false);
+                }}
+                className="max-sm:!w-8 max-sm:!px-0"
               >
-                Ahora no
+                <X aria-hidden size={14} className="sm:hidden" />
+                <span className="max-sm:hidden">Ahora no</span>
               </Button>
             </div>
           </div>
