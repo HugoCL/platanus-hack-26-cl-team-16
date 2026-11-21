@@ -89,7 +89,7 @@ export function PinMark({
   return (
     <span
       aria-hidden
-      className={`relative grid size-9 origin-bottom-left place-items-center rounded-[50%_50%_50%_0] transition-[scale] duration-200 ease-[var(--ease-out)] [rotate:-45deg] motion-reduce:transition-none ${
+      className={`relative grid size-9 origin-bottom-left translate-x-1/2 place-items-center rounded-[50%_50%_50%_0] transition-[scale] duration-200 ease-[var(--ease-out)] [rotate:-45deg] motion-reduce:transition-none ${
         isSelected
           ? "z-20 scale-[1.2] bg-primary text-primary-foreground shadow-[0_0_0_3px_color-mix(in_oklch,var(--ui-primary)_20%,transparent)]"
           : prospect
