@@ -20,6 +20,16 @@ import {
 } from "@ui-sdk/react/select";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@ui-sdk/react/tabs";
 import { Textarea } from "@ui-sdk/react/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-sdk/react/tooltip";
+import {
+  ArrowDownIcon,
+  ArrowLeftRightIcon,
+  ArrowUpIcon,
+  BadgeCheckIcon,
+  PanelRightIcon,
+  ShieldCheckIcon,
+  UserIcon,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { UiSpec } from "@/shared/genui";
 import { MAX_TEXT_LENGTH } from "@/shared/messages";
@@ -30,15 +40,6 @@ import {
   DEMO_VIEWER,
   MODERATOR_MODEL,
 } from "./demo-session";
-import {
-  ArrowDownIcon,
-  CheckIcon,
-  PanelIcon,
-  SendIcon,
-  ShieldIcon,
-  SwapIcon,
-  UserIcon,
-} from "./icons";
 import { MessageItem } from "./message-item";
 import { ReasonList } from "./moderation";
 import {
@@ -148,7 +149,7 @@ export function DemoRoom() {
             onTogglePanel={() => setPanelOpen((o) => !o)}
           />
           <p className="m-0 flex items-center gap-1.5 border-b border-border bg-muted px-4 py-1.5 text-xs text-subtle-foreground">
-            <ShieldIcon size={13} />
+            <ShieldCheckIcon size={13} />
             Moderada · cada mensaje es revisado antes de entregarse
           </p>
           <Thread
@@ -374,13 +375,20 @@ function SessionHeader({
         <h1 className="m-0 flex flex-wrap items-center gap-1.5 text-sm font-semibold">
           <Avatar participant={self} size={24} />
           {self?.name}
-          <SwapIcon size={14} className="text-subtle-foreground" />
+          <ArrowLeftRightIcon size={14} className="text-subtle-foreground" />
           <Avatar participant={other} size={24} />
           {other?.name}
-          <span className="inline-flex items-center gap-0.5 text-xs font-normal text-subtle-foreground">
-            <CheckIcon size={12} />
-            Verificada
-          </span>
+          <Tooltip>
+            <TooltipTrigger
+              aria-label="Ficha verificada"
+              data-size="sm"
+              data-variant="ghost"
+              className="!h-6 !w-6 !p-0 text-subtle-foreground"
+            >
+              <BadgeCheckIcon size={14} />
+            </TooltipTrigger>
+            <TooltipContent>Ficha verificada</TooltipContent>
+          </Tooltip>
         </h1>
         <p className="m-0 truncate text-xs text-subtle-foreground">
           <code className="font-mono">{contract.intent.name}</code> · “
@@ -418,7 +426,7 @@ function SessionHeader({
           className="hidden lg:inline-flex"
           onClick={onTogglePanel}
         >
-          <PanelIcon />
+          <PanelRightIcon size={16} />
         </Button>
       </div>
     </header>
@@ -617,7 +625,7 @@ function Composer({
             className="!w-10 !p-0"
             data-size="lg"
           >
-            <SendIcon />
+            <ArrowUpIcon size={16} />
           </Button>
         </div>
         <div className="flex justify-between text-[11px] text-subtle-foreground">

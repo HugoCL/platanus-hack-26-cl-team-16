@@ -6,7 +6,7 @@ import { expect, it } from "vitest";
 import { api, internal } from "../convex/_generated/api";
 import schema from "../convex/schema";
 import { SEED_AGENTS } from "../shared/seed-data";
-import DirectoryList from "../src/components/directory-list";
+import DirectoryList from "../src/components/directory/directory-list";
 
 const modules = import.meta.glob("../convex/**/*.ts");
 
@@ -29,6 +29,8 @@ it("5. the web view shows every seed card", async () => {
       renderToStaticMarkup(createElement(Fragment, null, card.purpose)),
     );
   }
-  expect(html).toContain("Cardiología, Medicina general · Providencia");
-  expect(html).toContain("Sin reclamar");
+  expect(html).toContain("Clínica Providencia Salud");
+  expect(html).toContain("Providencia · Hospedado");
+  expect(html).toContain("Sin reclamar · pre-armado");
+  expect(html).toContain('href="/directorio/cafe-los-dominicos"');
 });

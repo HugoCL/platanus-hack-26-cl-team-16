@@ -4,6 +4,11 @@
  * specificity, and stay below Tailwind utilities so a class still wins.
  */
 @layer components {
+  /* Lucide icons: 1.5px strokes, as the system asks (Lucide draws 2px). */
+  .lucide {
+    stroke-width: 1.5;
+  }
+
   :is(
     [data-slot="button"],
     [data-slot="dialog-trigger"],

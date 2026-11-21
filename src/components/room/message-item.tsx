@@ -1,17 +1,17 @@
 "use client";
 
 import { Button } from "@ui-sdk/react/button";
+import {
+  BanIcon,
+  LockIcon,
+  ReplyIcon,
+  ShieldCheckIcon,
+  TriangleAlertIcon,
+  UserIcon,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import type { UiResponse, UiSpec } from "@/shared/genui";
 import { type GenUiAnswer, GenUiBlock } from "./genui-block";
-import {
-  AlertIcon,
-  BlockIcon,
-  LockIcon,
-  ReplyIcon,
-  ShieldIcon,
-  UserIcon,
-} from "./icons";
 import { ModerationBadge, PendingStages } from "./moderation";
 import {
   canSeeContent,
@@ -255,7 +255,7 @@ function BlockedBody({
   return (
     <div className="flex flex-col gap-2 text-foreground">
       <p className="m-0 inline-flex items-center gap-1.5 font-medium text-destructive-text">
-        <BlockIcon size={15} />
+        <BanIcon size={15} />
         {moderatorError
           ? "No se pudo verificar, por seguridad no se entregó"
           : "Este mensaje no fue entregado"}
@@ -281,9 +281,9 @@ function BlockedBody({
 }
 
 const SYSTEM_ICONS: Partial<Record<string, ReactNode>> = {
-  message_blocked: <BlockIcon size={13} />,
-  escalation_requested: <AlertIcon size={13} />,
-  session_terminated: <BlockIcon size={13} />,
+  message_blocked: <BanIcon size={13} />,
+  escalation_requested: <TriangleAlertIcon size={13} />,
+  session_terminated: <BanIcon size={13} />,
   human_joined: <UserIcon size={13} />,
   human_took_control: <UserIcon size={13} />,
 };
@@ -316,7 +316,7 @@ export function SystemNotice({
               : "text-subtle-foreground"
       }`}
     >
-      {SYSTEM_ICONS[code] ?? <ShieldIcon size={13} />}
+      {SYSTEM_ICONS[code] ?? <ShieldCheckIcon size={13} />}
       {text}
     </p>
   );

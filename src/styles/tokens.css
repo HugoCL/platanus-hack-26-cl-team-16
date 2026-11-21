@@ -93,6 +93,11 @@
   );
   --sm-warning: light-dark(oklch(0.666 0.179 58.318), oklch(0.769 0.188 70.08));
 
+  /* Directory map: land fill and the viewer's own position */
+  --sm-map-land: light-dark(oklch(0.955 0.004 95), oklch(0.2 0.005 56));
+  --sm-map-grid: light-dark(oklch(0.9 0.004 95), oklch(0.26 0.006 56));
+  --sm-map-you: oklch(0.6 0.15 250);
+
   --sm-radius-2xl: 13px; /* swatches, map, inner panels */
   --sm-radius-3xl: 16px; /* bubbles, inputs, options */
   --sm-radius-4xl: 19px; /* cards */

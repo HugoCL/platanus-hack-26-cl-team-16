@@ -18,6 +18,16 @@ import {
   SelectValue,
 } from "@ui-sdk/react/select";
 import { Textarea } from "@ui-sdk/react/textarea";
+import {
+  CalendarIcon,
+  CheckIcon,
+  FileTextIcon,
+  ListIcon,
+  MapPinIcon,
+  PanelTopIcon,
+  ShieldCheckIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
 import { type FormEvent, type ReactNode, useState } from "react";
 import type { z } from "zod";
 import {
@@ -31,16 +41,6 @@ import {
   type UiResponse,
   UiSpec,
 } from "@/shared/genui";
-import {
-  AlertIcon,
-  CalendarIcon,
-  CardIcon,
-  CheckIcon,
-  FormIcon,
-  ListIcon,
-  PinIcon,
-  ShieldIcon,
-} from "./icons";
 import { formatTime, groupSlotsByDay } from "./room-format";
 
 export type GenUiAnswer = { response: UiResponse; at: number };
@@ -53,13 +53,13 @@ type BlockProps<S> = {
 };
 
 const TYPE_META: Record<UiSpec["type"], { label: string; icon: ReactNode }> = {
-  card: { label: "Tarjeta", icon: <CardIcon /> },
-  form: { label: "Formulario", icon: <FormIcon /> },
-  slot_picker: { label: "Horarios", icon: <CalendarIcon /> },
-  confirmation: { label: "Confirmación", icon: <CheckIcon /> },
-  list: { label: "Lista", icon: <ListIcon /> },
-  map_pin: { label: "Ubicación", icon: <PinIcon /> },
-  moderator_alert: { label: "Moderador", icon: <ShieldIcon /> },
+  card: { label: "Tarjeta", icon: <PanelTopIcon size={16} /> },
+  form: { label: "Formulario", icon: <FileTextIcon size={16} /> },
+  slot_picker: { label: "Horarios", icon: <CalendarIcon size={16} /> },
+  confirmation: { label: "Confirmación", icon: <CheckIcon size={16} /> },
+  list: { label: "Lista", icon: <ListIcon size={16} /> },
+  map_pin: { label: "Ubicación", icon: <MapPinIcon size={16} /> },
+  moderator_alert: { label: "Moderador", icon: <ShieldCheckIcon size={16} /> },
 };
 
 export function GenUiBlock({
@@ -599,7 +599,7 @@ function ModeratorAlertBlock({
 }) {
   return (
     <div className="flex items-start gap-2 rounded-2xl bg-destructive-soft p-3 text-sm text-destructive-text">
-      <AlertIcon className="mt-0.5 shrink-0" />
+      <TriangleAlertIcon size={16} className="mt-0.5 shrink-0" />
       <div className="flex flex-col gap-0.5">
         <code className="font-mono text-xs">{spec.rule}</code>
         <span>{spec.reason}</span>

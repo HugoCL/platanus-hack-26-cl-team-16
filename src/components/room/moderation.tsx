@@ -11,15 +11,15 @@ import {
   MeterValue,
 } from "@ui-sdk/react/meter";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-sdk/react/tooltip";
-import type { ReactNode } from "react";
-import type { ModerationReason, ModerationStatus } from "@/shared/moderation";
 import {
-  AlertIcon,
-  BlockIcon,
+  BanIcon,
   CheckIcon,
   ClockIcon,
   PencilIcon,
-} from "./icons";
+  TriangleAlertIcon,
+} from "lucide-react";
+import type { ReactNode } from "react";
+import type { ModerationReason, ModerationStatus } from "@/shared/moderation";
 import { REASON_LABELS, STAGE_LABELS } from "./room-format";
 
 const BADGES: Record<
@@ -40,12 +40,12 @@ const BADGES: Record<
   },
   blocked: {
     label: "Bloqueado",
-    icon: <BlockIcon size={14} />,
+    icon: <BanIcon size={14} />,
     className: "bg-destructive-soft text-destructive-text",
   },
   escalated: {
     label: "Requiere tu aprobación",
-    icon: <AlertIcon size={14} />,
+    icon: <TriangleAlertIcon size={14} />,
     className: "bg-warning/15 text-foreground",
   },
 };
