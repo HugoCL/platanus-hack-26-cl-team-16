@@ -168,10 +168,14 @@ it("drops a later reply action that the judge's rate limit rejects without faili
       recipient: message.senderParticipantId as Id<"participants">,
       content: { kind: "text", text: "Dos." },
     },
+    { kind: "close" },
   ]);
 
   await send(human, provider);
   await t.finishAllScheduledFunctions(vi.runAllTimers);
+  expect(
+    await t.run(async (ctx) => (await ctx.db.get(sessionId))?.status),
+  ).toBe("closed");
 
   const jobs = await t.run((ctx) =>
     ctx.db.system.query("_scheduled_functions").collect(),

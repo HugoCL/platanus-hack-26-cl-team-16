@@ -271,6 +271,7 @@ export const commit = internalMutation({
         },
       );
     }
+    let terminated = false;
     if (
       verdict.decision === "block" &&
       !args.events.some((event) =>
@@ -279,7 +280,7 @@ export const commit = internalMutation({
     ) {
       const stored = await ctx.db.get("sessions", args.sessionId);
       const violationCount = (stored?.violationCount ?? 0) + 1;
-      const terminated = violationCount >= session.contract.maxViolations;
+      terminated = violationCount >= session.contract.maxViolations;
       await ctx.db.patch("sessions", args.sessionId, {
         violationCount,
         ...(terminated
@@ -297,7 +298,7 @@ export const commit = internalMutation({
     }
     if (agentTurn) {
       await ctx.db.patch("sessions", args.sessionId, { turnCount });
-      if (exhausted) {
+      if (exhausted && !terminated) {
         await publishNotice(
           ctx,
           args.sessionId,
@@ -450,8 +451,14 @@ export const reply = internalAction({
             );
           } else {
             console.error(
-              `gate.reply: dropped ${actions.length - index} of the reply actions of ${self}, rate limited`,
+              `gate.reply: dropped the rate-limited messages of ${self}`,
             );
+            if (actions.slice(index).some((a) => a.kind === "close")) {
+              await ctx.runMutation(internal.rooms.closeAsParticipant, {
+                sessionId,
+                participantId: self,
+              });
+            }
           }
           return null;
         }

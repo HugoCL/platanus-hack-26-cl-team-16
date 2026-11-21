@@ -1,9 +1,15 @@
 // @vitest-environment edge-runtime
 import { beforeEach, describe, expect, it } from "vitest";
-import { internal } from "../../convex/_generated/api";
+import { api, internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { judgeRateLimiter } from "../../convex/moderator";
-import { errorKind, roomWithHuman, seededRooms } from "./roomFixture";
+import {
+  errorKind,
+  REQUEST,
+  ROOM_OWNER,
+  roomWithHuman,
+  seededRooms,
+} from "./roomFixture";
 
 let rooms: Awaited<ReturnType<typeof seededRooms>>;
 let room: Awaited<ReturnType<typeof roomWithHuman>>;
@@ -74,7 +80,7 @@ describe("the judge's rate limit", () => {
   });
 
   it("rate limits opening rooms per initiator before the judge runs", async () => {
-    for (let i = 0; i < 9; i++) await rooms.open();
+    for (let i = 0; i < 10; i++) await rooms.open();
     rooms.judge.mockClear();
     const sessions = () =>
       rooms.t.run(
@@ -85,6 +91,21 @@ describe("the judge's rate limit", () => {
     expect(await errorKind(rooms.open())).toBe("RateLimited");
     expect(rooms.judge).not.toHaveBeenCalled();
     expect(await sessions()).toBe(before);
+  });
+});
+
+describe("opening rooms for signed-in people", () => {
+  it("gives each person their own bucket when they share a consumer agent", async () => {
+    const openAs = (subject: string) =>
+      rooms.t.withIdentity({ subject }).action(internal.rooms.open, {
+        initiatorAgentId: rooms.consumerId,
+        providerAgentId: rooms.clinicId,
+        request: REQUEST,
+        human: { displayName: subject },
+      });
+    for (let i = 0; i < 10; i++) await openAs("ana");
+    expect(await errorKind(openAs("ana"))).toBe("RateLimited");
+    expect(await openAs("bea")).toMatchObject({ status: "active" });
   });
 });
 
@@ -108,6 +129,33 @@ describe("the judge's rate limit under concurrency", () => {
 });
 
 describe("maxViolations", () => {
+  it("publishes only the termination when the terminating block is the last agent turn", async () => {
+    const short = await roomWithHuman(rooms, 3);
+    rooms.judge.mockReturnValue({ decision: "block", rule: "scope" });
+    await send(short.consumer, undefined, short);
+    await send(short.provider, undefined, short);
+    await send(short.consumer, undefined, short);
+    const codes = await rooms.t.run(async (ctx) =>
+      (
+        await ctx.db
+          .query("messages")
+          .withIndex("by_sessionId", (q) => q.eq("sessionId", short.sessionId))
+          .collect()
+      ).flatMap((m) => (m.content.kind === "system" ? [m.content.code] : [])),
+    );
+    expect(codes).toEqual(["session_opened", "session_terminated"]);
+  });
+
+  it("lets a participant close a terminated room without an error", async () => {
+    rooms.judge.mockReturnValue({ decision: "block", rule: "scope" });
+    for (let i = 0; i < 3; i++) await send(room.consumer);
+    expect(
+      await rooms.t.withIdentity(ROOM_OWNER).mutation(api.rooms.close, {
+        sessionId: room.sessionId,
+      }),
+    ).toEqual({ sessionId: room.sessionId, status: "terminated" });
+  });
+
   it("does not count a moderator failure as a violation", async () => {
     rooms.judge.mockImplementation(() => {
       throw new Error("openrouter 503");
