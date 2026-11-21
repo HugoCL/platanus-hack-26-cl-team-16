@@ -4,7 +4,6 @@ import {
   type ModerationCase,
   moderationInput,
 } from "../shared/fixtures/moderation-set";
-import { JUDGE_HISTORY_SIZE } from "../shared/moderator/judge";
 import {
   createModerator,
   MODERATOR_TIMEOUT_MS,
@@ -33,7 +32,8 @@ function scriptedJudge() {
         (c) => JSON.stringify(c.message.content) === content,
       );
       if (!c) throw new Error("fake judge: no scripted answer");
-      return c.expected.decision === "allow"
+      return c.expected.decision === "allow" ||
+        (args.role === "moderator" && c.expected.stage !== "injection")
         ? { decision: "allow", rule: "purpose" }
         : { decision: "block", rule: c.expected.rule };
     },
@@ -47,6 +47,70 @@ function stubbornJudge(answer: LlmProvider["generateObject"]): LlmProvider {
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe("parallel judges", () => {
+  it.each([
+    ["allow", "allow", undefined],
+    ["block", "allow", "injection"],
+    ["allow", "block", "scope"],
+    ["block", "block", "injection"],
+    ["error", "allow", "purpose"],
+    ["allow", "error", "purpose"],
+  ])(
+    "combines message %s and conversation %s",
+    async (message, conversation, rule) => {
+      const llm = createFakeLlmProvider({
+        object: ({ role }) => {
+          const decision = role === "moderator" ? message : conversation;
+          if (decision === "error") throw new Error("private provider failure");
+          return {
+            decision,
+            rule: role === "moderator" ? "injection" : "scope",
+          };
+        },
+      });
+      const result = await createModerator({
+        llm,
+        model: "message-model",
+        conversationModel: "conversation-model",
+      }).moderate(moderationInput(caseById("clinica-pide-hora")));
+      expect(result.verdict).toMatchObject(
+        rule ? { decision: "block", rule } : { decision: "allow" },
+      );
+      expect(result.events).toMatchObject([
+        { stage: "deterministic" },
+        {
+          stage: "injection",
+          model: "message-model",
+          latencyMs: expect.any(Number),
+        },
+        {
+          stage: "purpose",
+          model: "conversation-model",
+          latencyMs: expect.any(Number),
+        },
+      ]);
+    },
+  );
+
+  it("starts both judges before either settles", async () => {
+    const started: string[] = [];
+    const releases: (() => void)[] = [];
+    const llm = stubbornJudge(<T>({ role }: LlmPrompt) => {
+      started.push(role);
+      return new Promise<T>((resolve) =>
+        releases.push(() => resolve({ decision: "allow" } as T)),
+      );
+    });
+    const pending = createModerator({ llm }).moderate(
+      moderationInput(caseById("clinica-pide-hora")),
+    );
+    await Promise.resolve();
+    expect(started).toEqual(["moderator", "conversation_moderator"]);
+    for (const release of releases) release();
+    expect((await pending).verdict.decision).toBe("allow");
+  });
 });
 
 describe("criterion 1: the set with the scripted fake LLM", () => {
@@ -67,10 +131,12 @@ describe("criterion 1: the set with the scripted fake LLM", () => {
       expect(events.map((e) => e.stage)).toEqual(
         decidedBy === "deterministic"
           ? ["deterministic"]
-          : ["deterministic", "purpose"],
+          : ["deterministic", "injection", "purpose"],
       );
-      expect(events.at(-1)?.action).toBe(c.expected.decision);
-      expect(prompts).toHaveLength(decidedBy === "deterministic" ? 0 : 1);
+      expect(events.find((e) => e.stage === decidedBy)?.action).toBe(
+        c.expected.decision,
+      );
+      expect(prompts).toHaveLength(decidedBy === "deterministic" ? 0 : 2);
     },
   );
 });
@@ -158,9 +224,9 @@ describe("criterion 5: fail-closed", () => {
   ])("blocks when %s", async (_why, llm) => {
     const generateObject = vi.spyOn(llm, "generateObject");
     const { verdict, events } = await createModerator({ llm }).moderate(legit);
-    expect(generateObject).toHaveBeenCalledTimes(1);
+    expect(generateObject).toHaveBeenCalledTimes(2);
     expect(verdict).toMatchObject({ decision: "block", rule: "purpose" });
-    expect(events[1]).toMatchObject({ stage: "purpose", action: "block" });
+    expect(events[1]).toMatchObject({ stage: "injection", action: "block" });
     expect(events[1].reasons[0].code).toBe("moderator_error");
     expect(JSON.stringify({ verdict, events })).not.toMatch(
       /secreto|maybe|Zod|invalid_value/i,
@@ -190,8 +256,8 @@ describe("criterion 5: fail-closed", () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(first?.aborted).toBe(true);
     expect(settled).toBe(false);
-    expect(generateObject).toHaveBeenCalledTimes(2);
-    const second = generateObject.mock.calls[1][0].abortSignal;
+    expect(generateObject).toHaveBeenCalledTimes(4);
+    const second = generateObject.mock.calls[2][0].abortSignal;
     expect(second).not.toBe(first);
     expect(second?.aborted).toBe(false);
     await vi.advanceTimersByTimeAsync(MODERATOR_TIMEOUT_MS - 1);
@@ -200,12 +266,12 @@ describe("criterion 5: fail-closed", () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(second?.aborted).toBe(true);
     const { verdict, events } = await result;
-    expect(generateObject).toHaveBeenCalledTimes(2);
-    expect(beforeJudge).toHaveBeenCalledTimes(2);
+    expect(generateObject).toHaveBeenCalledTimes(4);
+    expect(beforeJudge).toHaveBeenCalledTimes(4);
 
     expect(verdict).toMatchObject({ decision: "block", rule: "purpose" });
     expect(events[1]).toMatchObject({
-      stage: "purpose",
+      stage: "injection",
       action: "block",
       model: "fake/moderador",
       latencyMs: 2 * MODERATOR_TIMEOUT_MS,
@@ -242,7 +308,7 @@ describe("criterion 5: fail-closed", () => {
       const { verdict, events } = await result;
       expect(verdict.decision).toBe(kind === "allow" ? "allow" : "block");
       expect(events[1].reasons.map((r) => r.code)).toEqual(codes);
-      expect(generateObject).toHaveBeenCalledTimes(2);
+      expect(generateObject).toHaveBeenCalledTimes(3);
     },
   );
 
@@ -275,7 +341,7 @@ describe("criterion 5: fail-closed", () => {
         legit,
       );
       expect(verdict.decision).toBe(answer.decision);
-      expect(generateObject).toHaveBeenCalledTimes(1);
+      expect(generateObject).toHaveBeenCalledTimes(2);
       expect(events[1].reasons.map((r) => r.code)).toEqual(codes);
     },
   );
@@ -313,7 +379,7 @@ describe("public reasons", () => {
 });
 
 describe("the judge prompt", () => {
-  it("carries the contract, the last 8 messages and the message as data", async () => {
+  it("isolates the message judge and gives the conversation judge all bounded history", async () => {
     const c = caseById("clinica-pide-hora");
     const input = moderationInput({
       ...c,
@@ -343,16 +409,18 @@ describe("the judge prompt", () => {
 
     await createModerator({ llm }).moderate(input);
 
-    const [{ role, system, prompt }] = prompts;
-    expect(role).toBe("moderator");
+    const [message, { role, system, prompt }] = prompts;
+    expect(message.role).toBe("moderator");
+    expect(message.prompt).not.toContain("<historial>");
+    expect(message.prompt).not.toContain("mensaje número");
+    expect(role).toBe("conversation_moderator");
     expect(system).toMatch(/lista blanca/);
     expect(prompt).toContain(JSON.stringify(input.contract.allowedIntents));
     expect(prompt).toContain("proveedor (agente proveedor)");
     const shown = Array.from({ length: 12 }, (_, i) => i).filter((i) =>
       prompt.includes(`mensaje número ${i}"`),
     );
-    expect(shown).toEqual([4, 5, 6, 7, 8, 9, 10]);
-    expect(JUDGE_HISTORY_SIZE).toBe(8);
+    expect(shown).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     expect(prompt).toContain("[mensaje bloqueado por el moderador]");
     expect(prompt.match(/<\/mensaje>/g)).toHaveLength(1);
     expect(prompt).toContain("\\u003c/mensaje>");

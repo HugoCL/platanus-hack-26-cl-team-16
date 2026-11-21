@@ -24,7 +24,12 @@ export async function seededRooms({
   transactionLimits?: boolean;
 } = {}) {
   const judge = vi.fn((): unknown => ({ decision: "allow", rule: "purpose" }));
-  const llm = providers.createFakeLlmProvider({ object: judge });
+  const llm = providers.createFakeLlmProvider({
+    object: (args) =>
+      args.role === "moderator"
+        ? { decision: "allow", rule: "purpose" }
+        : judge(),
+  });
   const createLlm = vi
     .spyOn(providers, "createLlmProvider")
     .mockReturnValue(llm);

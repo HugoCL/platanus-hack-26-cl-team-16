@@ -267,6 +267,11 @@ describe("the request passes the moderator before the room opens", () => {
       }),
       expect.objectContaining({
         messageId: notice?._id,
+        stage: "injection",
+        action: "allow",
+      }),
+      expect.objectContaining({
+        messageId: notice?._id,
         stage: "purpose",
         action: "allow",
       }),

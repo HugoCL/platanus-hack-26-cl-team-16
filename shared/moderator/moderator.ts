@@ -7,7 +7,7 @@ import type {
   VerdictRule,
 } from "../moderation";
 import type { LlmProvider } from "../providers/llm";
-import { type JudgeDecision, judge } from "./judge";
+import { conversationJudge, type JudgeDecision, messageJudge } from "./judge";
 import { checkRules } from "./rules";
 
 export const MODERATOR_TIMEOUT_MS = 3000;
@@ -43,11 +43,13 @@ class JudgeTimeout extends Error {}
 export function createModerator({
   llm,
   model,
+  conversationModel,
   timeoutMs = MODERATOR_TIMEOUT_MS,
   beforeJudge,
 }: {
   llm: LlmProvider;
   model?: string;
+  conversationModel?: string;
   timeoutMs?: number;
   beforeJudge?: () => Promise<void>;
 }): Moderator {
@@ -75,66 +77,80 @@ export function createModerator({
         };
       }
 
-      await beforeJudge?.();
-      const started = Date.now();
-      for (let retry = false; ; retry = true) {
-        let attemptStarted = false;
-        let verdict: Verdict;
-        let reasons: ModerationReason[];
-        try {
-          if (retry) await beforeJudge?.();
-          attemptStarted = true;
-          const decision = await withTimeout(
-            (signal) => judge(llm, input, signal),
-            timeoutMs,
-          );
-          verdict = publicVerdict(decision);
-          reasons =
-            decision.decision === "block"
-              ? [
-                  {
-                    code: JUDGE_BLOCK[decision.rule].code,
-                    stage: "purpose",
-                    detail: JUDGE_BLOCK[decision.rule].reason,
-                  },
-                ]
-              : [];
-        } catch (error) {
-          const timedOut = error instanceof JudgeTimeout;
-          if (timedOut && !retry) continue;
-          verdict = {
-            decision: "block",
-            rule: "purpose",
-            reason: timedOut
-              ? "El moderador no respondió a tiempo; el mensaje se bloqueó."
-              : "El moderador falló; el mensaje se bloqueó.",
-          };
-          reasons = [
-            {
-              code: "moderator_error",
-              stage: "purpose",
-              detail: timedOut
-                ? `El juez no respondió en ${2 * timeoutMs} ms.`
-                : attemptStarted
-                  ? "El juez falló o devolvió una respuesta inválida."
-                  : "No se pudo iniciar el reintento del juez.",
-            },
-          ];
-        }
-        return {
-          verdict,
-          events: [
-            deterministic,
-            {
-              stage: "purpose",
+      const runJudge = async (
+        run: typeof messageJudge,
+        stage: "injection" | "purpose",
+        model?: string,
+      ) => {
+        await beforeJudge?.();
+        const started = Date.now();
+        for (let retry = false; ; retry = true) {
+          let attemptStarted = false;
+          let verdict: Verdict;
+          let reasons: ModerationReason[];
+          try {
+            if (retry) await beforeJudge?.();
+            attemptStarted = true;
+            const decision = await withTimeout(
+              (signal) => run(llm, input, signal),
+              timeoutMs,
+            );
+            verdict = publicVerdict(decision);
+            reasons =
+              decision.decision === "block"
+                ? [
+                    {
+                      code: JUDGE_BLOCK[decision.rule].code,
+                      stage,
+                      detail: JUDGE_BLOCK[decision.rule].reason,
+                    },
+                  ]
+                : [];
+          } catch (error) {
+            const timedOut = error instanceof JudgeTimeout;
+            if (timedOut && !retry) continue;
+            verdict = {
+              decision: "block",
+              rule: "purpose",
+              reason: timedOut
+                ? "El moderador no respondió a tiempo; el mensaje se bloqueó."
+                : "El moderador falló; el mensaje se bloqueó.",
+            };
+            reasons = [
+              {
+                code: "moderator_error",
+                stage,
+                detail: timedOut
+                  ? `El juez no respondió en ${2 * timeoutMs} ms.`
+                  : attemptStarted
+                    ? "El juez falló o devolvió una respuesta inválida."
+                    : "No se pudo iniciar el reintento del juez.",
+              },
+            ];
+          }
+          return {
+            verdict,
+            event: {
+              stage,
               action: verdict.decision,
               reasons,
               model,
               latencyMs: Date.now() - started,
             },
-          ],
-        };
-      }
+          };
+        }
+      };
+      const [message, conversation] = await Promise.all([
+        runJudge(messageJudge, "injection", model),
+        runJudge(conversationJudge, "purpose", conversationModel),
+      ]);
+      return {
+        verdict:
+          message.verdict.decision === "block"
+            ? message.verdict
+            : conversation.verdict,
+        events: [deterministic, message.event, conversation.event],
+      };
     },
   };
 }

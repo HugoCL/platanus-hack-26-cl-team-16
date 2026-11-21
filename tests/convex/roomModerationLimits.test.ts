@@ -124,7 +124,7 @@ describe("the judge's rate limit under concurrency", () => {
         key: `participant:${room.human}`,
       }),
     );
-    expect(Math.floor(tokens.value)).toBe(9);
+    expect(Math.floor(tokens.value)).toBe(18);
   });
 });
 

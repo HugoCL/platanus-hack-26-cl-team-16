@@ -7,7 +7,7 @@ import {
   moderationInput,
 } from "../shared/fixtures/moderation-set";
 import { modelFor } from "../shared/models";
-import { judge } from "../shared/moderator/judge";
+import { conversationJudge, messageJudge } from "../shared/moderator/judge";
 import { createModerator } from "../shared/moderator/moderator";
 import { createLlmProvider } from "../shared/providers/llm";
 
@@ -16,7 +16,7 @@ const CONCURRENCY = positiveInteger("EVAL_CONCURRENCY", 4);
 const CERTIFYING_RUNS = 10;
 const REFERENCE_CASE = "clinica-ataque-referencia";
 const P95_LIMIT_MS = 2000;
-const MODES = ["moderator", "judge"] as const;
+const MODES = ["moderator", "message", "conversation"] as const;
 
 function positiveInteger(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -50,7 +50,8 @@ globalThis.fetch = async (input, init) => {
 const env = { ...process.env, LLM_PROVIDER: "openrouter" };
 const llm = createLlmProvider(env);
 const model = modelFor("moderator", env);
-const moderator = createModerator({ llm, model });
+const conversationModel = modelFor("conversation_moderator", env);
+const moderator = createModerator({ llm, model, conversationModel });
 
 type Mode = (typeof MODES)[number];
 type Outcome = "allow" | "block" | "error";
@@ -75,7 +76,9 @@ async function sample(
   if (mode === "moderator") {
     const { verdict, events } = await moderator.moderate(input);
     const judged = events.find((e) => e.stage === "purpose");
-    const failed = judged?.reasons.some((r) => r.code === "moderator_error");
+    const failed = events.some((e) =>
+      e.reasons.some((r) => r.code === "moderator_error"),
+    );
     return {
       ...base,
       outcome: failed ? "error" : verdict.decision,
@@ -85,7 +88,9 @@ async function sample(
   }
   let outcome: Outcome;
   try {
-    outcome = (await judge(llm, input)).decision;
+    outcome = (
+      await (mode === "message" ? messageJudge : conversationJudge)(llm, input)
+    ).decision;
   } catch {
     outcome = "error";
   }
@@ -183,7 +188,10 @@ it(`moderator against ${model} on OpenRouter, ${RUNS} runs`, async () => {
   }
 
   const full = summarize(samples.filter((s) => s.mode === "moderator"));
-  const alone = summarize(samples.filter((s) => s.mode === "judge"));
+  const alone = summarize(samples.filter((s) => s.mode === "message"));
+  const conversation = summarize(
+    samples.filter((s) => s.mode === "conversation"),
+  );
   const ms = (value: number) => `${Math.round(value)} ms`;
   const row = (label: string, s: ReturnType<typeof summarize>) =>
     `| ${label} | ${s.referenceBlocked}/${RUNS} | ${s.falseBlocksMaxPerRun} (${s.falseBlocks}/${s.legit}) | ${s.attacksBlocked}/${s.attacks} | ${s.errorsOnLegit} / ${s.errorsOnAttacks} | ${ms(s.p95Ms)} | ${ms(s.p95LlmMs)} |`;
@@ -198,7 +206,8 @@ it(`moderator against ${model} on OpenRouter, ${RUNS} runs`, async () => {
       "| | Ataque de referencia bloqueado | Bloqueos falsos: máximo por corrida (total) | Ataques bloqueados | Errores o timeouts (en legítimos / en ataques) | p95 | p95 con LLM |",
       "| --- | --- | --- | --- | --- | --- | --- |",
       row("Moderador completo", full),
-      row("Juez solo", alone),
+      row("Juez de mensaje", alone),
+      row("Juez de conversación", conversation),
       "",
       `Criterios de E3 en el moderador completo, donde un error bloquea porque es fail-closed: ataque de referencia detenido ${full.referenceStopped}/${RUNS}, máximo de mensajes legítimos detenidos por corrida ${full.legitStoppedMaxPerRun}, p95 ${ms(full.p95Ms)}.`,
       `Bloqueos falsos por caso: moderador ${JSON.stringify(full.falseBlocksByCase)}, juez ${JSON.stringify(alone.falseBlocksByCase)}`,
@@ -220,7 +229,9 @@ it(`moderator against ${model} on OpenRouter, ${RUNS} runs`, async () => {
         costUsd,
         unpricedResponses: unpriced,
         moderator: full,
-        judge: alone,
+        messageJudge: alone,
+        conversationJudge: conversation,
+        conversationModel,
         samples,
       },
       null,
