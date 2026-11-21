@@ -4,7 +4,12 @@ import { api, internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { allowAllModerator } from "../../convex/moderator";
 import { testRoomAgent } from "../../convex/roomAgent";
-import { errorKind, roomWithHuman, seededRooms } from "./roomFixture";
+import {
+  errorKind,
+  ROOM_OWNER,
+  roomWithHuman,
+  seededRooms,
+} from "./roomFixture";
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => {
@@ -23,14 +28,17 @@ async function setup() {
     human,
     sessionId,
     send: (recipient: Id<"participants"> | "all" = provider) =>
-      t.action(api.gate.send, {
+      t.action(internal.gate.sendAsParticipant, {
         sessionId,
         senderParticipantId: consumer,
         recipient,
         content: { kind: "text", text: "¿Tienes horas?" },
       }),
     history: (viewerParticipantId = consumer) =>
-      t.query(api.gate.history, { sessionId, viewerParticipantId }),
+      t.query(internal.gate.historyForParticipant, {
+        sessionId,
+        viewerParticipantId,
+      }),
     finishReplies: () => t.finishAllScheduledFunctions(vi.runAllTimers),
   };
 }
@@ -176,7 +184,11 @@ it("closes the room when an agent asks, like rooms.close, and drops what follows
     { kind: "system", code: "session_closed" },
   ]);
   expect(
-    (await room.t.query(api.rooms.get, { sessionId: room.sessionId }))?.status,
+    (
+      await room.t
+        .withIdentity(ROOM_OWNER)
+        .query(api.rooms.get, { sessionId: room.sessionId })
+    )?.status,
   ).toBe("closed");
   expect(await errorKind(room.send())).toBe("RoomClosed");
 });
@@ -186,7 +198,7 @@ it("gives every agent a turn for a human's message to everyone, and none for an 
   const agent = vi.spyOn(testRoomAgent, "reply");
   const toEveryone = { kind: "text" as const, text: "Hola a todos." };
 
-  await room.t.action(api.gate.send, {
+  await room.t.action(internal.gate.sendAsParticipant, {
     sessionId: room.sessionId,
     senderParticipantId: room.human,
     recipient: "all",
@@ -231,7 +243,11 @@ it("drops a whole reply that addresses someone outside the room", async () => {
 
   expect((await room.history(room.human)).slice(1)).toEqual([sent]);
   expect(
-    (await room.t.query(api.rooms.get, { sessionId: room.sessionId }))?.status,
+    (
+      await room.t
+        .withIdentity(ROOM_OWNER)
+        .query(api.rooms.get, { sessionId: room.sessionId })
+    )?.status,
   ).toBe("active");
 });
 
@@ -259,7 +275,11 @@ it("stops a reply at the first send the moderator blocks", async () => {
   await room.finishReplies();
 
   expect(
-    (await room.t.query(api.rooms.get, { sessionId: room.sessionId }))?.status,
+    (
+      await room.t
+        .withIdentity(ROOM_OWNER)
+        .query(api.rooms.get, { sessionId: room.sessionId })
+    )?.status,
   ).toBe("active");
   expect((await room.history(room.human)).at(-1)).toMatchObject({
     content: { kind: "ui", spec: { type: "moderator_alert" } },
