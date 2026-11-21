@@ -8,11 +8,41 @@ import {
   DEMO_VIEWER,
 } from "../src/components/room/demo-session";
 import { GenUiBlock } from "../src/components/room/genui-block";
+import { MessageItem } from "../src/components/room/message-item";
 import { RoomView } from "../src/components/room/room-view";
 
 vi.mock("../src/components/header-account", () => ({
   HeaderAccount: () => null,
 }));
+
+it("keeps block reasons reachable when the sender can see the original card", () => {
+  const message = DEMO_SCRIPT.find(
+    ({ message }) => message.content.kind === "ui",
+  )?.message;
+  if (!message) throw new Error("Missing UI message");
+  const html = renderToStaticMarkup(
+    createElement(MessageItem, {
+      message: {
+        ...message,
+        senderParticipantId: "self",
+        status: "blocked",
+        reasons: [
+          {
+            code: "off_purpose",
+            stage: "purpose",
+            detail: "Fuera del contrato",
+          },
+        ],
+      },
+      viewer: { role: "owner", ownParticipantIds: ["self"] },
+      answers: {},
+      uiSpecsByMessage: {},
+      onRespond: () => {},
+      onShowAudit: () => {},
+    }),
+  );
+  expect(html).toContain("Bloqueado: ver razones del moderador");
+});
 
 it("keeps an explicit confirmation action for keyboard slot selection", () => {
   const message = DEMO_SCRIPT.find(
