@@ -237,7 +237,7 @@ export const DEMO_SCRIPT: ScriptStep[] = [
       content: {
         kind: "system",
         code: "message_blocked",
-        text: "El moderador bloqueó un mensaje · violación 1 de 3",
+        text: "El moderador bloqueó un mensaje · bloqueo 1 de 3",
       },
       status: "allowed",
       verdict: notice,

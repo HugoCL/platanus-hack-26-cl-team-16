@@ -32,6 +32,7 @@ import {
   BotIcon,
   PanelRightIcon,
   SendHorizontalIcon,
+  ShieldAlertIcon,
   ShieldCheckIcon,
   UserIcon,
 } from "lucide-react";
@@ -71,10 +72,10 @@ import {
 } from "./room-format";
 import { useDemoRoom } from "./use-demo-room";
 
-const TONE_SEGMENT = {
-  neutral: "bg-foreground",
-  warning: "bg-warning",
-  danger: "bg-destructive",
+const BLOCK_TONE = {
+  neutral: "bg-muted text-subtle-foreground",
+  warning: "bg-warning/15 text-foreground",
+  danger: "bg-destructive-soft text-destructive-text",
 } as const;
 
 const ROLE_LABELS: Record<Viewer["role"], string> = {
@@ -172,7 +173,7 @@ export function RoomView({
     return map;
   }, [messages]);
 
-  const violations = messages.filter(
+  const blocked = messages.filter(
     (m) => m.status === "blocked" && m.senderParticipantId !== null,
   ).length;
   const readOnly = status !== "active";
@@ -217,8 +218,6 @@ export function RoomView({
             <SessionHeader
               self={self}
               other={other}
-              contract={contract}
-              violations={violations}
               onTogglePanel={() => {
                 if (window.matchMedia("(min-width: 64rem)").matches)
                   setPanelOpen((o) => !o);
@@ -278,6 +277,9 @@ export function RoomView({
             <p role="alert" className="m-0 px-4 py-2 text-sm text-destructive">
               {error}
             </p>
+          ) : null}
+          {contract && blocked > 0 && !readOnly ? (
+            <BlockNotice blocked={blocked} max={contract.maxViolations} />
           ) : null}
           <Composer
             readOnly={readOnly}
@@ -476,21 +478,12 @@ function SessionList({
 function SessionHeader({
   self,
   other,
-  contract,
-  violations,
   onTogglePanel,
 }: {
   self?: RoomParticipant;
   other?: RoomParticipant;
-  contract: SessionContract;
-  violations: number;
   onTogglePanel: () => void;
 }) {
-  const tone = violationTone(violations, contract.maxViolations);
-  const segments = Array.from({ length: contract.maxViolations }, (_, i) => ({
-    id: `violation-${i}`,
-    filled: i < violations,
-  }));
   return (
     <header className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-border px-5 py-4">
       <div className="flex min-w-0 flex-[1_1_18rem] items-center gap-3">
@@ -512,23 +505,6 @@ function SessionHeader({
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
-        <span
-          data-testid="violations"
-          className="inline-flex items-center gap-2 text-subtle-foreground"
-        >
-          <span className="max-sm:sr-only">Violaciones</span>
-          <span aria-hidden="true" className="flex gap-0.5">
-            {segments.map((segment) => (
-              <span
-                key={segment.id}
-                className={`h-1.5 w-3.5 rounded-full ${segment.filled ? TONE_SEGMENT[tone] : "bg-muted-foreground/30"}`}
-              />
-            ))}
-          </span>
-          <span className="font-mono text-foreground tabular-nums">
-            {violations}/{contract.maxViolations}
-          </span>
-        </span>
         <Button
           data-size="sm"
           data-variant="ghost"
@@ -775,6 +751,24 @@ function Composer({
   );
 }
 
+function BlockNotice({ blocked, max }: { blocked: number; max: number }) {
+  return (
+    <div className="px-4 pt-2">
+      <p
+        role="status"
+        className={`m-0 mx-auto flex w-full max-w-3xl items-center gap-2 rounded-2xl px-3 py-2 text-xs ${BLOCK_TONE[violationTone(blocked, max)]}`}
+      >
+        <ShieldAlertIcon size={14} className="shrink-0" />
+        <span>
+          {blocked} de {max}{" "}
+          {max === 1 ? "mensaje bloqueado" : "mensajes bloqueados"}. La sala se
+          cierra al llegar a {max}.
+        </span>
+      </p>
+    </div>
+  );
+}
+
 function SidePanel({
   contract,
   messages,
@@ -799,7 +793,11 @@ function SidePanel({
         <ContractView contract={contract} />
       </TabsPanel>
       <TabsPanel value="auditoria">
-        <AuditView messages={messages} onJump={onJump} />
+        <AuditView
+          messages={messages}
+          maxBlocked={contract.maxViolations}
+          onJump={onJump}
+        />
       </TabsPanel>
       <TabsPanel value="participantes">
         <ParticipantsView participants={participants} role={role} />
@@ -903,8 +901,10 @@ function ContractView({ contract }: { contract: SessionContract }) {
       <Section title="Qué pide el proveedor">
         <Terms items={fields(contract.recipientRequests)} />
       </Section>
-      <Section title="Máximo de violaciones">
-        <p className="m-0">{contract.maxViolations} antes de cerrar la sala</p>
+      <Section title="Máximo de bloqueos">
+        <p className="m-0">
+          {contract.maxViolations} mensajes bloqueados antes de cerrar la sala
+        </p>
       </Section>
       <p className="m-0 text-xs text-subtle-foreground">
         Calculado al abrir la sala cruzando la intención de tu agente con el
@@ -916,11 +916,16 @@ function ContractView({ contract }: { contract: SessionContract }) {
 
 function AuditView({
   messages,
+  maxBlocked,
   onJump,
 }: {
   messages: RoomMessage[];
+  maxBlocked: number;
   onJump: (messageId: string) => void;
 }) {
+  const blocked = messages.filter(
+    (m) => m.status === "blocked" && m.senderParticipantId !== null,
+  ).length;
   const [onlyInterventions, setOnlyInterventions] = useState(false);
   const metrics = auditMetrics(messages);
   const events = messages.filter(
@@ -932,10 +937,11 @@ function AuditView({
 
   return (
     <div className="flex flex-col gap-4">
-      <dl className="m-0 grid grid-cols-3 divide-x divide-border border-y border-border">
+      <dl className="m-0 grid grid-cols-2 gap-y-1 border-y border-border py-1">
         {[
           ["Revisados", metrics.reviewed],
           ["Intervenciones", metrics.interventions],
+          ["Bloqueos", `${blocked}/${maxBlocked}`],
           [
             "Latencia media",
             metrics.averageLatencyMs === null
@@ -943,7 +949,7 @@ function AuditView({
               : formatLatency(metrics.averageLatencyMs),
           ],
         ].map(([label, value]) => (
-          <div key={label} className="flex flex-col px-3 py-2.5 first:pl-0">
+          <div key={label} className="flex flex-col py-1.5">
             <dt className="text-[11px] text-subtle-foreground">{label}</dt>
             <dd className="m-0 text-base font-semibold tabular-nums">
               {value}
