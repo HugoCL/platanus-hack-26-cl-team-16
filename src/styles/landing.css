@@ -76,7 +76,7 @@
     justify-content: center;
   }
 
-  .landing-footer {
+  .landing .site-footer {
     scroll-snap-align: end;
   }
 }
@@ -696,35 +696,6 @@
     display: block;
     color: var(--landing-muted);
   }
-}
-
-.landing-footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem 2rem;
-  padding: 1.5rem var(--landing-pad);
-  background: var(--brand-yellow);
-  color: var(--landing-ink);
-  font: 500 0.75rem / 1.4 var(--ui-font-mono);
-
-  & nav {
-    display: flex;
-    align-items: center;
-    gap: 1.25rem;
-  }
-
-  & a {
-    color: inherit;
-    text-decoration: underline;
-    text-underline-offset: 0.25em;
-  }
-}
-
-.landing-footer-logo {
-  font: 700 1.25rem / 1 var(--ui-font-sans);
-  letter-spacing: -0.03em;
 }
 
 /* Scroll reveal: elements marked data-reveal fade in from a blur as they first enter the

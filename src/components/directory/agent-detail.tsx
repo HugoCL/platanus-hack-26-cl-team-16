@@ -21,6 +21,7 @@ import type { DirectoryCard } from "@/convex/directory";
 import type { Category } from "@/shared/catalog";
 import { CONSUMER_AGENT_SLUG } from "@/shared/seed-data";
 import { dataFieldLabel, intentLabel } from "../room/room-format";
+import { SiteFooter } from "../site-footer";
 import { VerifiedBadge } from "../verified-badge";
 import { isProspect, ProspectBadge } from "./agent-badges";
 import {
@@ -40,7 +41,7 @@ export function AgentDetail({ slug }: { slug: string }) {
   return (
     <div className="flex min-h-dvh flex-col bg-background">
       <SiteHeader current="directory" />
-      <div className="mx-auto flex w-full max-w-280 flex-col gap-7 px-4 pt-6 pb-16 sm:px-6">
+      <div className="mx-auto flex w-full max-w-280 flex-1 flex-col gap-7 px-4 pt-6 pb-16 sm:px-6">
         <nav aria-label="Ruta" className="text-caption">
           <Link
             href="/directory"
@@ -65,6 +66,7 @@ export function AgentDetail({ slug }: { slug: string }) {
           <Detail card={card} categories={categories} />
         )}
       </div>
+      <SiteFooter />
     </div>
   );
 }

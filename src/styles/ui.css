@@ -352,3 +352,33 @@
     transform: none;
   }
 }
+
+/* The yellow footer of the landing, shared by the pages that scroll to an end. */
+.site-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+  padding: 1.5rem clamp(1.25rem, 6vw, 6rem);
+  background: var(--brand-yellow);
+  color: var(--brand-ink);
+  font: 500 0.75rem / 1.4 var(--ui-font-mono);
+
+  & nav {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+  }
+
+  & a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+  }
+}
+
+.site-footer-logo {
+  font: 700 1.25rem / 1 var(--ui-font-sans);
+  letter-spacing: -0.03em;
+}

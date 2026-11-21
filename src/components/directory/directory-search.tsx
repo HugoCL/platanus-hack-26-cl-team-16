@@ -733,7 +733,7 @@ export function DirectorySearch() {
         data-variant="solid"
         data-size="xl"
         onClick={() => setView((v) => (v === "list" ? "map" : "list"))}
-        className="fixed bottom-7 left-1/2 z-40 inline-flex -translate-x-1/2 items-center gap-2 shadow-[0_8px_24px_-6px_oklch(0_0_0/0.35)] lg:!hidden"
+        className="fixed bottom-7 left-1/2 z-40 inline-flex -translate-x-1/2 items-center gap-2 shadow-float lg:!hidden"
       >
         {view === "list" ? (
           <MapIcon aria-hidden size={18} />

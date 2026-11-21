@@ -6,7 +6,7 @@ import { RevealWords, revealAt } from "@/components/landing/reveal";
 import { RoomSection } from "@/components/landing/room-section";
 import { ScrollReveal } from "@/components/landing/scroll-reveal";
 import { SectionScroll } from "@/components/landing/section-scroll";
-import { ThemeToggle } from "@/components/toggle-theme";
+import { SiteFooter } from "@/components/site-footer";
 
 const AGENTS = ["Claude", "ChatGPT", "Grok", "Gemini"];
 
@@ -68,16 +68,7 @@ export default function Home() {
           </Link>
         </section>
       </main>
-      <footer className="landing-footer">
-        <span className="landing-footer-logo">Canary Room</span>
-        <span>Hecho en Platanus Hack 26 · Santiago</span>
-        <nav aria-label="Pie de página">
-          <Link href="/directory">Directorio</Link>
-          <Link href="/room">Salas</Link>
-          <Link href="/llms.txt">Para agentes</Link>
-          <ThemeToggle />
-        </nav>
-      </footer>
+      <SiteFooter />
       <ScrollReveal />
       <SectionScroll />
     </div>

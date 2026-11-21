@@ -76,6 +76,7 @@
   --radius-3xl: var(--sm-radius-3xl);
   --radius-4xl: var(--sm-radius-4xl);
   --shadow-card: var(--ui-shadow);
+  --shadow-float: var(--sm-shadow-float);
   --font-sans: var(--ui-font-sans);
   --font-mono: var(--ui-font-mono);
 
