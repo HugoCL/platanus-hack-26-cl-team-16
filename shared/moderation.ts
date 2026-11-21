@@ -84,8 +84,30 @@ export const DELIVERABLE_STATUSES: readonly ModerationStatus[] = [
   "redacted",
 ];
 
+export const VerdictRule = z.enum([
+  "purpose",
+  "scope",
+  "injection",
+  "sensitive_data",
+]);
+export type VerdictRule = z.infer<typeof VerdictRule>;
+
+export const Verdict = z.discriminatedUnion("decision", [
+  z.object({
+    decision: z.literal("allow"),
+    reason: z.string().min(1).max(500),
+  }),
+  z.object({
+    decision: z.literal("block"),
+    rule: VerdictRule,
+    reason: z.string().min(1).max(500),
+  }),
+]);
+export type Verdict = z.infer<typeof Verdict>;
+
 export const MessageModeration = z.object({
   status: ModerationStatus,
+  verdict: Verdict.optional(),
   reasons,
   redactedText: z.string().optional(),
   decidedAt: z.number().optional(),

@@ -1,13 +1,17 @@
-import { encodeGeohash } from "../geo";
-import type {
+import { z } from "zod";
+import fixtureBusinesses from "../fixtures/businesses.json";
+import { distanceKm, encodeGeohash } from "../geo";
+import type { Env } from "../models";
+import {
   BusinessCandidate,
-  ProspectingScope,
-  SiteExtraction,
+  type BusinessProvider,
+  type ProspectingScope,
+  type SiteExtraction,
+  SiteExtraction as SiteExtractionSchema,
 } from "../prospecting";
-import { SiteExtraction as SiteExtractionSchema } from "../prospecting";
 
 export interface BusinessSource {
-  readonly provider: BusinessCandidate["source"]["provider"];
+  readonly provider: BusinessProvider;
   discover(scope: ProspectingScope): Promise<BusinessCandidate[]>;
 }
 
@@ -15,13 +19,50 @@ export interface BusinessEnricher {
   enrich(websiteUrl: string): Promise<SiteExtraction>;
 }
 
+const FixtureBusiness = BusinessCandidate.extend({
+  location: z.object({
+    lat: z.number(),
+    lng: z.number(),
+    comuna: z.string().min(1),
+    region: z.string().min(1),
+    address: z.string().optional(),
+  }),
+});
+
+export function createFixtureSource(
+  businesses: unknown = fixtureBusinesses,
+): BusinessSource {
+  const parsed = z.array(FixtureBusiness).parse(businesses);
+  return {
+    provider: "fixture",
+    async discover(scope) {
+      const { comuna, center, radiusKm } = scope.area;
+      return parsed
+        .filter((b) => b.category === scope.category)
+        .filter((b) =>
+          comuna
+            ? b.location.comuna === comuna
+            : distanceKm(center, b.location) <= radiusKm,
+        )
+        .slice(0, scope.limit)
+        .map((b) => ({
+          ...b,
+          location: {
+            ...b.location,
+            geohash: encodeGeohash(b.location.lat, b.location.lng),
+          },
+        }));
+    },
+  };
+}
+
 const OSM_TAGS: Record<string, string> = {
-  cafe: '"amenity"="cafe"',
-  restaurant: '"amenity"="restaurant"',
-  clinic: '"amenity"~"clinic|doctors"',
-  dentist: '"amenity"="dentist"',
-  pharmacy: '"amenity"="pharmacy"',
-  bakery: '"shop"="bakery"',
+  cafeteria: '"amenity"="cafe"',
+  restaurante: '"amenity"="restaurant"',
+  salud: '"amenity"~"clinic|doctors"',
+  odontologia: '"amenity"="dentist"',
+  farmacia: '"amenity"="pharmacy"',
+  panaderia: '"shop"="bakery"',
 };
 
 type OverpassElement = {
@@ -34,8 +75,7 @@ type OverpassElement = {
 };
 
 export function createOverpassSource(
-  endpoint = process.env.OVERPASS_URL ??
-    "https://overpass-api.de/api/interpreter",
+  endpoint = "https://overpass-api.de/api/interpreter",
 ): BusinessSource {
   return {
     provider: "osm",
@@ -95,9 +135,17 @@ export function createOverpassSource(
   };
 }
 
-export function createFirecrawlEnricher(
-  apiKey = process.env.FIRECRAWL_API_KEY,
-): BusinessEnricher {
+export function createGooglePlacesSource(apiKey: string): BusinessSource {
+  if (!apiKey) throw new Error("GOOGLE_PLACES_API_KEY is not set");
+  return {
+    provider: "google_places",
+    async discover() {
+      throw new Error("Google Places source is not implemented yet");
+    },
+  };
+}
+
+export function createFirecrawlEnricher(apiKey: string): BusinessEnricher {
   if (!apiKey) throw new Error("FIRECRAWL_API_KEY is not set");
   return {
     async enrich(websiteUrl) {
@@ -127,19 +175,34 @@ export function createFirecrawlEnricher(
   };
 }
 
-export function createGooglePlacesSource(
-  apiKey = process.env.GOOGLE_PLACES_API_KEY,
-): BusinessSource | null {
-  if (!apiKey) return null;
-  return {
-    provider: "google_places",
-    async discover() {
-      throw new Error("Google Places source is not implemented yet");
-    },
-  };
+export function configuredBusinessSources(
+  env: Env = process.env,
+): BusinessSource[] {
+  const names = (env.BUSINESS_SOURCES ?? "fixture")
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+  return names.map((name) => {
+    if (name === "fixture") return createFixtureSource();
+    if (name === "osm") return createOverpassSource(env.OVERPASS_URL);
+    if (name === "google_places") {
+      return createGooglePlacesSource(env.GOOGLE_PLACES_API_KEY ?? "");
+    }
+    throw new Error(
+      `unknown business source "${name}" (use fixture, osm or google_places)`,
+    );
+  });
 }
 
-export function availableBusinessSources(): BusinessSource[] {
-  const places = createGooglePlacesSource();
-  return places ? [places, createOverpassSource()] : [createOverpassSource()];
+export function configuredBusinessEnricher(
+  env: Env = process.env,
+): BusinessEnricher | null {
+  const name = env.BUSINESS_ENRICHER ?? "none";
+  if (name === "none") return null;
+  if (name === "firecrawl") {
+    return createFirecrawlEnricher(env.FIRECRAWL_API_KEY ?? "");
+  }
+  throw new Error(
+    `unknown business enricher "${name}" (use none or firecrawl)`,
+  );
 }

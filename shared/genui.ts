@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { Money } from "./catalog";
+import { VerdictRule } from "./moderation";
 
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 const shortText = z.string().min(1).max(120);
@@ -61,7 +63,7 @@ export const SlotPickerSpec = z.object({
         start: isoDateTime,
         end: isoDateTime,
         label: shortText.optional(),
-        resource: shortText.optional(),
+        detail: shortText.optional(),
       }),
     )
     .min(1)
@@ -105,6 +107,15 @@ export const MapPinSpec = z.object({
   address: z.string().max(200).optional(),
 });
 
+export const ModeratorAlertSpec = z.object({
+  type: z.literal("moderator_alert"),
+  id,
+  title: shortText,
+  rule: VerdictRule,
+  reason: z.string().min(1).max(500),
+  blockedMessageId: z.string().min(1).optional(),
+});
+
 export const UiSpec = z.discriminatedUnion("type", [
   CardSpec,
   FormSpec,
@@ -112,9 +123,31 @@ export const UiSpec = z.discriminatedUnion("type", [
   ConfirmationSpec,
   ListSpec,
   MapPinSpec,
+  ModeratorAlertSpec,
 ]);
 export type UiSpec = z.infer<typeof UiSpec>;
 export type UiComponentType = UiSpec["type"];
+
+export const AgentUiSpec = z.discriminatedUnion("type", [
+  CardSpec,
+  FormSpec,
+  SlotPickerSpec,
+  ConfirmationSpec,
+  ListSpec,
+  MapPinSpec,
+]);
+export type AgentUiSpec = z.infer<typeof AgentUiSpec>;
+
+export const Phase1UiSpec = z.discriminatedUnion("type", [
+  SlotPickerSpec,
+  ConfirmationSpec,
+  CardSpec,
+  ModeratorAlertSpec,
+]);
+export type Phase1UiSpec = z.infer<typeof Phase1UiSpec>;
+export const PHASE1_UI_COMPONENTS = Phase1UiSpec.options.map(
+  (option) => option.shape.type.value,
+);
 
 export const UiResponse = z.discriminatedUnion("type", [
   z.object({ type: z.literal("card_action"), cardId: id, actionId: id }),
@@ -139,3 +172,61 @@ export const UiResponse = z.discriminatedUnion("type", [
   }),
 ]);
 export type UiResponse = z.infer<typeof UiResponse>;
+
+const httpsImage = z.url({ protocol: /^https$/ });
+
+export const ProductCardSpec = z.object({
+  type: z.literal("product_card"),
+  id,
+  offeringId: z.string().min(1),
+  name: shortText,
+  description: longText.optional(),
+  imageUrl: httpsImage.optional(),
+  price: Money.optional(),
+});
+
+export const ProductListSpec = z.object({
+  type: z.literal("product_list"),
+  id,
+  title: shortText.optional(),
+  selection: z.enum(["none", "single", "multiple"]),
+  items: z
+    .array(
+      z.object({
+        id,
+        offeringId: z.string().min(1),
+        name: shortText,
+        imageUrl: httpsImage.optional(),
+        price: Money.optional(),
+      }),
+    )
+    .min(1)
+    .max(50),
+});
+
+export const OrderSummarySpec = z.object({
+  type: z.literal("order_summary"),
+  id,
+  title: shortText,
+  lines: z
+    .array(
+      z.object({
+        label: shortText,
+        quantity: z.number().int().positive(),
+        unitPrice: Money,
+        subtotal: Money,
+      }),
+    )
+    .min(1)
+    .max(50),
+  total: Money,
+  confirmLabel: shortText,
+  cancelLabel: shortText,
+});
+
+export const PostE8CommerceUiSpec = z.discriminatedUnion("type", [
+  ProductCardSpec,
+  ProductListSpec,
+  OrderSummarySpec,
+]);
+export type PostE8CommerceUiSpec = z.infer<typeof PostE8CommerceUiSpec>;

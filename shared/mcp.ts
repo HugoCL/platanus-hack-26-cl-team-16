@@ -1,8 +1,7 @@
 import { z } from "zod";
+import { AgentCard } from "./agent";
 import { LatLng } from "./geo";
-import { MessageContent, SendableContent } from "./messages";
-import { MessageModeration } from "./moderation";
-import { AgentEndpoint, AgentKind, AgentScope, AgentStatus } from "./scope";
+import { Message, Recipient, SendableContent } from "./messages";
 import {
   SessionContract,
   SessionIntent,
@@ -12,16 +11,17 @@ import {
 
 const agentId = z.string().min(1);
 const sessionId = z.string().min(1);
-const messageId = z.string().min(1);
 
-export const AgentSummary = z.object({
+export const AgentSummary = AgentCard.pick({
+  slug: true,
+  name: true,
+  purpose: true,
+  categories: true,
+  kind: true,
+  status: true,
+  verified: true,
+}).extend({
   agentId,
-  slug: z.string(),
-  name: z.string(),
-  purpose: z.string(),
-  categories: z.array(z.string()),
-  kind: AgentKind,
-  status: AgentStatus,
   entityName: z.string().optional(),
   comuna: z.string().optional(),
   distanceKm: z.number().optional(),
@@ -29,25 +29,11 @@ export const AgentSummary = z.object({
 });
 export type AgentSummary = z.infer<typeof AgentSummary>;
 
-export const AgentDetail = AgentSummary.extend({
-  description: z.string(),
-  scope: AgentScope,
-  endpoint: AgentEndpoint.optional(),
-  publicKey: z.string().optional(),
-  location: LatLng.extend({ address: z.string().optional() }).optional(),
+export const AgentDetail = AgentCard.extend({
+  agentId,
+  entityName: z.string().optional(),
 });
 export type AgentDetail = z.infer<typeof AgentDetail>;
-
-export const DeliveredMessage = z.object({
-  messageId,
-  sessionId,
-  senderAgentId: agentId.optional(),
-  senderName: z.string(),
-  sentAt: z.number(),
-  content: MessageContent,
-  moderation: MessageModeration.pick({ status: true, reasons: true }),
-});
-export type DeliveredMessage = z.infer<typeof DeliveredMessage>;
 
 export const SearchAgentsInput = z.object({
   query: z.string().min(1).max(300),
@@ -79,12 +65,10 @@ export const OpenSessionOutput = z.object({
 
 export const SendMessageInput = z.object({
   sessionId,
+  recipient: Recipient.default("all"),
   content: SendableContent,
 });
-export const SendMessageOutput = z.object({
-  messageId,
-  moderation: MessageModeration.pick({ status: true, reasons: true }),
-});
+export const SendMessageOutput = z.object({ message: Message });
 
 export const WaitForMessagesInput = z.object({
   sessionId,
@@ -92,7 +76,7 @@ export const WaitForMessagesInput = z.object({
   timeoutMs: z.number().int().min(0).max(25000).default(20000),
 });
 export const WaitForMessagesOutput = z.object({
-  messages: z.array(DeliveredMessage),
+  messages: z.array(Message),
   cursor: z.number(),
   sessionStatus: SessionStatus,
 });

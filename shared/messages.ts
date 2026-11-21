@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { UiResponse, UiSpec } from "./genui";
+import { AgentUiSpec, UiResponse, UiSpec } from "./genui";
+import { ModerationStatus, Verdict } from "./moderation";
 
 export const MAX_TEXT_LENGTH = 4000;
 
@@ -9,6 +10,10 @@ export const TextContent = z.object({
 });
 
 export const UiContent = z.object({ kind: z.literal("ui"), spec: UiSpec });
+export const AgentUiContent = z.object({
+  kind: z.literal("ui"),
+  spec: AgentUiSpec,
+});
 
 export const UiResponseContent = z.object({
   kind: z.literal("ui_response"),
@@ -48,8 +53,57 @@ export type MessageKind = MessageContent["kind"];
 
 export const SendableContent = z.discriminatedUnion("kind", [
   TextContent,
-  UiContent,
+  AgentUiContent,
   UiResponseContent,
   CiphertextContent,
 ]);
 export type SendableContent = z.infer<typeof SendableContent>;
+
+export const Recipient = z.union([z.literal("all"), z.string().min(1)]);
+export type Recipient = z.infer<typeof Recipient>;
+
+const VERDICT_FOR_STATUS: Partial<
+  Record<ModerationStatus, Verdict["decision"]>
+> = { allowed: "allow", blocked: "block" };
+
+export const Message = z
+  .object({
+    messageId: z.string().min(1),
+    sessionId: z.string().min(1),
+    senderParticipantId: z.string().min(1).nullable(),
+    recipient: Recipient,
+    content: MessageContent,
+    status: ModerationStatus,
+    verdict: Verdict.nullable(),
+    sentAt: z.number().int().nonnegative(),
+  })
+  .superRefine((message, ctx) => {
+    const { content } = message;
+    const fromPlatform =
+      content.kind === "system" ||
+      (content.kind === "ui" && content.spec.type === "moderator_alert");
+    if (fromPlatform !== (message.senderParticipantId === null)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["senderParticipantId"],
+        message:
+          "system notices and moderator alerts have no sender; every other message has one",
+      });
+    }
+    if (message.status === "pending" && message.verdict) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["verdict"],
+        message: "a pending message has no verdict yet",
+      });
+    }
+    const expected = VERDICT_FOR_STATUS[message.status];
+    if (expected && message.verdict?.decision !== expected) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["verdict"],
+        message: `a ${message.status} message needs a "${expected}" verdict`,
+      });
+    }
+  });
+export type Message = z.infer<typeof Message>;

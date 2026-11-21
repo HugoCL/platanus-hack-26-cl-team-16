@@ -21,7 +21,8 @@
     "skills:check": "node scripts/skills/check.mjs",
     "skills:link": "node scripts/skills/link.mjs",
     "smoke": "python3 scripts/smoke.py",
-    "browser:install": "agent-browser install"
+    "browser:install": "agent-browser install",
+    "test": "vitest run"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.61.3",
@@ -41,14 +42,18 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",
+    "@edge-runtime/vm": "5.0.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^26.6.5",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@typescript/native": "npm:typescript@^7.0.2",
     "agent-browser": "0.43.0",
+    "convex-test": "0.0.72",
     "skills": "1.9.0",
     "tailwindcss": "^4.3.3",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vite": "8.3.8",
+    "vitest": "5.1.0"
   }
 }

@@ -7,8 +7,18 @@ export const Slug = z
 export const IntentName = Slug;
 export const DataField = Slug;
 
+export const Capability = z.enum(["booking", "catalog", "ordering", "info"]);
+export type Capability = z.infer<typeof Capability>;
+
+export const CAPABILITY_INTENTS = {
+  booking: ["check_availability", "book"],
+  catalog: ["browse_catalog", "request_quote"],
+  ordering: ["place_order"],
+  info: ["ask_info"],
+} as const satisfies Record<Capability, readonly string[]>;
+
 export const AgentScope = z.object({
-  allowedIntents: z.array(IntentName).min(1).max(32),
+  allowedIntents: z.array(IntentName).max(32),
   forbiddenTopics: z.array(z.string().min(1).max(200)).max(32),
   dataItShares: z.array(DataField).max(32),
   dataItRequests: z.array(DataField).max(32),

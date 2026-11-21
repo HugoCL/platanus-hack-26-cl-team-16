@@ -1,7 +1,12 @@
 import { z } from "zod";
 import { Location } from "./geo";
 
-export const BusinessProvider = z.enum(["osm", "google_places", "firecrawl"]);
+export const BusinessProvider = z.enum([
+  "fixture",
+  "osm",
+  "google_places",
+  "firecrawl",
+]);
 export type BusinessProvider = z.infer<typeof BusinessProvider>;
 
 export const ProspectingScope = z.object({
