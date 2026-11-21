@@ -20,7 +20,7 @@ export function SiteHeader({
         href="/"
         className="font-display text-2xl leading-none font-extrabold italic tracking-tight text-foreground no-underline"
       >
-        [nombre].
+        Canary Room.
       </Link>
       <div className="flex flex-wrap items-center gap-2">
         <nav

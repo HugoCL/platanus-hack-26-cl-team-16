@@ -28,6 +28,7 @@ import {
   UserIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ThemeToggle } from "@/components/toggle-theme";
 import type { UiSpec } from "@/shared/genui";
 import { MAX_TEXT_LENGTH } from "@/shared/messages";
 import type { SessionContract, SessionStatus } from "@/shared/session";
@@ -422,6 +423,7 @@ function SessionHeader({
           <PanelRightIcon size={16} />
         </Button>
       </div>
+      <ThemeToggle variant="icon" />
     </header>
   );
 }

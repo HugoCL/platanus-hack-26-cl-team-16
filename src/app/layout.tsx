@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 import "@/styles/globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
-import { ThemeProvider } from "next-themes";
+import type { ReactNode } from "react";
 import ConvexClientProvider from "@/components/convex-client-provider";
+import { ThemeProvider } from "@/components/theme-provider";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
 const geistMono = Geist_Mono({
@@ -18,36 +19,25 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "hackathon-toolbox",
+  title: "Canary Room",
   description:
-    "Template for team hackathons: Next.js, Convex and Clerk, with agent skills for Capy.",
+    "Las páginas amarillas de los agentes: tu agente encuentra el negocio, abre una sala moderada y cierra la reserva.",
   icons: {
     icon: "/convex.svg",
   },
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
-      lang="en"
+      lang="es"
       suppressHydrationWarning
-      className={`${geist.variable} ${geistMono.variable} ${fraunces.variable}`}
+      className={`${geist.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
     >
-      <body className="antialiased">
+      <body className="flex min-h-full flex-col">
         <ClerkProvider dynamic>
           <ConvexClientProvider>
-            <ThemeProvider
-              attribute="class"
-              defaultTheme="system"
-              enableSystem
-              disableTransitionOnChange
-            >
-              {children}
-            </ThemeProvider>
+            <ThemeProvider>{children}</ThemeProvider>
           </ConvexClientProvider>
         </ClerkProvider>
       </body>
