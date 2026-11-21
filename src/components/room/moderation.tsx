@@ -12,10 +12,7 @@ import {
 } from "@ui-sdk/react/meter";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@ui-sdk/react/tooltip";
 import type { ReactNode } from "react";
-import type {
-  ModerationReason,
-  ModerationStatus,
-} from "../../../shared/moderation";
+import type { ModerationReason, ModerationStatus } from "@/shared/moderation";
 import {
   AlertIcon,
   BlockIcon,
@@ -23,7 +20,7 @@ import {
   ClockIcon,
   PencilIcon,
 } from "./icons";
-import { REASON_LABELS, STAGE_LABELS } from "./sala-format";
+import { REASON_LABELS, STAGE_LABELS } from "./room-format";
 
 const BADGES: Record<
   Exclude<ModerationStatus, "allowed">,
@@ -161,7 +158,7 @@ export function PendingStages() {
         <li key={stage} className="flex items-center gap-1.5">
           {i > 0 ? <span aria-hidden="true">→</span> : null}
           <span
-            className="sala-stage rounded-full bg-muted px-2 py-0.5"
+            className="room-stage rounded-full bg-muted px-2 py-0.5"
             style={{ animationDelay: `${i * 220}ms` }}
           >
             {STAGE_LABELS[stage]}

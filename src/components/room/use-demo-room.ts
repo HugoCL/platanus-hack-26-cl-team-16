@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { UiResponse } from "../../../shared/genui";
+import type { UiResponse } from "@/shared/genui";
 import { DEMO_SCRIPT } from "./demo-session";
 import type { GenUiAnswer } from "./genui-block";
-import { type RoomMessage, responseTargetId } from "./sala-format";
+import { type RoomMessage, responseTargetId } from "./room-format";
 
 const TYPING_MS = 1000;
 const REVIEW_MS = 900;

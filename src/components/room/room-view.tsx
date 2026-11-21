@@ -21,9 +21,9 @@ import {
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@ui-sdk/react/tabs";
 import { Textarea } from "@ui-sdk/react/textarea";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { UiSpec } from "../../../shared/genui";
-import { MAX_TEXT_LENGTH } from "../../../shared/messages";
-import type { SessionContract, SessionStatus } from "../../../shared/session";
+import type { UiSpec } from "@/shared/genui";
+import { MAX_TEXT_LENGTH } from "@/shared/messages";
+import type { SessionContract, SessionStatus } from "@/shared/session";
 import {
   DEMO_CONTRACT,
   DEMO_PARTICIPANTS,
@@ -53,7 +53,7 @@ import {
   SESSION_STATUS_LABELS,
   type Viewer,
   violationTone,
-} from "./sala-format";
+} from "./room-format";
 import { useDemoRoom } from "./use-demo-room";
 
 const STATUS_CHIP: Record<SessionStatus, string> = {
@@ -75,7 +75,7 @@ const ROLE_LABELS: Record<Viewer["role"], string> = {
   operator: "Operador",
 };
 
-export function SalaDemoRoom() {
+export function DemoRoom() {
   const room = useDemoRoom();
   const [role, setRole] = useState<Viewer["role"]>("owner");
   const [panelOpen, setPanelOpen] = useState(true);
@@ -492,7 +492,7 @@ function Thread({
         <p className="m-0 h-5 shrink-0 text-xs text-subtle-foreground">
           {typingName ? (
             <>
-              <span className="sala-typing" aria-hidden="true" /> {typingName}{" "}
+              <span className="room-typing" aria-hidden="true" /> {typingName}{" "}
               está escribiendo…
             </>
           ) : null}

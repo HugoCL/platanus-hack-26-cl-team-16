@@ -1,13 +1,13 @@
 import type { z } from "zod";
-import type { SlotPickerSpec, UiResponse, UiSpec } from "../../../shared/genui";
-import type { Message } from "../../../shared/messages";
+import type { SlotPickerSpec, UiResponse, UiSpec } from "@/shared/genui";
+import type { Message } from "@/shared/messages";
 import type {
   ModerationReason,
   ModerationReasonCode,
   ModerationStage,
   ModerationStatus,
-} from "../../../shared/moderation";
-import type { SessionStatus } from "../../../shared/session";
+} from "@/shared/moderation";
+import type { SessionStatus } from "@/shared/session";
 
 export const SANTIAGO = "America/Santiago";
 

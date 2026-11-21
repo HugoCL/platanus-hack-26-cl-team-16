@@ -30,7 +30,7 @@ import {
   type SlotPickerSpec,
   type UiResponse,
   UiSpec,
-} from "../../../shared/genui";
+} from "@/shared/genui";
 import {
   AlertIcon,
   CalendarIcon,
@@ -41,7 +41,7 @@ import {
   PinIcon,
   ShieldIcon,
 } from "./icons";
-import { formatTime, groupSlotsByDay } from "./sala-format";
+import { formatTime, groupSlotsByDay } from "./room-format";
 
 export type GenUiAnswer = { response: UiResponse; at: number };
 

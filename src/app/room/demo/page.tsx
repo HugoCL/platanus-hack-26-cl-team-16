@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { SalaDemoRoom } from "@/components/room/sala-room";
+import { DemoRoom } from "@/components/room/room-view";
 
 export const metadata: Metadata = {
   title: "Sala moderada · demo",
 };
 
-export default function SalaDemoPage() {
-  return <SalaDemoRoom />;
+export default function RoomDemoPage() {
+  return <DemoRoom />;
 }

@@ -2,7 +2,7 @@
 
 import { Button } from "@ui-sdk/react/button";
 import type { ReactNode } from "react";
-import type { UiResponse, UiSpec } from "../../../shared/genui";
+import type { UiResponse, UiSpec } from "@/shared/genui";
 import { type GenUiAnswer, GenUiBlock } from "./genui-block";
 import {
   AlertIcon,
@@ -23,7 +23,7 @@ import {
   type RoomParticipant,
   splitRedacted,
   type Viewer,
-} from "./sala-format";
+} from "./room-format";
 
 type MessageItemProps = {
   message: RoomMessage;
@@ -140,7 +140,7 @@ function Bubble({
       data-testid="room-message"
       data-status={status}
       aria-label={`${sender?.name ?? "Desconocido"}, ${formatTime(message.sentAt)}`}
-      className={`flex scroll-mt-24 flex-col gap-1 ${self ? "items-end" : "items-start"} ${highlighted ? "sala-highlight" : ""}`}
+      className={`flex scroll-mt-24 flex-col gap-1 ${self ? "items-end" : "items-start"} ${highlighted ? "room-highlight" : ""}`}
     >
       <header
         className={`flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-subtle-foreground ${self ? "flex-row-reverse" : ""}`}
@@ -152,7 +152,7 @@ function Bubble({
         <ModerationBadge status={status} reasons={message.reasons} />
       </header>
       <div
-        className={`sala-bubble flex max-w-[min(560px,92%)] flex-col gap-2 ${
+        className={`room-bubble flex max-w-[min(560px,92%)] flex-col gap-2 ${
           isUi && visible && status !== "blocked"
             ? ""
             : `rounded-3xl px-4 py-2.5 ${compact ? "text-sm" : ""} ${
@@ -160,7 +160,7 @@ function Bubble({
                   ? "bg-primary text-primary-foreground"
                   : "bg-card shadow-card"
               } ${frame}`
-        } ${status === "pending" ? "sala-pending" : ""}`}
+        } ${status === "pending" ? "room-pending" : ""}`}
       >
         {body}
       </div>

@@ -1,5 +1,5 @@
-import type { SessionContract, SessionStatus } from "../../../shared/session";
-import type { RoomMessage, RoomParticipant, Viewer } from "./sala-format";
+import type { SessionContract, SessionStatus } from "@/shared/session";
+import type { RoomMessage, RoomParticipant, Viewer } from "./room-format";
 
 // The scripted demo of specs/sala-moderada.md §11, on the seed's clinic and consumer agents.
 // Until E2 lands, the room runs on this fixture instead of Convex.

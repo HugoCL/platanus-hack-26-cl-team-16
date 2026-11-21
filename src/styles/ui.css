@@ -120,7 +120,7 @@
 }
 
 /* Sala moderada: motion for pending messages and audit highlights. */
-@keyframes sala-scan {
+@keyframes room-scan {
   0%,
   100% {
     opacity: 0.45;
@@ -130,7 +130,7 @@
   }
 }
 
-@keyframes sala-flash {
+@keyframes room-flash {
   from {
     box-shadow: 0 0 0 3px var(--sm-ring-strong);
   }
@@ -139,43 +139,43 @@
   }
 }
 
-.sala-bubble {
+.room-bubble {
   transition:
     opacity 180ms ease-out,
     border-color 180ms ease-out;
 }
 
-.sala-pending {
+.room-pending {
   opacity: 0.6;
 }
 
-.sala-stage {
-  animation: sala-scan 1.2s ease-in-out infinite;
+.room-stage {
+  animation: room-scan 1.2s ease-in-out infinite;
 }
 
-.sala-highlight > .sala-bubble {
+.room-highlight > .room-bubble {
   border-radius: var(--sm-radius-3xl);
-  animation: sala-flash 1.6s ease-out;
+  animation: room-flash 1.6s ease-out;
 }
 
-.sala-typing {
+.room-typing {
   display: inline-block;
   width: 0.5rem;
   height: 0.5rem;
   border-radius: 999px;
   background: currentColor;
-  animation: sala-scan 1s ease-in-out infinite;
+  animation: room-scan 1s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sala-bubble,
+  .room-bubble,
   [data-slot="button"] {
     transition: none;
   }
 
-  .sala-stage,
-  .sala-typing,
-  .sala-highlight > .sala-bubble {
+  .room-stage,
+  .room-typing,
+  .room-highlight > .room-bubble {
     animation: none;
   }
 

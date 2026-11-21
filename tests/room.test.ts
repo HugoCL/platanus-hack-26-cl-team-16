@@ -17,7 +17,7 @@ import {
   primaryReason,
   splitRedacted,
   violationTone,
-} from "../src/components/room/sala-format";
+} from "../src/components/room/room-format";
 
 const messages = DEMO_SCRIPT.map((step) => step.message);
 const slotPicker = messages.find(
