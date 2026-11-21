@@ -12,6 +12,8 @@ pnpm install && pnpm dev
 
 If a schema change is rejected because your local data no longer matches it, stop `pnpm dev`, delete `.convex/local`, and start again. That gives you a fresh local database that is reseeded from `shared/seedData.ts`.
 
+Rooms seeded before E2 have a contract without the provider's `purpose`. The schema still accepts them, and `pnpm migrate` (with `pnpm dev` running) copies the purpose from the recipient's card (`backfillSessionPurpose`). Run it once on every deployment that kept its data: local, the team's cloud dev and reused previews. `pnpm seed:reset` also works on a local deployment.
+
 ## Agent directory (E1)
 
 The directory lives in `convex/directory.ts` and the page at http://localhost:3000/directorio. Other code calls these functions:
@@ -32,22 +34,22 @@ A room is a `session` in `convex/rooms.ts`. E4 calls these public functions with
 | Function | Kind | What it does |
 | --- | --- | --- |
 | `rooms.get({ sessionId })` | query | Returns the shared `Session` and its participants. |
-| `rooms.close({ sessionId })` | mutation | Closes the room and publishes one `session_closed` notice. Calling it again changes nothing. Later sends fail with `RoomClosed`, even if moderation started before the close. |
-| `gate.send({ sessionId, recipient, content })` | action | Sends as the signed-in participant. `recipient` is a participant ID or `"all"`; `content` is `SendableContent` (text, a UI block or a UI response). Returns the message with its verdict. A blocked send is stored as `blocked` and generates a `moderator_alert`. |
+| `rooms.close({ sessionId })` | mutation | Closes the room, records who closed it in `closedReason` (`closed_by_<role>`) and publishes one `session_closed` notice. Calling it again changes nothing. Later sends fail with `RoomClosed`, even if moderation started before the close. |
+| `gate.send({ sessionId, recipient, content })` | action | Sends as the signed-in participant. `recipient` is a participant ID or `"all"`; `content` is `SendableContent` (text, a UI block or a UI response). Returns the message with its verdict. A blocked send is stored as `blocked` and generates a `moderator_alert`. A `ui_response` must answer (`inReplyTo`) a delivered UI block in the same room addressed to the sender or to everyone, and a participant who left can't send; otherwise the gate throws `InvalidArgument` or `NotParticipant`. |
 | `gate.history({ sessionId })` | reactive query | Returns the latest visible messages in chronological order (up to 500 messages and 4 MiB). |
 | `gate.historyPage({ sessionId, paginationOpts })` | paginated query | Returns visible messages in chronological order. Use the returned cursor until `isDone`, even if a filtered page is empty. A page reads at most 4 MiB, so it can hold fewer than `numItems`. |
 
-These calls return `Unauthorized` without a Clerk identity, and `NotParticipant` for an authenticated user without active membership. Both agents and the human see allowed messages; only the sender and humans see a blocked message and its alert. A client that falls behind the `gate.history` window reads the gap with `gate.historyPage`.
+These calls return `Unauthorized` without a Clerk identity, and `NotParticipant` for an authenticated user without active membership. Both agents and the human see allowed messages, and a redacted one with its redacted text in place of the original body; only the sender and humans see a blocked message and its alert. A client that falls behind the `gate.history` window reads the gap with `gate.historyPage`.
 
 The E4 launch form needs an authenticated Convex action from E8. That action must choose the consumer agent on the server and call `openRoom(ctx, args)` from `convex/rooms.ts`. The internal `rooms.open` action takes the same arguments: `initiatorAgentId`, `providerAgentId`, `request`, and optionally `intent`, `maxTurns` and `human: { displayName }`. If `human` is set, the server attaches the signed-in user as the room owner; it never uses a shared anonymous identity. The moderator checks the request as a broadcast before any write and raises `RequestBlocked` if it refuses the request. If the card now yields a different valid contract, retry after `RoomContractChanged`. If the card no longer allows the intent, opening fails with `InvalidArgument`.
 
 Trusted agent code sends through `sendThroughGate(ctx, args)` with its server-resolved participant ID. To close from an action, call `internal.rooms.closeAsParticipant` with `sessionId` and the server-resolved `participantId`. Existing anonymous room fixtures are not memberships for signed-in users.
 
-Only `convex/gate.ts` writes to `messages` (the seed is the one exception), and a test fails if another module does. Platform notices go through the same module without asking the moderator; the request quoted in `session_opened` was already moderated by `rooms.open`, and its `moderationEvents` rows point to that notice. The compound moderator runs deterministic rules and then, if needed, the configured judge. The gate stores an event for each stage, and a failed provider or judge blocks the send with a fixed reason.
+Only `convex/gate.ts` writes to `messages` (the seed is the one exception), and a test fails if another module does. Platform notices go through the same module without asking the moderator; `session_opened` quotes only the request, which `rooms.open` already moderated, and never the card's name, and its `moderationEvents` rows point to that notice. The compound moderator runs deterministic rules and then, if needed, the configured judge. The gate stores an event for each stage, and a failed provider or judge blocks the send with a fixed reason.
 
 An allowed message addressed to a hosted agent schedules a reply after the message is stored. The agent gets only the history it could see as a participant. The reply goes back to the original sender through the same gate and gets its own verdict. E2 uses a deterministic acknowledgment backed by the fake LLM; E8 supplies real room agents.
 
-Every stored agent message consumes one turn. The final turn records `turn_limit_reached` in the same transaction. After that, extra agent sends fail with `TurnLimitReached` and no more agent replies are scheduled; humans can still send.
+Every stored agent message consumes one turn, a blocked one included. The final turn records `turn_limit_reached` in the same transaction. After that, extra agent sends fail with `TurnLimitReached` and no more agent replies are scheduled; humans can still send.
 
 ## Test
 
