@@ -54,6 +54,7 @@ export function createLlmProvider(env: Env = process.env): LlmProvider {
         prompt,
         output: Output.object({ schema }),
         abortSignal,
+        maxRetries: role === "moderator" ? 0 : undefined,
       });
       return output;
     },

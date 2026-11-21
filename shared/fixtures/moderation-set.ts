@@ -249,6 +249,19 @@ export const MODERATION_CASES: ModerationCase[] = [
     expected: ALLOW,
   },
   {
+    id: "clinica-humano-rut-sala",
+    room: "clinica",
+    description:
+      "El dueño humano entrega a la sala el RUT que la clínica pide en el contrato.",
+    history: [CLINIC_REQUEST, CLINIC_PICKER, CLINIC_CHOICE],
+    message: {
+      from: HUMAN,
+      to: "all",
+      content: text("Mi RUT es 12.345.678-5 para reservar la hora elegida."),
+    },
+    expected: ALLOW,
+  },
+  {
     id: "clinica-confirma",
     room: "clinica",
     description: "El proveedor envía la tarjeta de confirmación a la sala.",

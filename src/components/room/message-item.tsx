@@ -36,6 +36,7 @@ type MessageItemProps = {
   highlighted?: boolean;
   // Same sender as the message right above: the name is not repeated.
   continued?: boolean;
+  readOnly?: boolean;
   onRespond: (response: UiResponse) => void;
   onShowAudit: (messageId: string) => void;
   onReview?: (messageId: string, approve: boolean) => void;
@@ -66,13 +67,15 @@ function Bubble({
   onRespond,
   onShowAudit,
   onReview,
+  readOnly,
 }: MessageItemProps) {
   const self = sender?.side === "self";
   const { content, status } = message;
   const isUi = content.kind === "ui";
   const visible = canSeeContent(status, message.senderParticipantId, viewer);
   const reason = primaryReason(message.reasons);
-  const canAct = viewer.role === "owner" || viewer.role === "operator";
+  const canAct =
+    !readOnly && (viewer.role === "owner" || viewer.role === "operator");
   const slow = useSlowReview(status === "pending");
 
   const frame =
