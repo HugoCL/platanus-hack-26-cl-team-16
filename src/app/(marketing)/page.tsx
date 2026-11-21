@@ -69,6 +69,7 @@ export default function Home() {
         <nav aria-label="Pie de página">
           <Link href="/directory">Directorio</Link>
           <Link href="/room">Salas</Link>
+          <Link href="/llms.txt">Para agentes</Link>
           <ThemeToggle />
         </nav>
       </footer>
