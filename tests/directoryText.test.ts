@@ -86,6 +86,17 @@ describe("free-text parser", () => {
 });
 
 describe("LLM fallback", () => {
+  it("leaves what the parser cannot read unresolved when there is no fallback", async () => {
+    await expect(
+      interpretDirectoryText("me duele el pecho", SEED_CATEGORIES, null),
+    ).resolves.toEqual({
+      category: null,
+      comuna: null,
+      unresolved: ["category"],
+      source: "none",
+    });
+  });
+
   it("is not requested when the parser resolves everything", async () => {
     await expect(
       interpretDirectoryText(
@@ -101,6 +112,43 @@ describe("LLM fallback", () => {
     });
     await expect(
       interpretDirectoryText("hola", SEED_CATEGORIES, noLlm),
+    ).resolves.toEqual({
+      category: null,
+      comuna: null,
+      unresolved: [],
+      source: "none",
+    });
+  });
+
+  it("is not requested for a field the caller already supplied", async () => {
+    await expect(
+      interpretDirectoryText(
+        "cardiólogo en Valparaíso",
+        SEED_CATEGORIES,
+        noLlm,
+        ["comuna"],
+      ),
+    ).resolves.toEqual({
+      category: "cardiologia",
+      comuna: null,
+      unresolved: [],
+      source: "parser",
+    });
+    await expect(
+      interpretDirectoryText("algo rarísimo zzz", SEED_CATEGORIES, noLlm, [
+        "category",
+      ]),
+    ).resolves.toEqual({
+      category: null,
+      comuna: null,
+      unresolved: [],
+      source: "none",
+    });
+    await expect(
+      interpretDirectoryText("dentista en Ñuñoa", SEED_CATEGORIES, noLlm, [
+        "category",
+        "comuna",
+      ]),
     ).resolves.toEqual({
       category: null,
       comuna: null,

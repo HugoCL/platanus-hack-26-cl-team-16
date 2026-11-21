@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as agentKeys from "../agentKeys.js";
 import type * as bookings from "../bookings.js";
 import type * as directory from "../directory.js";
 import type * as gate from "../gate.js";
@@ -33,6 +34,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  agentKeys: typeof agentKeys;
   bookings: typeof bookings;
   directory: typeof directory;
   gate: typeof gate;

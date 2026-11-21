@@ -8,6 +8,7 @@ import type { Capability } from "../shared/scope";
 import {
   CLINIC_AGENT_SLUG,
   CONSUMER_AGENT_SLUG,
+  EXTERNAL_AGENT_SLUG,
   SEED_AGENTS,
   SEED_AVAILABILITY,
   SEED_CATEGORIES,
@@ -16,6 +17,7 @@ import {
 import { DEFAULT_MAX_TURNS, type SessionContract } from "../shared/session";
 import type { Id, TableNames } from "./_generated/dataModel";
 import { internalMutation, type MutationCtx } from "./_generated/server";
+import { sha256Hex } from "./agentKeys";
 import { insertMessage } from "./roomMessages";
 import { loadSession } from "./roomState";
 
@@ -80,16 +82,6 @@ async function demoSession(ctx: MutationCtx) {
   return session;
 }
 
-async function sha256Hex(value: string) {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(value),
-  );
-  return Array.from(new Uint8Array(digest), (b) =>
-    b.toString(16).padStart(2, "0"),
-  ).join("");
-}
-
 export const seeders = {
   numbers: async (ctx) => {
     for (const value of [3, 1, 4, 1, 5]) {
@@ -144,7 +136,7 @@ export const seeders = {
   },
 
   agentApiKeys: async (ctx) => {
-    const agent = await agentBySlug(ctx, CONSUMER_AGENT_SLUG);
+    const agent = await agentBySlug(ctx, EXTERNAL_AGENT_SLUG);
     const unknowableKey = crypto.randomUUID();
     await ctx.db.insert("agentApiKeys", {
       agentId: agent._id,
