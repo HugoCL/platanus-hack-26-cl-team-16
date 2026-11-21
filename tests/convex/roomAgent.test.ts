@@ -1,6 +1,6 @@
 // @vitest-environment edge-runtime
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { api } from "../../convex/_generated/api";
+import { api, internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { allowAllModerator } from "../../convex/moderator";
 import { testRoomAgent } from "../../convex/roomAgent";
@@ -264,4 +264,47 @@ it("stops a reply at the first send the moderator blocks", async () => {
   expect((await room.history(room.human)).at(-1)).toMatchObject({
     content: { kind: "ui", spec: { type: "moderator_alert" } },
   });
+});
+
+it("stores one confirmation when hosted replies publish the same card concurrently", async () => {
+  const room = await setup();
+  vi.spyOn(testRoomAgent, "reply").mockResolvedValue([
+    {
+      kind: "send",
+      recipient: room.human,
+      content: {
+        kind: "ui",
+        spec: {
+          type: "confirmation",
+          id: "reserva-1",
+          title: "Reserva confirmada",
+          summary: "Martes a las 10.",
+          details: [],
+          confirmLabel: "Listo",
+          cancelLabel: "Cerrar",
+        },
+      },
+    },
+  ]);
+  const first = await room.send();
+  const second = await room.send();
+
+  await Promise.all(
+    [first, second].map((message) =>
+      room.t.action(internal.gate.reply, {
+        messageId: message.messageId as Id<"messages">,
+        participantId: room.provider,
+      }),
+    ),
+  );
+  await room.finishReplies();
+
+  const history = await room.history(room.human);
+  expect(history.slice(3)).toMatchObject([
+    {
+      recipient: room.human,
+      content: { kind: "ui", spec: { id: "reserva-1" } },
+      status: "allowed",
+    },
+  ]);
 });

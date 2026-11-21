@@ -57,6 +57,7 @@ export async function sendThroughGate(
     senderParticipantId: Id<"participants">;
     recipient: Doc<"messages">["recipient"];
     content: unknown;
+    hostedReply?: true;
   },
 ): Promise<Message> {
   const parsed = SendableContent.safeParse(args.content);
@@ -89,6 +90,7 @@ export async function sendThroughGate(
     content,
     verdict: outcome.verdict,
     events: outcome.events,
+    hostedReply: args.hostedReply,
   });
 }
 
@@ -133,9 +135,35 @@ export const commit = internalMutation({
     content: zodToConvex(SendableContent),
     verdict: zodToConvex(Verdict),
     events: v.array(eventValidator),
+    hostedReply: v.optional(v.literal(true)),
   },
   handler: async (ctx, args): Promise<Message> => {
     const { session, sender } = await checkSend(ctx, args);
+    const { content } = args;
+    if (
+      args.hostedReply &&
+      sender.kind === "agent" &&
+      content.kind === "ui" &&
+      content.spec.type === "confirmation"
+    ) {
+      const confirmationId = content.spec.id;
+      const previous = await ctx.db
+        .query("messages")
+        .withIndex("by_sessionId_and_moderation_status", (q) =>
+          q.eq("sessionId", args.sessionId).eq("moderation.status", "allowed"),
+        )
+        .filter((q) =>
+          q.and(
+            q.eq(q.field("senderParticipantId"), args.senderParticipantId),
+            q.eq(q.field("recipient"), args.recipient),
+            q.eq(q.field("content.kind"), "ui"),
+            q.eq(q.field("content.spec.type"), "confirmation"),
+            q.eq(q.field("content.spec.id"), confirmationId),
+          ),
+        )
+        .first();
+      if (previous) return toMessage(previous);
+    }
     const agentTurn = sender.kind === "agent";
     const turnCount = session.turnCount + (agentTurn ? 1 : 0);
     const exhausted = turnCount >= session.contract.maxTurns;
@@ -310,6 +338,7 @@ export const reply = internalAction({
             senderParticipantId: self,
             recipient: action.recipient as Doc<"messages">["recipient"],
             content: action.content,
+            hostedReply: true,
           });
           if (sent.status !== "allowed") return null;
         }
