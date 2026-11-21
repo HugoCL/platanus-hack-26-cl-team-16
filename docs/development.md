@@ -25,6 +25,15 @@ The directory lives in `convex/directory.ts` and the page at http://localhost:30
 
 Each card is an `AgentDetail` (the full `AgentCard` with purpose and scope) plus `comuna` and `allowedIntents`, so it also validates as an `AgentSummary`. Draft cards are never listed.
 
+## Rooms (E2)
+
+A room is a `session` in `convex/rooms.ts`. Other code calls these functions:
+
+| Function | Kind | What it does |
+| --- | --- | --- |
+| `rooms.open` | mutation | Opens a room from `initiatorAgentId` (the consumer agent), `providerAgentId` (the card) and the free-text `request`, with an optional `intent` (one the card allows; defaults to its first), `maxTurns` (default 12) and `human` (`{ displayName }`, added as the owner acting for the initiator). The contract is the request plus the card's purpose, capabilities, allowed intents, forbidden topics and data rules, and it never changes. Returns the room as a shared `Session`, already `active`. A missing, draft or invalid card, a room with oneself, a disallowed intent or a contract that fails validation throws a `ConvexError` with `data.kind` `"InvalidArgument"`. |
+| `rooms.get` | query | One room by `sessionId` as a shared `Session` with its participants, or `null`. |
+
 ## Test
 
 ```sh

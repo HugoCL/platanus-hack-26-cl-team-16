@@ -12,6 +12,7 @@ import type * as directory from "../directory.js";
 import type * as jobs from "../jobs.js";
 import type * as migrations from "../migrations.js";
 import type * as myFunctions from "../myFunctions.js";
+import type * as rooms from "../rooms.js";
 import type * as seed from "../seed.js";
 
 import type {
@@ -25,6 +26,7 @@ declare const fullApi: ApiFromModules<{
   jobs: typeof jobs;
   migrations: typeof migrations;
   myFunctions: typeof myFunctions;
+  rooms: typeof rooms;
   seed: typeof seed;
 }>;
 
