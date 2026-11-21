@@ -62,7 +62,7 @@ export const openFromCard = action({
       providerAgentId: provider.agentId as Id<"agents">,
       request: description,
       intent,
-      human: { displayName: identity.name ?? identity.email ?? "Tú" },
+      human: { displayName: identity.name ?? identity.givenName ?? "Tú" },
     });
     return { sessionId: room.sessionId as Id<"sessions"> };
   },

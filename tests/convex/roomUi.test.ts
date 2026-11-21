@@ -115,16 +115,16 @@ describe("room UI API", () => {
     expect(await rooms.t.query(api.rooms.mine, {})).toEqual([]);
   });
 
-  it.each([{ email: "ana@example.com" }, {}])(
-    "uses identity name fallbacks: %j",
-    async (identity) => {
-      const caller = rooms.t.withIdentity({ subject: "fallback", ...identity });
-      const opened = await caller.action(api.rooms.openFromCard, args);
-      const view = await caller.query(api.rooms.view, opened);
-      expect(view?.participantNames).toContainEqual({
-        participantId: view?.humanParticipantId,
-        name: "email" in identity ? identity.email : "Tú",
-      });
-    },
-  );
+  it.each([
+    { identity: { givenName: "Ana", email: "ana@example.com" }, name: "Ana" },
+    { identity: { email: "ana@example.com" }, name: "Tú" },
+  ])("uses identity name fallbacks: %j", async ({ identity, name }) => {
+    const caller = rooms.t.withIdentity({ subject: "fallback", ...identity });
+    const opened = await caller.action(api.rooms.openFromCard, args);
+    const view = await caller.query(api.rooms.view, opened);
+    expect(view?.participantNames).toContainEqual({
+      participantId: view?.humanParticipantId,
+      name,
+    });
+  });
 });
