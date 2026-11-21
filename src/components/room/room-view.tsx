@@ -44,7 +44,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { SiteHeader } from "@/components/directory/site-header";
 import type { UiResponse, UiSpec } from "@/shared/genui";
 import { MAX_TEXT_LENGTH } from "@/shared/messages";
 import type { SessionContract, SessionStatus } from "@/shared/session";
@@ -201,8 +200,7 @@ export function RoomView({
   ) : null;
 
   return (
-    <div className="flex h-dvh flex-col bg-background">
-      <SiteHeader current="rooms" />
+    <div className="flex min-h-0 flex-1 flex-col bg-background">
       {toolbar}
       <div className="flex min-h-0 flex-1">
         <SessionList
@@ -218,6 +216,7 @@ export function RoomView({
             <SessionHeader
               self={self}
               other={other}
+              panelOpen={panelOpen}
               onTogglePanel={() => {
                 if (window.matchMedia("(min-width: 64rem)").matches)
                   setPanelOpen((o) => !o);
@@ -478,10 +477,12 @@ function SessionList({
 function SessionHeader({
   self,
   other,
+  panelOpen,
   onTogglePanel,
 }: {
   self?: RoomParticipant;
   other?: RoomParticipant;
+  panelOpen: boolean;
   onTogglePanel: () => void;
 }) {
   return (
@@ -496,7 +497,7 @@ function SessionHeader({
             <span className="truncate" title={other?.name}>
               {other?.name}
             </span>
-            <VerifiedBadge />
+            {other?.verified && <VerifiedBadge />}
           </h1>
           <p className="m-0 flex items-center gap-1.5 text-xs text-subtle-foreground">
             <ShieldCheckIcon size={13} className="shrink-0" />
@@ -509,6 +510,18 @@ function SessionHeader({
           data-size="sm"
           data-variant="ghost"
           aria-label="Contrato y auditoría"
+          aria-expanded={panelOpen}
+          className="hidden lg:inline-flex"
+          onClick={onTogglePanel}
+        >
+          <PanelRightIcon size={16} />
+        </Button>
+        <Button
+          data-size="sm"
+          data-variant="ghost"
+          aria-label="Contrato y auditoría"
+          aria-haspopup="dialog"
+          className="lg:hidden"
           onClick={onTogglePanel}
         >
           <PanelRightIcon size={16} />
