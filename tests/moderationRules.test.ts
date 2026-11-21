@@ -112,28 +112,37 @@ describe("RUT", () => {
 });
 
 describe("cards", () => {
-  it.each(["4111 1111 1111 1111", "5555-5555-5555-4444", "378282246310005"])(
-    "blocks %s",
-    (value) => {
-      const findings = rulesFor(
-        "clinica",
-        "consumidor",
-        "proveedor",
-        text(value),
-      );
-      expect(rulesOf(findings)).toEqual(["sensitive_data"]);
-    },
-  );
+  it.each([
+    "4111 1111 1111 1111",
+    "5555-5555-5555-4444",
+    "378282246310005",
+    "4111.1111.1111.1111",
+    "4111\u00a01111\u00a01111\u00a01111",
+    "4111 - 1111 - 1111 - 1111",
+    "4111 1111 1111 1111 123",
+    "Pedido 77 4111 1111 1111 1111",
+    "4111111111111111 12",
+  ])("blocks %j", (value) => {
+    const findings = rulesFor(
+      "clinica",
+      "consumidor",
+      "proveedor",
+      text(value),
+    );
+    expect(rulesOf(findings)).toEqual(["sensitive_data"]);
+  });
 
-  it("ignores a number that fails Luhn", () => {
-    expect(
-      rulesFor(
-        "clinica",
-        "consumidor",
-        "proveedor",
-        text("4111 1111 1111 1112"),
-      ),
-    ).toEqual([]);
+  it.each([
+    "4111 1111 1111 1112",
+    "+56 9 1234 5678 y +56 2 2345 6789",
+    "Precios: 59.990 12.990 3.500 2.200",
+    "$59.990, $12.990 y $3.500",
+    "Tallas 36 37 38 39 40 41 42",
+    "Pedido 123 456 789 012",
+  ])("ignores %j", (value) => {
+    expect(rulesFor("clinica", "consumidor", "proveedor", text(value))).toEqual(
+      [],
+    );
   });
 
   it("looks inside UI blocks", () => {
@@ -217,7 +226,12 @@ describe("ui_response", () => {
       [PICKER],
     ],
     [
-      "a block addressed to someone else",
+      "a block addressed to another participant",
+      choose("rojas-jueves-1030"),
+      [{ ...PICKER, to: "consumidor" as const }],
+    ],
+    [
+      "a block addressed to the whole room",
       choose("rojas-jueves-1030"),
       [{ ...PICKER, to: "all" as const }],
     ],
@@ -230,6 +244,20 @@ describe("ui_response", () => {
       history,
     );
     expect(findings.map((f) => [f.rule, f.code])).toEqual([
+      ["scope", "malformed_payload"],
+    ]);
+  });
+
+  it("puts sensitive data before a forged reply, keeping both", () => {
+    const findings = rulesFor(
+      "clinica",
+      "consumidor",
+      "proveedor",
+      choose("4111111111111111"),
+      [PICKER],
+    );
+    expect(findings.map((f) => [f.rule, f.code])).toEqual([
+      ["sensitive_data", "pii"],
       ["scope", "malformed_payload"],
     ]);
   });
