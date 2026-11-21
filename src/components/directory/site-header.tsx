@@ -9,9 +9,11 @@ const NAV = [
 
 export function SiteHeader({
   current,
+  nav = true,
   themeToggle = true,
 }: {
   current?: (typeof NAV)[number]["key"];
+  nav?: boolean;
   themeToggle?: boolean;
 }) {
   return (
@@ -23,25 +25,27 @@ export function SiteHeader({
         Canary Room
       </Link>
       <div className="flex flex-wrap items-center gap-2">
-        <nav
-          aria-label="Principal"
-          className="flex flex-wrap items-center gap-1"
-        >
-          {NAV.map((item) => (
-            <Link
-              key={item.key}
-              href={item.href}
-              aria-current={item.key === current ? "page" : undefined}
-              className={`inline-flex h-9 items-center rounded-full px-3.5 text-foreground no-underline ${
-                item.key === current
-                  ? "bg-muted font-medium"
-                  : "text-subtle-foreground hover:bg-muted"
-              }`}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        {nav && (
+          <nav
+            aria-label="Principal"
+            className="flex flex-wrap items-center gap-1"
+          >
+            {NAV.map((item) => (
+              <Link
+                key={item.key}
+                href={item.href}
+                aria-current={item.key === current ? "page" : undefined}
+                className={`inline-flex h-9 items-center rounded-full px-3.5 text-foreground no-underline ${
+                  item.key === current
+                    ? "bg-muted font-medium"
+                    : "text-subtle-foreground hover:bg-muted"
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        )}
         {themeToggle && <ThemeToggle variant="icon" />}
         <HeaderAccount />
       </div>
