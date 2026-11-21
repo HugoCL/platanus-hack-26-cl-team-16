@@ -9,7 +9,12 @@ import {
   modelFor,
 } from "../models";
 
-export type LlmPrompt = { role: LlmRole; system?: string; prompt: string };
+export type LlmPrompt = {
+  role: LlmRole;
+  system?: string;
+  prompt: string;
+  abortSignal?: AbortSignal;
+};
 
 export interface LlmProvider {
   readonly name: "openrouter" | "fake";
@@ -33,20 +38,22 @@ export function createLlmProvider(env: Env = process.env): LlmProvider {
 
   return {
     name: "openrouter",
-    async generateText({ role, system, prompt }) {
+    async generateText({ role, system, prompt, abortSignal }) {
       const { text } = await generateText({
         model: model(role),
         system,
         prompt,
+        abortSignal,
       });
       return text;
     },
-    async generateObject({ role, system, prompt, schema }) {
+    async generateObject({ role, system, prompt, schema, abortSignal }) {
       const { output } = await generateText({
         model: model(role),
         system,
         prompt,
         output: Output.object({ schema }),
+        abortSignal,
       });
       return output;
     },

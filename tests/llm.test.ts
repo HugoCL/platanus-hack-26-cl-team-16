@@ -113,6 +113,39 @@ describe("LLM provider", () => {
     ).rejects.toThrow();
   });
 
+  it("aborting the signal cancels the OpenRouter request", async () => {
+    const llm = createLlmProvider({
+      LLM_PROVIDER: "openrouter",
+      OPENROUTER_API_KEY: "test-key",
+    });
+    const hangUntilAborted = (_url: unknown, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () =>
+          reject(init.signal?.reason),
+        );
+      });
+    const calls = [
+      (abortSignal: AbortSignal) =>
+        llm.generateObject({
+          role: "moderator",
+          prompt: "x",
+          schema: z.object({ ok: z.boolean() }),
+          abortSignal,
+        }),
+      (abortSignal: AbortSignal) =>
+        llm.generateText({ role: "agent", prompt: "x", abortSignal }),
+    ];
+    for (const [i, call] of calls.entries()) {
+      vi.mocked(fetch).mockImplementationOnce(hangUntilAborted);
+      const controller = new AbortController();
+      const pending = call(controller.signal);
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(i + 1));
+      controller.abort();
+      await expect(pending).rejects.toThrow();
+      expect(vi.mocked(fetch).mock.calls[i][1]?.signal?.aborted).toBe(true);
+    }
+  });
+
   it("models come from the environment, with defaults", () => {
     expect(modelFor("agent", {})).toBe(DEFAULT_MODELS.agent);
     expect(modelFor("moderator", {})).toBe(DEFAULT_MODELS.moderator);

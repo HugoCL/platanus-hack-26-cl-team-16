@@ -13,6 +13,7 @@ import type {
 } from "convex/server";
 import type { z } from "zod";
 import { api } from "../convex/_generated/api";
+import { isApiKeyFormat } from "../convex/agentKeys";
 import {
   type GetAgentInput,
   MCP_TOOLS,
@@ -25,6 +26,10 @@ export type ConvexCaller = {
     query: Q,
     ...args: OptionalRestArgs<Q>
   ): Promise<FunctionReturnType<Q>>;
+  mutation<M extends FunctionReference<"mutation">>(
+    mutation: M,
+    ...args: OptionalRestArgs<M>
+  ): Promise<FunctionReturnType<M>>;
   action<A extends FunctionReference<"action">>(
     action: A,
     ...args: OptionalRestArgs<A>
@@ -38,16 +43,46 @@ type ToolRun<N extends McpToolName> = (
 
 const BEARER = /^Bearer\s+(\S+)$/i;
 
-// Next builds request.url from the address it listens on, so the public origin comes from the
-// proxy's forwarded headers when there are any.
-function crossOrigin({ headers, url }: Request) {
+const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+function toUrl(value: string) {
+  try {
+    return new URL(value);
+  } catch {
+    return null;
+  }
+}
+
+// DNS rebinding guard from the MCP spec: the host the client used and the Origin a browser sends
+// must be loopback or the deployment's public origin. The allowed values come from configuration,
+// never from the request, because a rebound page sends an Origin and a Host that match each other.
+// A chain of proxies lists several hosts in X-Forwarded-Host; the first is the one the client used.
+function allowedRequest(
+  { headers, url }: Request,
+  publicOrigin: string | undefined,
+) {
+  const publicUrl = publicOrigin === undefined ? null : toUrl(publicOrigin);
+  const host = toUrl(
+    `http://${
+      headers.get("x-forwarded-host")?.split(",")[0].trim() ??
+      headers.get("host") ??
+      new URL(url).host
+    }`,
+  );
+  if (
+    !host ||
+    (!LOOPBACK.has(host.hostname) && host.host !== publicUrl?.host)
+  ) {
+    return false;
+  }
   const origin = headers.get("origin");
-  if (origin === null) return false;
-  const own = new URL(url);
-  const proto = headers.get("x-forwarded-proto") ?? own.protocol.slice(0, -1);
-  const host =
-    headers.get("x-forwarded-host") ?? headers.get("host") ?? own.host;
-  return origin !== `${proto}://${host}`;
+  if (origin === null) return true;
+  const originUrl = toUrl(origin);
+  if (originUrl?.origin !== origin) return false;
+  return (
+    origin === publicUrl?.origin ||
+    (LOOPBACK.has(originUrl.hostname) && /^https?:$/.test(originUrl.protocol))
+  );
 }
 
 function registerTool<N extends McpToolName>(
@@ -79,7 +114,9 @@ function registerTool<N extends McpToolName>(
   );
 }
 
-// E1 has no distance search, so `near` is refused instead of ignored.
+// E1 has no distance search, so `near` is refused instead of ignored. The query text never leaves
+// this server: `llmFallback: false` keeps it from the LLM provider, so what the parser cannot read
+// comes back in `unresolved` for the client to pass as `category` or `comuna`.
 async function searchAgents(
   convex: ConvexCaller,
   { query, category, comuna, limit, near }: z.output<typeof SearchAgentsInput>,
@@ -87,13 +124,11 @@ async function searchAgents(
   if (near) {
     throw new Error("near is not supported yet: filter by comuna instead");
   }
-  const { agents } = await convex.action(api.directory.searchText, {
-    query,
-    category,
-    comuna,
-    limit,
-  });
-  return { agents };
+  const { agents, truncated, interpretation } = await convex.action(
+    api.directory.searchText,
+    { query, category, comuna, limit, llmFallback: false },
+  );
+  return { agents, truncated, unresolved: interpretation.unresolved };
 }
 
 async function getAgent(
@@ -107,7 +142,10 @@ async function getAgent(
   return { agent };
 }
 
-export function createMcpEndpoint(convex: ConvexCaller) {
+export function createMcpEndpoint(
+  convex: ConvexCaller,
+  { publicOrigin }: { publicOrigin?: string } = {},
+) {
   const handler = createMcpHandler(() => {
     const server = new McpServer(
       { name: "directorio-agentes", version: "0.1.0" },
@@ -120,20 +158,31 @@ export function createMcpEndpoint(convex: ConvexCaller) {
     return server;
   });
   return async (request: Request) => {
-    if (crossOrigin(request)) {
+    if (!allowedRequest(request, publicOrigin)) {
       return new Response("Origin not allowed", { status: 403 });
     }
     const apiKey = BEARER.exec(request.headers.get("authorization") ?? "")?.[1];
-    if (
-      !apiKey ||
-      !(await convex.query(api.agentKeys.authenticate, { apiKey }))
-    ) {
+    const caller =
+      apiKey && isApiKeyFormat(apiKey)
+        ? await convex.mutation(api.agentKeys.authenticate, { apiKey })
+        : null;
+    if (!caller) {
       return bearerAuthChallengeResponse(
         new OAuthError(
           OAuthErrorCode.InvalidToken,
           "Missing or invalid API key",
         ),
       );
+    }
+    if (!caller.ok) {
+      return new Response("Too many requests for this API key", {
+        status: 429,
+        headers: {
+          "retry-after": String(
+            Math.max(1, Math.ceil(caller.retryAfterMs / 1000)),
+          ),
+        },
+      });
     }
     return handler.fetch(request);
   };

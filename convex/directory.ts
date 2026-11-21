@@ -251,16 +251,19 @@ export const get = query({
 
 // An explicit category or comuna wins over what the text says about it. An empty one counts as absent,
 // because LLM clients often fill optional strings with "".
+// `llmFallback: false` never sends the text to the LLM provider. The MCP server passes it, because an
+// assistant's query can carry a patient's name or symptoms; what the parser cannot read stays unresolved.
 export const searchText = action({
   args: {
     query: v.string(),
     category: v.optional(v.string()),
     comuna: v.optional(v.string()),
     limit: v.optional(v.number()),
+    llmFallback: v.optional(v.boolean()),
   },
   handler: async (
     ctx,
-    { query, limit, ...given },
+    { query, limit, llmFallback = true, ...given },
   ): Promise<
     DirectorySearchResult & { interpretation: TextInterpretation }
   > => {
@@ -275,12 +278,16 @@ export const searchText = action({
     const interpretation = await interpretDirectoryText(
       query,
       categories,
-      {
-        acquire: async () => {
-          await rateLimiter.limit(ctx, "directoryTextLlm", { throws: true });
-        },
-        createLlm: () => createLlmProvider(),
-      },
+      llmFallback
+        ? {
+            acquire: async () => {
+              await rateLimiter.limit(ctx, "directoryTextLlm", {
+                throws: true,
+              });
+            },
+            createLlm: () => createLlmProvider(),
+          }
+        : null,
       DIRECTORY_FIELDS.filter((field) => given[field]),
     );
     const category = given.category || interpretation.category || undefined;

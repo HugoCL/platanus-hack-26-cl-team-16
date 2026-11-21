@@ -14,6 +14,7 @@
     "seed:reset": "convex run seed:reset",
     "migrate": "convex run migrations:runAll",
     "mcp:key": "convex run agentKeys:issue",
+    "mcp:revoke": "convex run agentKeys:revoke",
     "typecheck": "next typegen && node node_modules/@typescript/native/bin/tsc --noEmit",
     "build": "pnpm typecheck && next build",
     "start": "next start",
@@ -24,7 +25,8 @@
     "skills:link": "node scripts/skills/link.mjs",
     "smoke": "python3 scripts/smoke.py",
     "browser:install": "agent-browser install",
-    "test": "vitest run"
+    "test": "vitest run",
+    "eval:moderator": "vitest run --config vitest.eval.config.mts"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.61.3",
