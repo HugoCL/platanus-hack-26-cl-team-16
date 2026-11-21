@@ -1,5 +1,9 @@
+import type { TestConvex } from "convex-test";
+import { internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { MutationCtx } from "../../convex/_generated/server";
+import type schema from "../../convex/schema";
+import { providerTurn } from "../../lib/agents/provider";
 import { effectiveAllowedIntents } from "../../shared/agent";
 import {
   Message,
@@ -7,6 +11,7 @@ import {
   type SendableContent,
 } from "../../shared/messages";
 import type { Moderator } from "../../shared/moderation";
+import type { LlmProvider } from "../../shared/providers/llm";
 import { CONSUMER_AGENT_SLUG } from "../../shared/seedData";
 import {
   DEFAULT_MAX_TURNS,
@@ -182,3 +187,37 @@ export const choose = (room: LoggedRoom, picker: Message, slotId: string) =>
     inReplyTo: picker.messageId,
     response: { type: "slot_selected", pickerId: pickerOf(picker).id, slotId },
   });
+
+// One provider turn as E2's adapter will run it: the context loaded by `providerAgent.context`
+// and the `book` port bound to `bookings.book`, both at `NOW`.
+export async function askProvider(
+  t: TestConvex<typeof schema>,
+  room: LoggedRoom,
+  incoming: Message,
+  llm: LlmProvider,
+) {
+  const context = await t.query(internal.providerAgent.context, {
+    agentId: room.providerId,
+    now: NOW,
+  });
+  return providerTurn(
+    {
+      self: room.recipient,
+      contract: room.contract,
+      participants: room.participants,
+      history: [...room.history],
+      incoming,
+    },
+    context,
+    {
+      llm,
+      book: (slotId) =>
+        t.mutation(internal.bookings.book, {
+          sessionId: room.sessionId,
+          agentId: room.providerId,
+          availabilityId: slotId as Id<"availability">,
+          now: NOW,
+        }),
+    },
+  );
+}

@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import schema from "../../convex/schema";
-import { providerTurn, SLOT_OPTIONS } from "../../lib/agents/provider";
+import { SLOT_OPTIONS } from "../../lib/agents/provider";
 import type { Message, SendableContent } from "../../shared/messages";
 import {
   createFakeLlmProvider,
@@ -13,9 +13,11 @@ import {
 } from "../../shared/providers/llm";
 import { CLINIC_AGENT_SLUG } from "../../shared/seedData";
 import {
+  askProvider,
   choose,
   insertRoom,
   type LoggedRoom,
+  NOW,
   pickerOf,
   withLog,
 } from "./rooms";
@@ -57,30 +59,8 @@ async function providerAnswers(
   incoming: Message,
   llm: LlmProvider = noLlm,
 ) {
-  const context = await t.query(internal.providerAgent.context, {
-    agentId: room.providerId,
-  });
-  const actions = await providerTurn(
-    {
-      self: room.recipient,
-      contract: room.contract,
-      participants: room.participants,
-      history: [...room.history],
-      incoming,
-    },
-    context,
-    {
-      llm,
-      book: (slotId) =>
-        t.mutation(internal.bookings.book, {
-          sessionId: room.sessionId,
-          agentId: room.providerId,
-          availabilityId: slotId as Id<"availability">,
-        }),
-    },
-  );
   const sent: Message[] = [];
-  for (const action of actions) {
+  for (const action of await askProvider(t, room, incoming, llm)) {
     if (action.kind !== "send") throw new Error("a provider never closes");
     sent.push(
       await room.post(room.recipient, action.recipient, action.content),
@@ -137,7 +117,7 @@ describe("generic provider agent", () => {
     ]);
   });
 
-  it("books the human's choice and confirms it, once", async () => {
+  it("books the human's choice and confirms it", async () => {
     const room = await openRoom();
     const picker = await askForSlots(room);
     const chosen = pickerOf(picker).slots[1].id;
@@ -160,11 +140,39 @@ describe("generic provider agent", () => {
       },
     });
     expect(notice.recipient).toBe(room.initiator);
-    expect(notice.content.kind).toBe("text");
+    expect(notice.content).toEqual(
+      text(
+        "Reserva confirmada: Consulta cardiología · Dr. Felipe Rojas, jueves, 26 de noviembre, 10:30. Le envié la confirmación a Juan.",
+      ),
+    );
     expect((await availability(chosen))?.booked).toBe(1);
+  });
 
-    await providerAnswers(room, choice);
-    expect((await availability(chosen))?.booked).toBe(1);
+  it("books one slot per picker and confirms it once", async () => {
+    const room = await openRoom();
+    const picker = await askForSlots(room);
+    const [first, second] = pickerOf(picker).slots.map((s) => s.id);
+    const choice = await choose(room, picker, second);
+    const beforeConfirmation = [...room.history];
+    const [confirmation] = await providerAnswers(room, choice);
+
+    const retried = await askProvider(
+      t,
+      { ...room, history: beforeConfirmation },
+      choice,
+      noLlm,
+    );
+    expect(retried[0]).toEqual({
+      kind: "send",
+      recipient: room.owner,
+      content: confirmation.content,
+    });
+    expect(await providerAnswers(room, choice)).toEqual([]);
+    expect(
+      await providerAnswers(room, await choose(room, picker, first)),
+    ).toEqual([]);
+    expect((await availability(second))?.booked).toBe(1);
+    expect((await availability(first))?.booked).toBe(0);
   });
 
   it("never books a slot it did not offer in that picker", async () => {
@@ -172,6 +180,7 @@ describe("generic provider agent", () => {
     const picker = await askForSlots(room);
     const context = await t.query(internal.providerAgent.context, {
       agentId: room.providerId,
+      now: NOW,
     });
     const notOffered = context.freeSlots[3].id;
 
@@ -182,6 +191,60 @@ describe("generic provider agent", () => {
 
     expect(sent).toEqual([]);
     expect((await availability(notOffered))?.booked).toBe(0);
+  });
+
+  it("ignores blocked messages, messages for someone else and an agent's answer to a picker", async () => {
+    const room = await openRoom();
+    const picker = await askForSlots(room);
+    const slotId = pickerOf(picker).slots[0].id;
+    const choice = await choose(room, picker, slotId);
+    const blocked: Message = {
+      ...choice,
+      status: "blocked",
+      verdict: { decision: "block", rule: "purpose", reason: "Bloqueado." },
+    };
+    const forJuan = await room.post(
+      room.initiator,
+      room.owner,
+      text("Juan, ya hablé con la clínica."),
+    );
+    const fromAgent = await room.post(room.initiator, room.recipient, {
+      kind: "ui_response",
+      inReplyTo: picker.messageId,
+      response: {
+        type: "slot_selected",
+        pickerId: pickerOf(picker).id,
+        slotId,
+      },
+    });
+
+    for (const incoming of [blocked, forJuan, fromAgent]) {
+      await expect(askProvider(t, room, incoming, noLlm)).resolves.toEqual([]);
+    }
+    expect((await availability(slotId))?.booked).toBe(0);
+  });
+
+  it("asks for a human in text when the room has none", async () => {
+    const room = await openRoom();
+    const noHuman = {
+      ...room,
+      participants: room.participants.filter((p) => p.kind === "agent"),
+    };
+    const ask = await room.post(
+      room.initiator,
+      room.recipient,
+      text("¿Horarios?"),
+    );
+
+    await expect(askProvider(t, noHuman, ask, offerAny)).resolves.toEqual([
+      {
+        kind: "send",
+        recipient: room.initiator,
+        content: text(
+          "Un humano tiene que elegir el horario y en esta sala no hay ninguno.",
+        ),
+      },
+    ]);
   });
 
   it("criterion 5: a slot booked in one room is not offered in a new room", async () => {
@@ -197,27 +260,32 @@ describe("generic provider agent", () => {
     expect(offered).not.toContain(taken);
   });
 
-  it("offers other slots when the chosen one was taken in another room meanwhile", async () => {
+  it("offers the same offering's other slots when the chosen one was taken meanwhile", async () => {
     const a = await openRoom();
     const b = await openRoom();
     const pickerA = await askForSlots(a);
     const pickerB = await askForSlots(b);
-    const contested = pickerOf(pickerA).slots[0].id;
-    await providerAnswers(a, await choose(a, pickerA, contested));
+    const contested = pickerOf(pickerA).slots[0];
+    await providerAnswers(a, await choose(a, pickerA, contested.id));
 
     const [retry] = await providerAnswers(
       b,
-      await choose(b, pickerB, contested),
+      await choose(b, pickerB, contested.id),
     );
 
     expect(retry.recipient).toBe(b.owner);
     const spec = pickerOf(retry);
     expect(spec.title).toBe("Ese horario se acaba de tomar. Elige otro");
-    expect(spec.slots.map((s) => s.id)).not.toContain(contested);
-    expect((await availability(contested))?.booked).toBe(1);
+    expect(spec.slots.map((s) => [s.label, s.detail])).toEqual([
+      [
+        "viernes, 27 de noviembre, 16:00",
+        "Consulta cardiología · Dra. Carolina Muñoz",
+      ],
+    ]);
+    expect((await availability(contested.id))?.booked).toBe(1);
   });
 
-  describe("criterion 4: with an allow-all moderator, other patients' data cannot leak", () => {
+  describe("criterion 4: with an allow-all moderator, other people's data cannot leak", () => {
     async function roomWithAnotherPatient() {
       const other = await openRoom(CLINIC_AGENT_SLUG, "María Pérez González");
       const picker = await askForSlots(other);
@@ -339,7 +407,7 @@ describe("generic provider agent", () => {
     });
   });
 
-  it("a provider without the booking capability cannot offer slots", async () => {
+  it("a room whose contract does not allow booking cannot get slots", async () => {
     const room = await openRoom("cafe-apoquindo");
     const ask = await room.post(
       room.initiator,

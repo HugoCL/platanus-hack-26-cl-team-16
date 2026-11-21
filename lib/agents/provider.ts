@@ -1,13 +1,17 @@
 import { z } from "zod";
 import type { AgentCard } from "../../shared/agent";
 import type { Attributes, Money } from "../../shared/catalog";
-import type { AgentUiSpec, UiResponse } from "../../shared/genui";
+import type { AgentUiSpec } from "../../shared/genui";
+import type { Message } from "../../shared/messages";
+import { DELIVERABLE_STATUSES } from "../../shared/moderation";
 import type { LlmProvider } from "../../shared/providers/llm";
+import type { Booking } from "./booking";
 import {
   type AgentAction,
   type AgentTurn,
   agentWithRole,
   data,
+  delivered,
   describeMessage,
   humanOwner,
   sendText,
@@ -36,15 +40,7 @@ export type ProviderContext = {
   freeSlots: { id: string; offeringId: string; start: number; end: number }[];
 };
 
-export type Booking =
-  | {
-      status: "booked";
-      offeringName: string;
-      start: number;
-      end: number;
-      total: Money;
-    }
-  | { status: "unavailable" };
+type Slot = ProviderContext["freeSlots"][number];
 
 export type ProviderDeps = {
   llm: LlmProvider;
@@ -80,24 +76,21 @@ export async function providerTurn(
 ): Promise<AgentAction[]> {
   const { incoming } = turn;
   const sender = incoming.senderParticipantId;
-  if (sender === null || sender === turn.self) return [];
-  const { content } = incoming;
   if (
-    content.kind === "ui_response" &&
-    content.response.type === "slot_selected"
+    sender === null ||
+    sender === turn.self ||
+    !DELIVERABLE_STATUSES.includes(incoming.status) ||
+    (incoming.recipient !== turn.self && incoming.recipient !== "all")
   ) {
-    return bookChoice(
-      turn,
-      context,
-      book,
-      sender,
-      content.inReplyTo,
-      content.response,
-    );
+    return [];
+  }
+  const { content } = incoming;
+  if (content.kind === "ui_response") {
+    return bookChoice(turn, context, book, content);
   }
   if (content.kind !== "text") return [];
 
-  const canBook = context.card.capabilities.includes("booking");
+  const canBook = turn.contract.capabilities.includes("booking");
   const keys = new Map(context.offerings.map((o, i) => [`o${i + 1}`, o]));
   const decision = await llm.generateObject({
     role: "agent",
@@ -121,37 +114,59 @@ export async function providerTurn(
     const text = decision.text.trim();
     return text ? [sendText(sender, text)] : [];
   }
+  const human = humanOwner(turn.participants)?.participantId;
+  if (!human) {
+    return [
+      sendText(
+        sender,
+        "Un humano tiene que elegir el horario y en esta sala no hay ninguno.",
+      ),
+    ];
+  }
   const wanted = new Set(
     decision.offerings.flatMap((k) => keys.get(k)?.id ?? []),
   );
   return offer(
     turn,
     context,
-    humanOwner(turn.participants)?.participantId ?? sender,
+    human,
     (slot) => wanted.size === 0 || wanted.has(slot.offeringId),
     "Elige un horario",
   );
 }
 
+// Books the slot a human picked in one of this provider's pickers, once per picker.
 async function bookChoice(
   turn: AgentTurn,
   context: ProviderContext,
   book: ProviderDeps["book"],
-  chooser: string,
-  inReplyTo: string,
-  { pickerId, slotId }: Extract<UiResponse, { type: "slot_selected" }>,
+  { inReplyTo, response }: Extract<Message["content"], { kind: "ui_response" }>,
 ): Promise<AgentAction[]> {
-  const picker = turn.history.find(
+  const human = turn.participants.find(
+    (p) => p.participantId === turn.incoming.senderParticipantId,
+  );
+  if (human?.kind !== "human" || response.type !== "slot_selected") return [];
+  const { pickerId, slotId } = response;
+  const seen = delivered(turn.history);
+  const picker = seen.find(
     (m) =>
       m.messageId === inReplyTo &&
       m.senderParticipantId === turn.self &&
-      m.recipient === chooser,
+      m.recipient === human.participantId,
   );
   const spec = picker?.content.kind === "ui" ? picker.content.spec : null;
+  const confirmationId = `${pickerId}-reserva`;
+  const alreadyConfirmed = seen.some(
+    (m) =>
+      m.senderParticipantId === turn.self &&
+      m.content.kind === "ui" &&
+      m.content.spec.id === confirmationId,
+  );
   if (
     spec?.type !== "slot_picker" ||
     spec.id !== pickerId ||
-    !spec.slots.some((slot) => slot.id === slotId)
+    !spec.slots.some((slot) => slot.id === slotId) ||
+    alreadyConfirmed
   ) {
     return [];
   }
@@ -161,8 +176,8 @@ async function bookChoice(
     return offer(
       turn,
       context,
-      chooser,
-      (slot) => slot.id !== slotId,
+      human.participantId,
+      (slot) => slot.id !== slotId && slot.offeringId === booking.offeringId,
       "Ese horario se acaba de tomar. Elige otro",
     );
   }
@@ -171,12 +186,12 @@ async function bookChoice(
   const actions: AgentAction[] = [
     {
       kind: "send",
-      recipient: chooser,
+      recipient: human.participantId,
       content: {
         kind: "ui",
         spec: {
           type: "confirmation",
-          id: `${pickerId}-reserva`,
+          id: confirmationId,
           title: "Reserva confirmada",
           summary: `${booking.offeringName}, ${when}.`,
           details: [
@@ -200,15 +215,12 @@ async function bookChoice(
       },
     },
   ];
-  const initiator = agentWithRole(
-    turn.participants,
-    "initiator",
-  )?.participantId;
-  if (initiator && initiator !== chooser) {
+  const initiator = agentWithRole(turn.participants, "initiator");
+  if (initiator) {
     actions.push(
       sendText(
-        initiator,
-        `Reserva confirmada: ${booking.offeringName}, ${when}. Le envié la confirmación a tu humano.`,
+        initiator.participantId,
+        `Reserva confirmada: ${booking.offeringName}, ${when}. Le envié la confirmación a ${human.displayName}.`,
       ),
     );
   }
@@ -219,7 +231,7 @@ function offer(
   turn: AgentTurn,
   context: ProviderContext,
   recipient: string,
-  wanted: (slot: ProviderContext["freeSlots"][number]) => boolean,
+  wanted: (slot: Slot) => boolean,
   title: string,
 ): AgentAction[] {
   const slots = context.freeSlots

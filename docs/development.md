@@ -38,13 +38,15 @@ Each card is an `AgentDetail` (the full `AgentCard` with purpose and scope) plus
 
 The agents' cores live in `lib/agents/` and are pure. A turn goes in (`AgentTurn`: the room contract, its participants, the history the agent can see and the message it answers) and actions come out (`AgentAction`: messages to send through the room's moderation, or closing the room). They reach the model only through `LlmProvider`, so the tests run them on the fake LLM.
 
-The provider (`lib/agents/provider.ts`) is generic. Its configuration is its card, its active offerings and their free slots, plus the `systemPrompt` of its `hostedAgentConfigs` row when it has one, all loaded by the internal query `providerAgent.context`. That query reads nothing from other rooms, so the provider has no other patient's data to give away even when a message gets past the moderator (criterion 4). For a text, the model picks one action:
+The provider (`lib/agents/provider.ts`) is generic. Its configuration is its card, its active offerings and their free slots, plus the `systemPrompt` of its `hostedAgentConfigs` row when it has one, all loaded by the internal query `providerAgent.context` (with `now`, so past slots are left out). That query reads nothing from other rooms, so the provider has nobody else's data to give away even when a message gets past the moderator (criterion 4).
 
-- `offer_slots` (only with the `booking` capability): the provider sends the room's human a `slot_picker` with the first two free slots of the offerings the model picked. The model chooses offerings by key and never writes slots itself.
+It acts only on a delivered message addressed to it (or to `all`). For a text, the model picks one action:
+
+- `offer_slots` (only when the room's contract has the `booking` capability): the provider sends the room's human owner a `slot_picker` with the first two free slots of the offerings the model picked. The model chooses offerings by key and never writes slots itself. With no human in the room, it says so in text.
 - `reply`: the model's answer goes back to the sender.
 - `decline`: a fixed refusal goes back to the sender.
 
-A `slot_selected` answer to one of its own pickers, from the human it was sent to, books that slot through `bookings.book` without asking the model. The human then gets a `confirmation` card and the consumer agent a text. If another room took the slot meanwhile, the human gets a new picker without it.
+A `slot_selected` answer, from the human its picker was sent to, books that slot through `bookings.book` without asking the model, once per picker. The human then gets a `confirmation` card and the consumer agent a text. If another room took the slot meanwhile, the human gets a new picker with the same offering's other slots.
 
 ## Test
 
