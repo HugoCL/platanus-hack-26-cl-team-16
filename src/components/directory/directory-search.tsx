@@ -39,8 +39,10 @@ import { intentLabel } from "../room/room-format";
 import { cardDistance, categoryTree, pluralAgents } from "./directory-format";
 import DirectoryList from "./directory-list";
 import { DirectoryMap } from "./directory-map";
+import { FixtureToggle, useFixtureState } from "./fixture-toggle";
 import { OpenSessionDialog } from "./open-session-dialog";
 import { SiteHeader } from "./site-header";
+import { fixtureResult } from "./worst-case-fixture";
 
 const ALL = "all";
 const MAX_INTENT_FILTERS = 6;
@@ -74,10 +76,17 @@ export function DirectorySearch() {
   const [view, setView] = useState<"list" | "map">("list");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
+  const [fixture, setFixture] = useFixtureState();
   const filterKey = `${category}|${comuna}`;
   const [more, setMore] = useState({ key: filterKey, pages: 1 });
   const pages = more.key === filterKey ? more.pages : 1;
-  const { result, loadingMore } = usePagedSearch(category, comuna, pages);
+  const { result: liveResult, loadingMore } = usePagedSearch(
+    category,
+    comuna,
+    pages,
+  );
+  const result =
+    fixture === "demo" ? liveResult : fixtureResult(fixture, liveResult);
   const categories = useQuery(api.directory.categories, {});
 
   const origin = geo.state === "on" ? geo.origin : null;
@@ -573,6 +582,7 @@ export function DirectorySearch() {
       </Button>
 
       <OpenSessionDialog card={converse} onClose={() => setConverse(null)} />
+      <FixtureToggle state={fixture} onChange={setFixture} />
     </div>
   );
 }
