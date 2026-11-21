@@ -55,14 +55,14 @@ Rules that follow:
 The landing sells the product, so it is the one place with a brand voice: the phone book ("páginas amarillas") reinterpreted for agents.
 
 * **Light and dark, both complete.** The landing follows the theme toggle. Light is warm paper with ink text; dark is ink with light text. Its colors are `--landing-*` tokens declared with `light-dark()` at the top of `src/styles/landing.css`; never hard-code a color that only works on one of the two.
-* **Phone-book yellow** (`--sm-yellow`) is the brand color: the glow rising behind the hero, the call to action, highlighted listings, and the footer. Text on yellow is always ink (`--landing-ink`); never yellow text on a light surface.
+* **Phone-book yellow** (`--brand-yellow`) is the brand color: the glow behind the hero, the call to action, highlighted listings, and the footer. Controls use ink text (`--landing-ink`) on yellow; never yellow text on a light surface.
 * **Sections alternate** between the page background (`--landing-bg`) and a second surface (`--landing-alt`: phone-book paper in light, a lifted ink in dark), with hairline rules and listings with dot leaders. Never mix a light section into the dark theme or the other way around.
-* **The listing wall** behind the hero is decoration: a dense field of tiny listings, lit around the pointer, its columns sliding slowly up and down. It is drawn into one canvas image per column (`src/components/landing/listing-wall.tsx`), hidden from assistive tech, paused off-screen, and still under `prefers-reduced-motion`.
+* **The listing wall** behind the hero is decoration: static phone-book columns with category headings, dotted leaders, and highlighted seed businesses. One canvas (`src/components/landing/listing-wall.tsx`) redraws on resize or theme change and is hidden from assistive tech. There is no pointer spotlight or scrolling animation.
 * **Order:** hero, then the product demo (the moderated room replaying a booking), then how it works, then the closing call to action. The demo comes first so a visitor sees the product working before reading about it.
 * **Scroll in steps.** On screens at least 48rem wide and 40rem tall, the landing scrolls one section at a time with CSS scroll snap (`scroll-snap-type: y mandatory`, `scroll-snap-stop: always`): the header with the hero, the demo, how it works, and the closing call to action with the footer. Each section fills the viewport and centers its content. Phones scroll freely.
 * **Scroll reveal, once.** Content fades in from a blur and rises slightly the first time it enters the viewport, staggered in reading order, and then stays: scrolling back does not replay it, only a reload does. The hero title reveals word by word on load. Mark an element with `revealAt(i)` (`src/components/landing/reveal.tsx`); `ScrollReveal` observes each one until it is revealed. Content is hidden only when scripts run; under `prefers-reduced-motion` it only fades, with no blur or movement.
-* **Motion values.** Entrances use the strong ease-out `--landing-ease-out` (`cubic-bezier(0.23, 1, 0.32, 1)`); hover color changes use `ease`; the wall's slide is `linear`. The call to action presses to `scale(0.97)` in 160ms, and hover effects apply only on devices with a fine pointer.
-* **Headlines are two-tone:** the first line in muted gray, the second in the foreground.
+* **Motion values.** Entrances use the strong ease-out `--landing-ease-out` (`cubic-bezier(0.23, 1, 0.32, 1)`); hover color changes use `ease`. The call to action presses to `scale(0.97)` in 160ms, and hover effects apply only on devices with a fine pointer.
+* **Headlines:** the hero uses the foreground color; section headings pair muted text with foreground text.
 
 ---
 
