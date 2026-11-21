@@ -15,6 +15,7 @@ Next.js 16 (App Router, Turbopack), Convex, Clerk, Tailwind 4, [UI SDK](https://
 | `pnpm typecheck`, `pnpm build` | `next typegen` plus `tsc --noEmit`; `pnpm build` runs `pnpm typecheck`, then `next build` (it passes without `.env.local`; running needs `NEXT_PUBLIC_CONVEX_URL`). `pnpm start` serves the build. |
 | `pnpm seed`, `pnpm seed:reset`, `pnpm migrate` | `convex run seed:ensure` (idempotent), a wipe plus reseed (local deployments only), and `convex run migrations:runAll`. They talk to the running deployment, so start `pnpm dev` first. |
 | `pnpm test` | Vitest, offline: contract examples, seed data, fake LLM, business fixture, and `seed:ensure` through convex-test. No network or keys (`fetch` is stubbed to throw). |
+| `pnpm eval:moderator` | Runs the moderation set against the real model on OpenRouter, for the full moderator and for the judge alone, and prints the E3 criteria and the cost. Needs `OPENROUTER_API_KEY` and spends credit, so it never runs in CI or `pnpm test`. `EVAL_RUNS` (default 10), `EVAL_CONCURRENCY` (default 4) and `MODERATOR_MODEL` tune it; the raw samples go to `artifacts/moderator-eval.json`. |
 | `pnpm smoke` | Playwright smoke test. Starts `pnpm dev` itself, bootstraps `.venv` and Chromium on first run, saves `artifacts/smoke.png` and `artifacts/dev.log`. With a server already running: `SMOKE_REUSE=1 pnpm smoke`. `PORT` changes the port. |
 | `pnpm browser:install` | Download Chrome for `agent-browser`. |
 | `pnpm skills:sync [ids] [--update]` | Install or refresh vendored skills from `scripts/skills/sources.json` (staged, prunes orphans, regenerates `docs/skills.md`). |
@@ -23,7 +24,7 @@ Next.js 16 (App Router, Turbopack), Convex, Clerk, Tailwind 4, [UI SDK](https://
 
 Code lives in `src/` (`src/app/` routes, `src/components/`, `src/styles/`, `src/proxy.ts`) and `convex/` (backend). `@/*` maps to `src/*`; `@/convex/*` maps to `convex/*`. Before touching `convex/`, read `convex/_generated/ai/guidelines.md`.
 
-Architecture (Spanish) and the contracts every track builds on: `docs/architecture.md`; the zod schemas in `shared/` are the source of truth for `convex/schema.ts`. Start and test from a clean clone: `docs/development.md`.
+Architecture (Spanish) and the contracts every track builds on: `docs/architecture.md`; the zod schemas in `shared/` are the source of truth for `convex/schema.ts`. Start and test from a clean clone: `docs/development.md`. CI, the production deploy on Render and PR previews, with their costs and the human-only setup: `docs/deploy.md`.
 
 ## UI: UI SDK primitives, your design system
 
@@ -44,7 +45,7 @@ Convex conventions (details in the file headers):
 - Destructive schema change or backfill: write a migration in `convex/migrations.ts`, add it to `runAll`, run `pnpm migrate`.
 - Components: `@convex-dev/migrations`, `@convex-dev/rate-limiter` (`addNumber` is limited and throws a `ConvexError` whose `data.kind` is `"RateLimited"`, see `isRateLimitError`), `@convex-dev/workpool` mounted as `backgroundWork` (example in `convex/jobs.ts`).
 
-Smoke checks the home page's `h1` ("Convex + Next.js + Clerk") and the `data-testid`s `add-number` and `numbers` (it adds a number and waits for the newest number's id, `data-latest-id`, to change; `loading` is not checked). The PR that changes the home page updates `check()` in `scripts/smoke.py` in the same PR.
+Smoke checks the home page's `h1` ("Convex + Next.js + Clerk") and the `data-testid`s `add-number` and `numbers` (it adds a number and waits for the newest number's id, `data-latest-id`, to change; `loading` is not checked). Then it opens `/directorio` and waits for one `data-testid="agent-card"` per non-draft card in `SEED_AGENTS` (read from `shared/seed-data.ts` with Node, capped at the page size of 20). The PR that changes the home page updates `check()` in `scripts/smoke.py` in the same PR.
 
 ## Local dev with no accounts
 
@@ -52,15 +53,15 @@ Smoke checks the home page's `h1` ("Convex + Next.js + Clerk") and the `data-tes
 
 - **Convex.** A local deployment runs as a subprocess of `convex dev` (`CONVEX_AGENT_MODE=anonymous`, set by `scripts/dev.mjs`). State is in `.convex/` and `.env.local`, both gitignored. `pnpm dev` stays anonymous unless `CONVEX_DEPLOY_KEY` or `CONVEX_DEPLOYMENT_TOKEN` is set, or `.env.local` or `.env` selects a deployment (`CONVEX_DEPLOYMENT=` that does not start with `anonymous:`, or `CONVEX_SELF_HOSTED_*`). In anonymous mode every Convex deployment variable is removed from the children's environment, and cloud mode refuses a production key or deployment (`pnpm dev` pushes and seeds).
 - **Clerk.** Keyless mode provisions temporary dev keys on first load. The prompt "Configure your application" in the corner is expected.
-- In this mode `convex/auth.config.ts` has `providers: []`, so Convex sees every user as signed out. The signed-in UI works only after the switch below. `/server` requires sign-in (`src/proxy.ts` protects it).
+- `convex/auth.config.ts` accepts tokens from the team's Clerk app only (`cheerful-cougar-1086.clerk.accounts.dev`, a development instance). The keyless app is a different Clerk app, so in this mode Convex sees every user as signed out. The signed-in UI needs the team's Clerk keys (the switch below). `/server` requires sign-in (`src/proxy.ts` protects it).
+- Sign-in and sign-up do not work yet in any mode. Clerk answers both with `action_blocked` ("This app uses an outdated version of Clerk") for clerk-js 5, which `@clerk/nextjs` 6 loads, and accepts them from clerk-js 6. They need a Clerk SDK upgrade: the repository has `@clerk/nextjs` 6 and the current major is 7.
 
 ### Switch to real accounts (a human does this once)
 
 1. `npx convex login`, then point `.env.local` at a cloud dev deployment: `npx convex dev --configure=new` for a new project (stop it once it is running), or `npx convex deployment select dev` for an existing one. `pnpm dev` then detects the non-anonymous `.env.local` by itself.
-2. Claim the Clerk app from the "Configure your application" prompt (or the claim link in the `pnpm dev` log).
-3. In the Clerk Dashboard, activate the Convex integration, then copy the Frontend API URL.
-4. In `convex/auth.config.ts`, uncomment the provider and paste the URL as a literal `domain`. Do not use `process.env`: when the variable is not set on the deployment, `convex dev` exits.
-5. On Capy, put the Clerk keys in the project variables (`docs/capy.md`).
+2. Put the team's Clerk development keys (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY`, from the Clerk Dashboard, API keys) in `.env.local`. The team's app is already claimed and its Convex integration is active.
+3. `convex/auth.config.ts` already names that app's Frontend API URL as a literal `domain`. Change it only to move to another Clerk app, and keep it a literal. Do not use `process.env`: when the variable is not set on the deployment, `convex dev` exits.
+4. On Capy, put the Clerk keys in the project variables (`docs/capy.md`).
 
 Convex Auth is the account-free alternative to Clerk. Clerk stays the default here.
 

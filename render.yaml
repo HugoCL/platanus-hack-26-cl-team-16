@@ -1,0 +1,43 @@
+# Render Blueprint: the production web service and its opt-in pull request previews.
+# How it works, what it costs and the one-time human steps: docs/deploy.md.
+# Render creates what this file declares on the next sync, so a new resource here is a new cost.
+services:
+  - type: web
+    name: platanus-hack-26-cl-team-16
+    runtime: node
+    repo: https://github.com/HugoCL/platanus-hack-26-cl-team-16
+    branch: main
+    # Next to Convex's default region (AWS us-east-1). It cannot change after creation.
+    region: virginia
+    # $0: 0.1 CPU, 512 MB, spins down after 15 minutes without traffic. `0.5c-512mb` ($7/month)
+    # stays up. Previews use the same plan.
+    plan: free
+    buildCommand: bash scripts/render-build.sh
+    # `next start` without pnpm as its parent process: the instance has 512 MB.
+    startCommand: node_modules/.bin/next start
+    healthCheckPath: /
+    # Deploy a commit on main only after all of its GitHub checks pass.
+    autoDeployTrigger: checksPass
+    # A preview is created only for a pull request with the `render-preview` label.
+    previews:
+      generation: manual
+    # Changes that cannot alter the running app do not spend build minutes.
+    buildFilter:
+      ignoredPaths:
+        - "**/*.md"
+        - .agents/**
+        - .capy/**
+        - .github/**
+        - .scratch/**
+        - licenses/**
+        - tests/**
+    envVars:
+      # Secrets: Render asks for each value once, when the Blueprint is created.
+      - key: CONVEX_DEPLOY_KEY
+        sync: false
+      - key: CONVEX_PREVIEW_DEPLOY_KEY
+        sync: false
+      - key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false

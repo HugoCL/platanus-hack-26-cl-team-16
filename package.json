@@ -2,6 +2,7 @@
   "name": "hackathon-toolbox",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.22.0",
   "engines": {
     "node": ">=22",
     "pnpm": ">=11"
@@ -22,7 +23,8 @@
     "skills:link": "node scripts/skills/link.mjs",
     "smoke": "python3 scripts/smoke.py",
     "browser:install": "agent-browser install",
-    "test": "vitest run"
+    "test": "vitest run",
+    "eval:moderator": "vitest run --config vitest.eval.config.mts"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.61.3",
@@ -30,6 +32,7 @@
     "@convex-dev/migrations": "0.3.8",
     "@convex-dev/rate-limiter": "0.4.3",
     "@convex-dev/workpool": "0.4.16",
+    "@openrouter/ai-sdk-provider": "3.1.0",
     "@ui-sdk/core": "0.1.0-beta.7",
     "@ui-sdk/react": "0.1.0-beta.7",
     "ai": "7.0.176",

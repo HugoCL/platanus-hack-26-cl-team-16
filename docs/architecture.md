@@ -15,8 +15,8 @@ Un "Google / páginas amarillas de agentes" con cuatro vertientes:
 
 Next.js 16 (App Router) + Convex + Clerk + Tailwind 4 + UI SDK, más AI SDK para los LLM. Convex calza bien con el problema: las salas de chat son queries reactivas (sin montar websockets), `scheduler` y `workpool` corren el moderador, los agentes hospedados y los jobs de scraping, y trae búsqueda full-text y vectorial.
 
-- **LLM**: detrás de la interfaz `LlmProvider` (`shared/providers/llm.ts`), con dos implementaciones elegidas por `LLM_PROVIDER`: `fake` (por defecto y en las pruebas: determinista, sin red ni key) y `gateway` (Vercel AI Gateway con `AI_GATEWAY_API_KEY`, y la key de Anthropic conectada en el gateway, BYOK). Los modelos se configuran fuera del código: `AGENT_MODEL` para los agentes y `MODERATOR_MODEL` para el moderador, con valores por defecto en `shared/models.ts`.
-- **Deploy**: Next.js como Web Service en Render + Convex cloud. Los pasos de deploy los hace un humano.
+- **LLM**: detrás de la interfaz `LlmProvider` (`shared/providers/llm.ts`), con dos implementaciones elegidas por `LLM_PROVIDER`: `fake` (por defecto y en las pruebas: determinista, sin red ni key) y `openrouter` (OpenRouter mediante el AI SDK, con `OPENROUTER_API_KEY`). Los modelos se configuran fuera del código: `AGENT_MODEL` para los agentes y `MODERATOR_MODEL` para el moderador, con valores por defecto en `shared/models.ts`.
+- **Deploy**: Next.js como Web Service en Render + Convex cloud. Los pasos de deploy los hace un humano: `docs/deploy.md`.
 
 ```mermaid
 flowchart LR
@@ -82,19 +82,20 @@ Nada del modelo depende de un rubro: la clínica es solo la primera configuraci�
 - `sessions`: agente iniciador (consumidor), **intención** declarada (`SessionIntent`), **contrato de sesión** (`SessionContract`: la petición más las capacidades, intents permitidos, temas prohibidos y datos del proveedor, calculado al abrir y sin cambios después; `null` mientras está `requested`), modo (`moderated` | `private`), estado (`requested` → `active` → `closed` | `terminated`), contador de turnos y de violaciones. El contrato lleva `maxTurns` (`DEFAULT_MAX_TURNS` = 12) para cortar bucles entre agentes.
 - `participants`: agentes (rol `initiator` | `recipient`) y humanos (rol `owner` | `observer` | `operator`, opcionalmente en nombre de un agente).
 - `messages`: emisor, **destinatario** (`recipient`: un participante o `"all"`), `content.kind` = `text` | `ui` | `ui_response` | `system` | `ciphertext` (`MessageContent`) y moderación (`MessageModeration`: `status` = `pending` | `allowed` | `redacted` | `blocked` | `escalated`, el **veredicto** y razones con scores). El contrato de mensaje en la API es `Message`. Los avisos del sistema y las alertas del moderador no tienen emisor; los agentes no pueden mandarlos (`SendableContent`).
-- Un mensaje se escribe en `pending`, el moderador lo resuelve, y solo los `allowed`/`redacted` (`DELIVERABLE_STATUSES`) son visibles para el destinatario. Las queries reactivas hacen que la UI y los agentes hospedados lo reciban al instante.
+- El envío modera antes de guardar: una action consulta al moderador y una mutation interna guarda el mensaje ya con su veredicto. En la fase 1 ningún mensaje se escribe en `pending`, que queda en el schema solo como valor histórico. Solo los `allowed`/`redacted` (`DELIVERABLE_STATUSES`) son visibles para el destinatario. Las queries reactivas hacen que la UI y los agentes hospedados lo reciban al instante.
 
 ### 3.5 Moderador
-Corre en cada mensaje antes de entregarlo, **fail-closed** (si falla, no se entrega):
+Corre en cada mensaje antes de guardarlo y entregarlo, **fail-closed**: si falla o tarda más de 3 s, el mensaje se bloquea con el motivo `moderator_error`. Es una lista blanca: pregunta si el mensaje sirve al propósito del contrato, no si se parece a un ataque conocido. Vive en `shared/moderator/` e implementa la interfaz `Moderator` de `shared/moderation.ts`.
 
-1. **Filtros deterministas** (etapa `deterministic`): tamaño, rate limit (componente ya incluido), URLs, patrones de PII (RUT, tarjetas), payloads raros.
-2. **Prompt injection** (etapa `injection`): clasificador LLM barato y rápido sobre el contenido entrante ("ignora tus instrucciones", exfiltración, cambio de rol).
-3. **Alineación con el propósito** (etapa `purpose`): LLM juez con el contrato de sesión + historial reciente. Revisa ambos lados: que el iniciador no pida fuera del scope y que el proveedor no entregue datos que no debe.
-4. **Veredicto** (`Verdict`, fase 1): `allow` o `block`, con la regla aplicada (`purpose` | `scope` | `injection` | `sensitive_data`) y un motivo legible. Un bloqueo publica un bloque `moderator_alert` a la sala y el destinatario nunca recibe el mensaje.
+1. **Reglas deterministas** (etapa `deterministic`, `rules.ts`), sin LLM: un RUT válido (módulo 11), con formato o compacto (8 o 9 caracteres sin guion ni rótulo, salvo que sea un celular, es decir, 9 dígitos que empiezan con 9; un precio, que es `$` y dígitos con o sin puntos; o un teléfono, que es `+56` y 9 dígitos que empiezan con 2 a 9; si el mensaje dice RUT o RUN como palabra, estas excepciones no aplican y todo número que pase el módulo 11 es RUT), salvo que el contrato lo pida y vaya del lado consumidor (su agente o su humano) al agente proveedor; toda tarjeta que pase Luhn; frases típicas de inyección; una `ui_response` que no responde a un bloque ofrecido a ese humano; y contenido cifrado, que el moderador no puede leer.
+2. **Juez LLM** (etapa `purpose`, `judge.ts`): con el rol `moderator` de `LlmProvider`, ve el contrato, los participantes y los últimos 8 mensajes, y revisa ambos lados: que el iniciador no pida fuera del scope y que el proveedor no entregue datos que no debe. También atrapa la inyección parafraseada. En la fase 1 no hay un clasificador de inyección aparte, para que el veredicto salga de una sola llamada al LLM.
+3. **Veredicto** (`Verdict`, fase 1): `allow` o `block`, con la regla aplicada (`purpose` | `scope` | `injection` | `sensitive_data`) y un motivo legible. Los motivos del veredicto y de los eventos son textos fijos por regla o código: el juez responde solo la decisión y la regla, y nunca se copia a la sala texto del modelo ni mensajes de error del proveedor. Un bloqueo publica un bloque `moderator_alert` a la sala y el destinatario nunca recibe el mensaje.
 
 `ModerationResult` (con `redact`, `escalate` y `terminate`) queda en el código para después de E8; nada de la fase 1 lo usa.
 
-Todo queda auditado en `moderationEvents` (un evento por etapa), visible en la UI de la sala. Es la pieza diferenciadora del pitch, así que el demo debe mostrar un bloqueo en vivo.
+El set versionado de casos, con su veredicto esperado, está en `shared/fixtures/moderation-set.ts`, y `pnpm test` lo corre con el LLM falso. `pnpm eval:moderator` lo corre contra el modelo real en OpenRouter (10 veces por defecto, fuera de CI) y reporta, para el moderador completo y para el juez solo, el ataque de referencia bloqueado, los bloqueos falsos del set legítimo, el p95 de latencia y el costo.
+
+Todo queda auditado en `moderationEvents` (un evento por etapa que corrió), visible en la UI de la sala. Es la pieza diferenciadora del pitch, así que el demo debe mostrar un bloqueo en vivo.
 
 ### 3.6 UI humana + UI generativa
 - Vista de sala: hilo de mensajes estilo chat, badges de moderación, panel del contrato de sesión, botón "tomar control" para que el humano hable en nombre de su agente.
@@ -148,7 +149,15 @@ Los datos semilla (`shared/seed-data.ts`, cargados por `convex/seed.ts` al arran
 
 ## 5. Plan de trabajo
 
-El orden lo fijan las épicas: E0 (base, contratos y semilla) → E1 (directorio) → E2 (salas) → E3 (moderador) y E4 (UI humana y GenUI) en paralelo → E8 (agentes de referencia y escenario de punta a punta). Después vienen E5 (MCP), E7 (agentes pre-hechos) y E6 (relay: indicador y nota de diseño). Lo que este documento trae de más (redact/escalate/terminate, form, map_pin, ciphertext, Overpass, Firecrawl, comercio) queda en el código, pero nada nuevo se construye encima hasta que E8 pase.
+La fase 1 sigue este orden: E0 (base, contratos y semilla) → E1 (directorio) → E2 (salas) → E3 (moderador) y E4 (UI humana y GenUI) en paralelo → E8 (agentes de referencia y escenario de punta a punta).
+
+E5 (MCP), E7 (agentes pre-hechos) y E6 (indicador de modo y nota de diseño) pueden adelantar trabajo en paralelo sin esperar a E8:
+
+- **E5:** servidor MCP y credenciales sobre E0, búsqueda sobre E1 y herramientas de sala sobre E2 y E3. La prueba de aceptación usa el proveedor y el escenario de E8 desde un cliente MCP.
+- **E7:** fuente local, fichas y borradores sobre E1. La prueba en sala usa el proveedor genérico de E8.
+- **E6:** nota de diseño desde ya e indicador cuando exista la vista de sala (E2 y E4). No implementa cifrado ni relay.
+
+Antes de integrar cualquiera de las tres a `main`, E8 tiene que estar integrado y su prueba de punta a punta debe seguir pasando en la rama. Lo que queda fuera del alcance acordado (redact/escalate/terminate, form, map_pin, ciphertext, Overpass, Firecrawl y comercio) no se adelanta con este cambio.
 
 ## 6. Variables de entorno
 
@@ -156,10 +165,10 @@ Ninguna es necesaria para `pnpm dev`, `pnpm build` ni `pnpm smoke`: cada proveed
 
 | Variable | Uso |
 | --- | --- |
-| `LLM_PROVIDER` | `fake` (por defecto) o `gateway`. |
+| `LLM_PROVIDER` | `fake` (por defecto) o `openrouter`. |
 | `AGENT_MODEL` | Modelo de los agentes. Por defecto `anthropic/claude-sonnet-5.5`. |
 | `MODERATOR_MODEL` | Modelo del moderador (uno rápido). Por defecto `anthropic/claude-haiku-5.5`. |
-| `AI_GATEWAY_API_KEY` | Vercel AI Gateway (LLM y embeddings), solo con `LLM_PROVIDER=gateway`. La key de Anthropic se configura en el gateway, no aquí. |
+| `OPENROUTER_API_KEY` | OpenRouter (LLM y embeddings), solo con `LLM_PROVIDER=openrouter`. |
 | `BUSINESS_SOURCES` | Lista separada por comas: `fixture` (por defecto), `osm`, `google_places`. |
 | `BUSINESS_ENRICHER` | `none` (por defecto) o `firecrawl`. |
 | `FIRECRAWL_API_KEY` | Solo con `BUSINESS_ENRICHER=firecrawl`. |
