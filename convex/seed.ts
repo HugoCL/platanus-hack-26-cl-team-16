@@ -135,6 +135,8 @@ export const seeders = {
     }
   },
 
+  agentLinkCodes: async () => {},
+
   agentApiKeys: async (ctx) => {
     const agent = await agentBySlug(ctx, EXTERNAL_AGENT_SLUG);
     const unknowableKey = crypto.randomUUID();

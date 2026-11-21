@@ -22,6 +22,7 @@ import {
   type QueryCtx,
   query,
 } from "./_generated/server";
+import { requireLiveCredential } from "./agentKeys";
 import { listedCard } from "./directory";
 import { eventValidator, publishNotice } from "./gate";
 import { moderate } from "./moderator";
@@ -134,6 +135,7 @@ export const view = query({
           participantId: v.string(),
           name: v.string(),
           slug: v.optional(v.string()),
+          verified: v.optional(v.boolean()),
         }),
       ),
       humanParticipantId: v.id("participants"),
@@ -155,6 +157,7 @@ export const view = query({
         return {
           participantId: participant.participantId,
           name: agent?.name ?? "Agente",
+          verified: !!agent?.verified && !agent.selfRegistered,
           ...(agent ? { slug: agent.slug } : {}),
         };
       }),
@@ -174,6 +177,7 @@ const openArgs = {
   intent: v.optional(v.string()),
   maxTurns: v.optional(v.number()),
   human: v.optional(v.object({ displayName: v.string() })),
+  credentialId: v.optional(v.id("agentApiKeys")),
 };
 
 export const open = internalAction({
@@ -184,12 +188,13 @@ export const open = internalAction({
 export async function openRoom(
   ctx: ActionCtx,
   args: ObjectType<typeof openArgs>,
+  { openerTokenTaken = false }: { openerTokenTaken?: boolean } = {},
 ): Promise<Session> {
   const identity = args.human ? await requireRoomIdentity(ctx) : null;
   const opener = identity
     ? `user:${identity.tokenIdentifier}`
     : `agent:${args.initiatorAgentId}`;
-  const { contract, participants } = await ctx.runQuery(
+  const { contract, participants, ownerTokenIdentifier } = await ctx.runQuery(
     internal.rooms.plan,
     args,
   );
@@ -204,7 +209,10 @@ export async function openRoom(
       contract,
       history: [],
     },
-    { sender: opener, room: `open:${opener}:${args.providerAgentId}` },
+    {
+      sender: openerTokenTaken ? undefined : opener,
+      room: `open:${opener}:${args.providerAgentId}`,
+    },
   );
   if (verdict.decision === "block") {
     throw new ConvexError({
@@ -217,6 +225,7 @@ export async function openRoom(
     ...args,
     contract,
     events,
+    ownerTokenIdentifier,
   });
 }
 
@@ -225,8 +234,12 @@ export const plan = internalQuery({
   handler: async (
     ctx,
     args,
-  ): Promise<{ contract: SessionContract; participants: Participant[] }> => {
-    const { contract, humanName } = await planRoom(ctx, args);
+  ): Promise<{
+    contract: SessionContract;
+    participants: Participant[];
+    ownerTokenIdentifier?: string;
+  }> => {
+    const { contract, human } = await planRoom(ctx, args);
     const participants: Participant[] = [
       {
         participantId: "initiator",
@@ -241,16 +254,20 @@ export const plan = internalQuery({
         role: "recipient",
       },
     ];
-    if (humanName) {
+    if (human) {
       participants.push({
         participantId: "owner",
         kind: "human",
-        displayName: humanName,
+        displayName: human.displayName,
         role: "owner",
         onBehalfOfAgentId: args.initiatorAgentId,
       });
     }
-    return { contract, participants };
+    return {
+      contract,
+      participants,
+      ownerTokenIdentifier: human?.tokenIdentifier,
+    };
   },
 });
 
@@ -259,9 +276,27 @@ export const create = internalMutation({
     ...openArgs,
     contract: zodToConvex(SessionContract),
     events: v.array(eventValidator),
+    ownerTokenIdentifier: v.optional(v.string()),
   },
-  handler: async (ctx, { contract, events, ...args }): Promise<Session> => {
-    const { contract: currentContract, humanName } = await planRoom(ctx, args);
+  handler: async (
+    ctx,
+    { contract, events, ownerTokenIdentifier, ...args },
+  ): Promise<Session> => {
+    if (args.credentialId) {
+      await requireLiveCredential(
+        ctx,
+        args.credentialId,
+        args.initiatorAgentId,
+      );
+    }
+    const { contract: currentContract, human } = await planRoom(ctx, args);
+    if (human?.tokenIdentifier !== ownerTokenIdentifier) {
+      throw new ConvexError({
+        kind: "RoomOwnerChanged",
+        message:
+          "the room owner changed during moderation; retry opening the room",
+      });
+    }
     if (
       JSON.stringify(convexToJson(contract)) !==
       JSON.stringify(convexToJson(currentContract))
@@ -293,13 +328,11 @@ export const create = internalMutation({
       agentId: args.providerAgentId,
       role: "recipient",
     });
-    if (humanName) {
-      const { tokenIdentifier } = await requireRoomIdentity(ctx);
+    if (human) {
       await ctx.db.insert("participants", {
         sessionId,
         kind: "human",
-        tokenIdentifier,
-        displayName: humanName,
+        ...human,
         role: "owner",
         onBehalfOfAgentId: args.initiatorAgentId,
       });
@@ -328,17 +361,12 @@ async function planRoom(ctx: QueryCtx, args: ObjectType<typeof openArgs>) {
     invalidArgument("an agent cannot open a room with itself");
   }
   const initiator = await ctx.db.get(args.initiatorAgentId);
-  if (!initiator || !listedCard(initiator)) {
+  if (
+    !initiator ||
+    (!listedCard(initiator) &&
+      !(initiator.kind === "external" && initiator.status === "draft"))
+  ) {
     invalidArgument("the initiator agent does not exist or is not listed");
-  }
-  if (args.human && initiator.ownerTokenIdentifier !== undefined) {
-    const { tokenIdentifier } = await requireRoomIdentity(ctx);
-    if (initiator.ownerTokenIdentifier !== tokenIdentifier) {
-      throw new ConvexError({
-        kind: "NotOwner",
-        message: "you can only open a room on behalf of an agent you own",
-      });
-    }
   }
   const provider = await ctx.db.get(args.providerAgentId);
   const listed = provider && listedCard(provider);
@@ -372,14 +400,28 @@ async function planRoom(ctx: QueryCtx, args: ObjectType<typeof openArgs>) {
         .join("; "),
     );
   }
-  const humanName = args.human?.displayName.trim();
-  if (
-    humanName !== undefined &&
-    (humanName.length < 1 || humanName.length > 120)
-  ) {
-    invalidArgument("the human's display name must have 1 to 120 characters");
+  if (args.human) {
+    const { tokenIdentifier } = await requireRoomIdentity(ctx);
+    if (
+      initiator.ownerTokenIdentifier !== undefined &&
+      initiator.ownerTokenIdentifier !== tokenIdentifier
+    ) {
+      throw new ConvexError({
+        kind: "NotOwner",
+        message: "you can only open a room on behalf of an agent you own",
+      });
+    }
+    const displayName = args.human.displayName.trim();
+    if (displayName.length < 1 || displayName.length > 120) {
+      invalidArgument("the human's display name must have 1 to 120 characters");
+    }
+    return { contract: parsed.data, human: { tokenIdentifier, displayName } };
   }
-  return { contract: parsed.data, humanName };
+  const tokenIdentifier = args.credentialId && initiator.ownerTokenIdentifier;
+  return {
+    contract: parsed.data,
+    human: tokenIdentifier ? { tokenIdentifier, displayName: "Tú" } : undefined,
+  };
 }
 
 export const get = query({
