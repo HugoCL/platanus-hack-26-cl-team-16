@@ -2,8 +2,8 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import { allowAllModerator } from "../../convex/moderator";
 import { testRoomAgent } from "../../convex/roomAgent";
+import * as rules from "../../shared/moderator/rules";
 import {
   errorKind,
   ROOM_OWNER,
@@ -45,7 +45,7 @@ async function setup() {
 
 it("publishes a hosted agent's answer to the sender with its own verdict", async () => {
   const room = await setup();
-  const moderate = vi.spyOn(allowAllModerator, "moderate");
+  const moderate = vi.spyOn(rules, "checkRules");
   const sent = await room.send();
   expect(sent.status).toBe("allowed");
   await room.finishReplies();
@@ -67,15 +67,8 @@ it("publishes a hosted agent's answer to the sender with its own verdict", async
 
 it("does not deliver a blocked agent reply to the other agent", async () => {
   const room = await setup();
-  const moderate = vi.spyOn(allowAllModerator, "moderate");
-  moderate.mockResolvedValueOnce({
-    verdict: { decision: "allow", reason: "Within the room's purpose." },
-    events: [],
-  });
-  moderate.mockResolvedValueOnce({
-    verdict: { decision: "block", rule: "purpose", reason: "Off-topic." },
-    events: [],
-  });
+  room.judge.mockReturnValueOnce({ decision: "allow", rule: "purpose" });
+  room.judge.mockReturnValueOnce({ decision: "block", rule: "purpose" });
 
   const sent = await room.send();
   await room.finishReplies();
@@ -91,10 +84,7 @@ it("does not deliver a blocked agent reply to the other agent", async () => {
 it("does not ask an agent to reply to a block or a message for a human or external agent", async () => {
   const room = await setup();
   const agent = vi.spyOn(testRoomAgent, "reply");
-  vi.spyOn(allowAllModerator, "moderate").mockResolvedValueOnce({
-    verdict: { decision: "block", rule: "purpose", reason: "Off-topic." },
-    events: [],
-  });
+  room.judge.mockReturnValueOnce({ decision: "block", rule: "purpose" });
   await room.send();
   await room.send(room.human);
   await room.t.run((ctx) =>
@@ -108,19 +98,19 @@ it("does not ask an agent to reply to a block or a message for a human or extern
 it("does not expose previous blocked messages to the hosted recipient", async () => {
   const room = await setup();
   const agent = vi.spyOn(testRoomAgent, "reply");
-  vi.spyOn(allowAllModerator, "moderate").mockResolvedValueOnce({
-    verdict: { decision: "block", rule: "purpose", reason: "Off-topic." },
-    events: [],
-  });
-  await room.send();
+  room.judge.mockReturnValueOnce({ decision: "block", rule: "purpose" });
+  expect((await room.send()).status).toBe("blocked");
+  await room.finishReplies();
+  expect(agent).not.toHaveBeenCalled();
   const allowed = await room.send();
   await room.finishReplies();
+  expect(agent.mock.calls[0][0].message).toEqual(allowed);
   expect(agent.mock.calls[0][0].history.slice(1)).toEqual([allowed]);
 });
 
 it("sends what an agent asks, to whom it asks, each through the gate", async () => {
   const room = await setup();
-  const moderate = vi.spyOn(allowAllModerator, "moderate");
+  const moderate = vi.spyOn(rules, "checkRules");
   const agent = vi.spyOn(testRoomAgent, "reply").mockResolvedValueOnce([
     {
       kind: "send",
@@ -261,15 +251,8 @@ it("stops a reply at the first send the moderator blocks", async () => {
     },
     { kind: "close" },
   ]);
-  const moderate = vi.spyOn(allowAllModerator, "moderate");
-  moderate.mockResolvedValueOnce({
-    verdict: { decision: "allow", reason: "Within the room's purpose." },
-    events: [],
-  });
-  moderate.mockResolvedValueOnce({
-    verdict: { decision: "block", rule: "sensitive_data", reason: "Datos." },
-    events: [],
-  });
+  room.judge.mockReturnValueOnce({ decision: "allow", rule: "purpose" });
+  room.judge.mockReturnValueOnce({ decision: "block", rule: "purpose" });
 
   await room.send();
   await room.finishReplies();
@@ -326,5 +309,79 @@ it("stores one confirmation when hosted replies publish the same card concurrent
       content: { kind: "ui", spec: { id: "reserva-1" } },
       status: "allowed",
     },
+  ]);
+});
+
+const confirmation = (summary: string) => ({
+  kind: "ui" as const,
+  spec: {
+    type: "confirmation" as const,
+    id: "reserva-1",
+    title: "Reserva confirmada",
+    summary,
+    details: [],
+    confirmLabel: "Listo",
+    cancelLabel: "Cerrar",
+  },
+});
+
+it("records a blocked confirmation even when one with the same id was allowed", async () => {
+  const room = await setup();
+  const agent = vi.spyOn(testRoomAgent, "reply");
+  agent.mockResolvedValueOnce([
+    { kind: "send", recipient: room.human, content: confirmation("Martes.") },
+  ]);
+  await room.send();
+  await room.finishReplies();
+
+  agent.mockResolvedValueOnce([
+    {
+      kind: "send",
+      recipient: room.human,
+      content: confirmation("Miércoles."),
+    },
+    { kind: "close" },
+  ]);
+  room.judge.mockReturnValueOnce({ decision: "allow", rule: "purpose" });
+  room.judge.mockReturnValueOnce({ decision: "block", rule: "purpose" });
+  await room.send();
+  await room.finishReplies();
+
+  const cards = (await room.history(room.provider)).filter(
+    (m) => m.content.kind === "ui" && m.content.spec.type === "confirmation",
+  );
+  expect(cards).toMatchObject([
+    { content: confirmation("Martes."), status: "allowed" },
+    { content: confirmation("Miércoles."), status: "blocked" },
+  ]);
+  expect((await room.history(room.human)).at(-1)).toMatchObject({
+    content: { kind: "ui", spec: { type: "moderator_alert" } },
+  });
+  expect(
+    (
+      await room.t
+        .withIdentity(ROOM_OWNER)
+        .query(api.rooms.get, { sessionId: room.sessionId })
+    )?.status,
+  ).toBe("active");
+});
+
+it("stores a confirmation that reuses an id with different content", async () => {
+  const room = await setup();
+  const agent = vi.spyOn(testRoomAgent, "reply");
+  for (const summary of ["Martes.", "Miércoles."]) {
+    agent.mockResolvedValueOnce([
+      { kind: "send", recipient: room.human, content: confirmation(summary) },
+    ]);
+    await room.send();
+    await room.finishReplies();
+  }
+
+  const cards = (await room.history(room.human)).filter(
+    (m) => m.content.kind === "ui" && m.content.spec.type === "confirmation",
+  );
+  expect(cards).toMatchObject([
+    { content: confirmation("Martes."), status: "allowed" },
+    { content: confirmation("Miércoles."), status: "allowed" },
   ]);
 });

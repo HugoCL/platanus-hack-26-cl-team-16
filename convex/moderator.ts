@@ -1,30 +1,13 @@
-import type {
-  ModerationInput,
-  ModerationOutcome,
-  Moderator,
-} from "../shared/moderation";
-
-export const allowAllModerator: Moderator = {
-  async moderate() {
-    return {
-      verdict: {
-        decision: "allow",
-        reason: "Moderador de prueba: permite todo hasta E3.",
-      },
-      events: [],
-    };
-  },
-};
-
-export function currentModerator(): Moderator {
-  return allowAllModerator;
-}
+import { modelFor } from "../shared/models";
+import type { ModerationInput, ModerationOutcome } from "../shared/moderation";
+import { createModerator } from "../shared/moderator/moderator";
+import { createLlmProvider } from "../shared/providers/llm";
 
 const MODERATOR_FAILED: ModerationOutcome = {
   verdict: {
     decision: "block",
     rule: "purpose",
-    reason: "El moderador no respondió; el mensaje se bloqueó.",
+    reason: "El moderador falló; el mensaje se bloqueó.",
   },
   events: [
     {
@@ -34,7 +17,7 @@ const MODERATOR_FAILED: ModerationOutcome = {
         {
           code: "moderator_error",
           stage: "purpose",
-          detail: "the moderator threw instead of returning a verdict",
+          detail: "No se pudo completar la moderación.",
         },
       ],
     },
@@ -45,7 +28,11 @@ export async function moderate(
   input: ModerationInput,
 ): Promise<ModerationOutcome> {
   try {
-    return await currentModerator().moderate(input);
+    const llm = createLlmProvider();
+    return await createModerator({
+      llm,
+      model: llm.name === "fake" ? "fake" : modelFor("moderator"),
+    }).moderate(input);
   } catch {
     return MODERATOR_FAILED;
   }

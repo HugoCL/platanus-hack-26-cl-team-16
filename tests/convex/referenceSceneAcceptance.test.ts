@@ -2,7 +2,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import { allowAllModerator } from "../../convex/moderator";
 import { referenceLlm } from "../../convex/referenceLlm";
 import { createFakeLlmProvider } from "../../shared/providers/llm";
 import { REQUEST, ROOM_OWNER, seededRooms } from "./roomFixture";
@@ -20,7 +19,7 @@ afterEach(() => {
 it.each(["reference", "external"] as const)(
   "completes the moderated booking offline (consumer: %s)",
   async (consumerKind) => {
-    const { t, clinicId, consumerId } = await seededRooms();
+    const { t, clinicId, consumerId, judge } = await seededRooms();
     const blockedText = "Mensaje de prueba que el moderador no entrega.";
     const model = vi.fn(({ prompt }: { prompt: string }) =>
       prompt.includes("<proveedores>")
@@ -33,21 +32,6 @@ it.each(["reference", "external"] as const)(
     vi.mocked(referenceLlm).mockReturnValue(
       createFakeLlmProvider({ object: model }),
     );
-    const original = allowAllModerator.moderate.bind(allowAllModerator);
-    const moderate = vi
-      .spyOn(allowAllModerator, "moderate")
-      .mockImplementation((input) =>
-        input.content.kind === "text" && input.content.text === blockedText
-          ? Promise.resolve({
-              verdict: {
-                decision: "block",
-                rule: "purpose",
-                reason: "Prueba.",
-              },
-              events: [],
-            })
-          : original(input),
-      );
     const asOwner = t.withIdentity(ROOM_OWNER);
     if (consumerKind === "external") {
       await t.run((ctx) =>
@@ -143,13 +127,29 @@ it.each(["reference", "external"] as const)(
       asOwner.action(api.gate.send, choice),
       asOwner.action(api.gate.send, choice),
     ]);
+    judge.mockReturnValueOnce({ decision: "block", rule: "purpose" });
     const blocked = await t.action(internal.gate.sendAsParticipant, {
       sessionId,
       senderParticipantId: consumer,
       recipient: provider,
       content: { kind: "text", text: blockedText },
     });
-    expect(blocked.status).toBe("blocked");
+    expect(blocked).toMatchObject({
+      status: "blocked",
+      verdict: { decision: "block", rule: "purpose" },
+    });
+    const blockedId = blocked.messageId as Id<"messages">;
+    expect(
+      await t.run((ctx) =>
+        ctx.db
+          .query("moderationEvents")
+          .withIndex("by_messageId", (q) => q.eq("messageId", blockedId))
+          .take(3),
+      ),
+    ).toMatchObject([
+      { stage: "deterministic", action: "allow" },
+      { stage: "purpose", action: "block", reasons: [{ code: "off_purpose" }] },
+    ]);
     expect((await history(provider)).map((m) => m.messageId)).not.toContain(
       blocked.messageId,
     );
@@ -188,7 +188,6 @@ it.each(["reference", "external"] as const)(
         ctx.db.get("availability", slotId as Id<"availability">),
       ),
     ).toMatchObject({ booked: 1 });
-    expect(moderate).toHaveBeenCalled();
     expect(model).toHaveBeenCalledTimes(consumerKind === "reference" ? 2 : 1);
   },
 );
