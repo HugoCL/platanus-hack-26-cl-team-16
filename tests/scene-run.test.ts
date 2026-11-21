@@ -66,7 +66,15 @@ it.each([
   }
 });
 
-it("passes only the pinned anonymous selector to Convex", () => {
+it.each([
+  {},
+  { CONVEX_DEPLOY_KEY: "<ignore_deploy_key>" },
+  { CONVEX_DEPLOYMENT_TOKEN: "<ignore_deploy_key>" },
+  {
+    CONVEX_DEPLOY_KEY: "<ignore_deploy_key>",
+    CONVEX_DEPLOYMENT_TOKEN: "synthetic-test-value",
+  },
+])("passes only the pinned anonymous selector to Convex with %j", (env) => {
   const cwd = mkdtempSync(join(tmpdir(), "scene-run-test-"));
   try {
     const deployment = "CONVEX_DEPLOYMENT=anonymous:anonymous-demo";
@@ -84,7 +92,7 @@ echo null
     );
     const result = spawnSync(process.execPath, [runner], {
       cwd,
-      env: { NODE_ENV: "test", PATH: `${cwd}:/usr/bin:/bin` },
+      env: { NODE_ENV: "test", PATH: `${cwd}:/usr/bin:/bin`, ...env },
       encoding: "utf8",
       timeout: 5000,
     });

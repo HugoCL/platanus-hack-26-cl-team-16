@@ -40,15 +40,19 @@ const local = readEnvFile(".env.local");
 const dotenv = readEnvFile(".env");
 const deployment = local.CONVEX_DEPLOYMENT ?? "";
 const remoteSelectors = [
-  "CONVEX_DEPLOY_KEY",
-  "CONVEX_DEPLOYMENT_TOKEN",
   "CONVEX_SELF_HOSTED_URL",
   "CONVEX_SELF_HOSTED_ADMIN_KEY",
 ];
+function hasDeployKey(env) {
+  const key = env.CONVEX_DEPLOY_KEY || env.CONVEX_DEPLOYMENT_TOKEN;
+  return Boolean(key && key !== "<ignore_deploy_key>");
+}
+
 if (
   !/^anonymous:anonymous-[\w-]+$/.test(deployment) ||
   [process.env, dotenv, local].some(
     (env) =>
+      hasDeployKey(env) ||
       remoteSelectors.some((key) => env[key]) ||
       (env.CONVEX_DEPLOYMENT && env.CONVEX_DEPLOYMENT !== deployment),
   )
