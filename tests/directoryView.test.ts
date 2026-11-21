@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
-import { createElement } from "react";
+import { createElement, Fragment } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import DirectoryList from "../components/DirectoryList";
@@ -25,7 +25,9 @@ it("5. the web view shows every seed card", async () => {
   );
   for (const { card } of SEED_AGENTS) {
     expect(html).toContain(`data-slug="${card.slug}"`);
-    expect(html).toContain(card.purpose.replace(/"/g, "&quot;"));
+    expect(html).toContain(
+      renderToStaticMarkup(createElement(Fragment, null, card.purpose)),
+    );
   }
   expect(html).toContain("Cardiología, Medicina general · Providencia");
   expect(html).toContain("Sin reclamar");

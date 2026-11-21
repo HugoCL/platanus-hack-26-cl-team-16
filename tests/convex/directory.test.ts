@@ -1,8 +1,9 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
+import { toDirectoryCard } from "../../convex/directory";
 import schema from "../../convex/schema";
 import { AgentDetail, AgentSummary } from "../../shared/mcp";
 import { CLINIC_AGENT_SLUG } from "../../shared/seedData";
@@ -32,6 +33,7 @@ describe("E1 success criteria", () => {
     expect(interpretation).toEqual({
       category: "cardiologia",
       comuna: "Providencia",
+      unresolved: [],
       source: "parser",
     });
     expect(agents[0]?.slug).toBe(CLINIC_AGENT_SLUG);
@@ -47,14 +49,11 @@ describe("E1 success criteria", () => {
     await expect(
       t.query(api.directory.search, { comuna: "Narnia" }),
     ).resolves.toEqual([]);
-    const text = await t.action(api.directory.searchText, {
-      query: "xyzzy qwerty",
-    });
-    expect(text.agents).toEqual([]);
-    const textNoMatch = await t.action(api.directory.searchText, {
-      query: "gimnasio en Pirque",
-    });
-    expect(textNoMatch.agents).toEqual([]);
+    for (const query of ["gimnasio en Pirque", "hola"]) {
+      const result = await t.action(api.directory.searchText, { query });
+      expect(result.interpretation.unresolved).toEqual([]);
+      expect(result.agents).toEqual([]);
+    }
   });
 
   it("4. every returned card is valid and carries its purpose and scope", async () => {
@@ -82,6 +81,65 @@ describe("E1 success criteria", () => {
 });
 
 describe("directory search", () => {
+  it("publishes only the card fields", async () => {
+    const clinic = await t.query(api.directory.get, {
+      slug: CLINIC_AGENT_SLUG,
+    });
+    await t.run(async (ctx) => {
+      await ctx.db.patch(clinic?.agentId as never, {
+        ownerTokenIdentifier: "secret-owner",
+        embedding: [0.1, 0.2],
+      });
+    });
+    const cards = [
+      ...(await t.query(api.directory.search, {})),
+      await t.query(api.directory.get, { slug: CLINIC_AGENT_SLUG }),
+    ];
+    const allowed = new Set([
+      ...Object.keys(AgentDetail.shape),
+      ...Object.keys(AgentSummary.shape),
+    ]);
+    for (const card of cards) {
+      expect(Object.keys(card ?? {}).filter((k) => !allowed.has(k))).toEqual(
+        [],
+      );
+    }
+    expect(JSON.stringify(cards)).not.toContain("secret-owner");
+
+    const withFutureField = await t.run(async (ctx) => {
+      const doc = await ctx.db.get(clinic?.agentId as never);
+      return toDirectoryCard(ctx, {
+        ...(doc as object),
+        apiSecret: "x",
+      } as never);
+    });
+    expect(withFutureField).not.toHaveProperty("apiSecret");
+  });
+
+  it("free text never drops the half it could not resolve", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    for (const query of [
+      "cardiólogo en Narnia",
+      "me duele el pecho en Providencia",
+    ]) {
+      const result = await t.action(api.directory.searchText, { query });
+      expect(result.interpretation.unresolved).toHaveLength(1);
+      expect(result.agents).toEqual([]);
+    }
+    warn.mockRestore();
+  });
+
+  it("rejects a limit that is not an integer from 1 to 20", async () => {
+    for (const limit of [-1, 0, 1.5, 21]) {
+      await expect(t.query(api.directory.search, { limit })).rejects.toThrow(
+        /limit/,
+      );
+      await expect(
+        t.action(api.directory.searchText, { query: "café", limit }),
+      ).rejects.toThrow(/limit/);
+    }
+  });
+
   it("a parent category includes its children", async () => {
     const slugs = (
       await t.query(api.directory.search, { category: "salud" })
@@ -128,5 +186,12 @@ describe("directory search", () => {
     await expect(
       t.query(api.directory.get, { slug: "no-existe" }),
     ).resolves.toBeNull();
+    await expect(t.query(api.directory.get, {})).rejects.toThrow(/exactly one/);
+    await expect(
+      t.query(api.directory.get, {
+        slug: CLINIC_AGENT_SLUG,
+        agentId: bySlug?.agentId as never,
+      }),
+    ).rejects.toThrow(/exactly one/);
   });
 });

@@ -92,11 +92,61 @@ const CATEGORY_SYNONYMS: Record<string, string[]> = {
   farmacia: ["remedio", "medicamento"],
 };
 
-export type TextInterpretation = {
+export type DirectoryField = "category" | "comuna";
+
+export type ParsedText = {
   category: string | null;
   comuna: string | null;
+  unresolved: DirectoryField[];
+};
+
+export type TextInterpretation = ParsedText & {
   source: "parser" | "llm" | "none";
 };
+
+const STOPWORDS = new Set([
+  "a",
+  "agente",
+  "agentes",
+  "al",
+  "algo",
+  "alguien",
+  "alguna",
+  "alguno",
+  "busco",
+  "buscar",
+  "cerca",
+  "comuna",
+  "con",
+  "de",
+  "del",
+  "el",
+  "en",
+  "favor",
+  "hay",
+  "hola",
+  "la",
+  "las",
+  "lo",
+  "los",
+  "me",
+  "mi",
+  "necesito",
+  "o",
+  "para",
+  "por",
+  "que",
+  "quiero",
+  "un",
+  "una",
+  "unas",
+  "unos",
+  "y",
+]);
+
+const PLACE_MARKER = /(?<![a-z0-9])(cerca de|comuna de|comuna|en)(?![a-z0-9])/g;
+
+type Span = { start: number; end: number };
 
 export function normalize(text: string): string {
   return text
@@ -148,14 +198,21 @@ export function categoryWithDescendants(
   return found;
 }
 
-function firstMatch(text: string, phrases: readonly string[]): number {
-  let best = -1;
+function firstMatch(text: string, phrases: readonly string[]): Span | null {
+  let best: Span | null = null;
   for (const phrase of phrases) {
-    const pattern = new RegExp(
+    const found = new RegExp(
       `(?<![a-z0-9])${phrase.replace(/ /g, "\\s+")}(?:s|es)?(?![a-z0-9])`,
-    );
-    const index = text.search(pattern);
-    if (index !== -1 && (best === -1 || index < best)) best = index;
+    ).exec(text);
+    if (!found) continue;
+    const span = { start: found.index, end: found.index + found[0].length };
+    if (
+      !best ||
+      span.start < best.start ||
+      (span.start === best.start && span.end > best.end)
+    ) {
+      best = span;
+    }
   }
   return best;
 }
@@ -170,22 +227,42 @@ function isAncestor(
   );
 }
 
+function contentWords(text: string): string[] {
+  return text.split(/[\s|]+/).filter((w) => w && !STOPWORDS.has(w));
+}
+
+function leftovers(text: string, spans: readonly Span[]) {
+  const masked = [...text]
+    .map((char, i) =>
+      spans.some((s) => i >= s.start && i < s.end) ? "|" : char,
+    )
+    .join("");
+  const marker = [...masked.matchAll(PLACE_MARKER)].at(-1);
+  if (!marker) return { need: contentWords(masked), place: [] };
+  const rest = masked.slice(marker.index + marker[0].length);
+  const cut = rest.indexOf("|");
+  return {
+    need: contentWords(
+      `${masked.slice(0, marker.index)} ${cut === -1 ? "" : rest.slice(cut)}`,
+    ),
+    place: contentWords(cut === -1 ? rest : rest.slice(0, cut)),
+  };
+}
+
 export function parseDirectoryText(
   text: string,
   categories: readonly Category[],
-): Omit<TextInterpretation, "source"> {
+): ParsedText {
   const normalized = normalize(text);
 
-  const categoryHits = categories
-    .map((c) => ({
-      slug: c.slug,
-      index: firstMatch(normalized, [
-        normalize(c.slug),
-        normalize(c.label),
-        ...(CATEGORY_SYNONYMS[c.slug] ?? []),
-      ]),
-    }))
-    .filter((hit) => hit.index !== -1);
+  const categoryHits = categories.flatMap((c) => {
+    const span = firstMatch(normalized, [
+      normalize(c.slug),
+      normalize(c.label),
+      ...(CATEGORY_SYNONYMS[c.slug] ?? []),
+    ]);
+    return span ? [{ slug: c.slug, span }] : [];
+  });
   const category =
     categoryHits
       .filter(
@@ -194,7 +271,7 @@ export function parseDirectoryText(
             isAncestor(hit.slug, other.slug, categories),
           ),
       )
-      .sort((a, b) => a.index - b.index)[0]?.slug ?? null;
+      .sort((a, b) => a.span.start - b.span.start)[0]?.slug ?? null;
 
   const comunaHits = [
     ...COMUNAS.map((comuna) => ({ comuna, phrase: normalize(comuna) })),
@@ -203,23 +280,28 @@ export function parseDirectoryText(
       phrase,
     })),
   ]
-    .map((hit) => ({ ...hit, index: firstMatch(normalized, [hit.phrase]) }))
-    .filter((hit) => hit.index !== -1)
-    .sort((a, b) => a.index - b.index || b.phrase.length - a.phrase.length);
+    .flatMap((hit) => {
+      const span = firstMatch(normalized, [hit.phrase]);
+      return span ? [{ comuna: hit.comuna, span }] : [];
+    })
+    .sort((a, b) => a.span.start - b.span.start || b.span.end - a.span.end);
   const comuna = comunaHits[0]?.comuna ?? null;
 
-  return { category, comuna };
+  const { need, place } = leftovers(
+    normalized,
+    [...categoryHits, ...comunaHits].map((hit) => hit.span),
+  );
+  const unresolved: DirectoryField[] = [];
+  if (!category && need.length > 0) unresolved.push("category");
+  if (!comuna && place.length > 0) unresolved.push("comuna");
+  return { category, comuna, unresolved };
 }
 
-export async function interpretDirectoryText(
+async function askLlm(
   text: string,
   categories: readonly Category[],
-  llm: LlmProvider,
-): Promise<TextInterpretation> {
-  const parsed = parseDirectoryText(text, categories);
-  if (parsed.category || parsed.comuna) return { ...parsed, source: "parser" };
-  if (categories.length === 0) return { ...parsed, source: "none" };
-
+  getLlm: () => LlmProvider,
+) {
   const schema = z.object({
     category: z
       .enum(categories.map((c) => c.slug) as [string, ...string[]])
@@ -227,10 +309,10 @@ export async function interpretDirectoryText(
     comuna: z.enum(COMUNAS).nullable(),
   });
   try {
-    const answer = await llm.generateObject({
+    return await getLlm().generateObject({
       role: "agent",
       system:
-        "Traduce una búsqueda del directorio de agentes a una categoría y una comuna. Responde null en lo que la búsqueda no diga.",
+        "Traduce una búsqueda del directorio de agentes a una categoría y una comuna. Responde null en lo que la búsqueda no diga o no esté en las listas.",
       prompt: [
         `Búsqueda: ${text}`,
         `Categorías: ${categories.map((c) => `${c.slug} (${c.label})`).join(", ")}`,
@@ -238,11 +320,43 @@ export async function interpretDirectoryText(
       ].join("\n"),
       schema,
     });
-    if (!answer.category && !answer.comuna)
-      return { ...answer, source: "none" };
-    return { ...answer, source: "llm" };
   } catch (error) {
     console.warn("directory: LLM could not interpret the search", error);
-    return { category: null, comuna: null, source: "none" };
+    return null;
   }
+}
+
+export async function interpretDirectoryText(
+  text: string,
+  categories: readonly Category[],
+  getLlm: () => LlmProvider,
+): Promise<TextInterpretation> {
+  const parsed = parseDirectoryText(text, categories);
+  const answer =
+    parsed.unresolved.length > 0 && categories.length > 0
+      ? await askLlm(text, categories, getLlm)
+      : null;
+  const fromLlm = {
+    category: parsed.unresolved.includes("category")
+      ? (answer?.category ?? null)
+      : null,
+    comuna: parsed.unresolved.includes("comuna")
+      ? (answer?.comuna ?? null)
+      : null,
+  };
+  const category = parsed.category ?? fromLlm.category;
+  const comuna = parsed.comuna ?? fromLlm.comuna;
+  return {
+    category,
+    comuna,
+    unresolved: parsed.unresolved.filter((field) =>
+      field === "category" ? !category : !comuna,
+    ),
+    source:
+      fromLlm.category || fromLlm.comuna
+        ? "llm"
+        : category || comuna
+          ? "parser"
+          : "none",
+  };
 }

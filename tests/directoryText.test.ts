@@ -1,13 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   canonicalComuna,
   interpretDirectoryText,
   parseDirectoryText,
 } from "../lib/directory";
-import { createFakeLlmProvider } from "../shared/providers/llm";
+import {
+  createFakeLlmProvider,
+  type LlmProvider,
+} from "../shared/providers/llm";
 import { SEED_CATEGORIES } from "../shared/seedData";
 
 const parse = (text: string) => parseDirectoryText(text, SEED_CATEGORIES);
+
+const noLlm = (): LlmProvider => {
+  throw new Error("the LLM must not be created");
+};
 
 describe("free-text parser", () => {
   it.each([
@@ -20,10 +27,25 @@ describe("free-text parser", () => {
     ["un café en Las Condes", "cafeteria", "Las Condes"],
     ["gasfiter Maipu urgente", "gasfiteria", "Maipú"],
     ["abogado en Santiago Centro", "abogados", "Santiago"],
+    ["dentista barato", "odontologia", null],
     ["algo en Estación Central", null, "Estación Central"],
     ["hola", null, null],
   ])("%s", (text, category, comuna) => {
-    expect(parse(text)).toEqual({ category, comuna });
+    expect(parse(text)).toEqual({ category, comuna, unresolved: [] });
+  });
+
+  it("flags the half it could not resolve", () => {
+    expect(parse("cardiólogo en Narnia")).toEqual({
+      category: "cardiologia",
+      comuna: null,
+      unresolved: ["comuna"],
+    });
+    expect(parse("me duele el pecho en Providencia")).toEqual({
+      category: null,
+      comuna: "Providencia",
+      unresolved: ["category"],
+    });
+    expect(parse("xyzzy qwerty").unresolved).toEqual(["category"]);
   });
 
   it("canonicalizes comunas", () => {
@@ -33,47 +55,79 @@ describe("free-text parser", () => {
 });
 
 describe("LLM fallback", () => {
-  it("is not called when the parser finds something", async () => {
-    const llm = createFakeLlmProvider({
-      object: () => {
-        throw new Error("must not be called");
-      },
-    });
-    await expect(
-      interpretDirectoryText("cardiólogo en Providencia", SEED_CATEGORIES, llm),
-    ).resolves.toEqual({
-      category: "cardiologia",
-      comuna: "Providencia",
-      source: "parser",
-    });
-  });
-
-  it("is used when the parser finds nothing", async () => {
-    const llm = createFakeLlmProvider({
-      object: ({ prompt }) =>
-        prompt.includes("me duele el pecho")
-          ? { category: "cardiologia", comuna: "Providencia" }
-          : { category: null, comuna: null },
-    });
+  it("is not created when the parser resolves everything", async () => {
     await expect(
       interpretDirectoryText(
-        "me duele el pecho, algo cerca de la oficina",
+        "cardiólogo en Providencia",
         SEED_CATEGORIES,
-        llm,
+        noLlm,
       ),
     ).resolves.toEqual({
       category: "cardiologia",
       comuna: "Providencia",
+      unresolved: [],
+      source: "parser",
+    });
+    await expect(
+      interpretDirectoryText("hola", SEED_CATEGORIES, noLlm),
+    ).resolves.toEqual({
+      category: null,
+      comuna: null,
+      unresolved: [],
+      source: "none",
+    });
+  });
+
+  it("fills only the half the parser could not resolve", async () => {
+    const llm = createFakeLlmProvider({
+      object: () => ({ category: "cardiologia", comuna: "Las Condes" }),
+    });
+    await expect(
+      interpretDirectoryText(
+        "me duele el pecho en Providencia",
+        SEED_CATEGORIES,
+        () => llm,
+      ),
+    ).resolves.toEqual({
+      category: "cardiologia",
+      comuna: "Providencia",
+      unresolved: [],
       source: "llm",
     });
   });
 
+  it("keeps a half unresolved when the LLM cannot name it", async () => {
+    const llm = createFakeLlmProvider({
+      object: () => ({ category: null, comuna: null }),
+    });
+    await expect(
+      interpretDirectoryText(
+        "cardiólogo en Narnia",
+        SEED_CATEGORIES,
+        () => llm,
+      ),
+    ).resolves.toEqual({
+      category: "cardiologia",
+      comuna: null,
+      unresolved: ["comuna"],
+      source: "parser",
+    });
+  });
+
   it("ignores answers outside the known categories and comunas", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const llm = createFakeLlmProvider({
       object: () => ({ category: "astrologia", comuna: "Narnia" }),
     });
     await expect(
-      interpretDirectoryText("lectura de tarot", SEED_CATEGORIES, llm),
-    ).resolves.toEqual({ category: null, comuna: null, source: "none" });
+      interpretDirectoryText("lectura de tarot", SEED_CATEGORIES, () => llm),
+    ).resolves.toEqual({
+      category: null,
+      comuna: null,
+      unresolved: ["category"],
+      source: "none",
+    });
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
   });
 });

@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import {
   canonicalComuna,
   categoryWithDescendants,
@@ -20,6 +20,19 @@ export type DirectoryCard = AgentDetail &
 
 const LISTED_STATUSES: AgentStatus[] = ["active", "prospect"];
 const SCAN_LIMIT = 500;
+export const MAX_LIMIT = 20;
+
+function checkLimit(limit: number | undefined) {
+  if (
+    limit !== undefined &&
+    (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT)
+  ) {
+    throw new ConvexError({
+      kind: "InvalidArgument",
+      message: `limit must be an integer from 1 to ${MAX_LIMIT}`,
+    });
+  }
+}
 
 async function loadCategories(ctx: QueryCtx): Promise<Category[]> {
   const rows = await ctx.db.query("categories").take(SCAN_LIMIT);
@@ -39,27 +52,29 @@ function rank(a: Doc<"agents">, b: Doc<"agents">) {
   );
 }
 
-async function toDirectoryCard(
+export async function toDirectoryCard(
   ctx: QueryCtx,
   agent: Doc<"agents">,
 ): Promise<DirectoryCard> {
-  const {
-    _id,
-    _creationTime,
-    entityId,
-    ownerTokenIdentifier,
-    primaryCategory,
-    searchText,
-    embedding,
-    ...card
-  } = agent;
-  const entity = entityId ? await ctx.db.get(entityId) : null;
+  const entity = agent.entityId ? await ctx.db.get(agent.entityId) : null;
   return {
-    ...card,
-    agentId: _id,
+    agentId: agent._id,
+    slug: agent.slug,
+    name: agent.name,
+    description: agent.description,
+    purpose: agent.purpose,
+    categories: agent.categories,
+    capabilities: agent.capabilities,
+    scope: agent.scope,
+    location: agent.location,
+    kind: agent.kind,
+    endpoint: agent.endpoint,
+    publicKey: agent.publicKey,
+    status: agent.status,
+    verified: agent.verified,
     entityName: entity?.name,
-    comuna: card.location?.comuna,
-    allowedIntents: effectiveAllowedIntents(card),
+    comuna: agent.location?.comuna,
+    allowedIntents: effectiveAllowedIntents(agent),
   };
 }
 
@@ -75,6 +90,7 @@ export const search = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args): Promise<DirectoryCard[]> => {
+    checkLimit(args.limit);
     const categories = await loadCategories(ctx);
     let wanted: Set<string> | undefined;
     if (args.category !== undefined) {
@@ -121,14 +137,18 @@ export const get = query({
     slug: v.optional(v.string()),
   },
   handler: async (ctx, { agentId, slug }): Promise<DirectoryCard | null> => {
+    if ((agentId === undefined) === (slug === undefined)) {
+      throw new ConvexError({
+        kind: "InvalidArgument",
+        message: "pass exactly one of agentId or slug",
+      });
+    }
     const agent = agentId
       ? await ctx.db.get(agentId)
-      : slug
-        ? await ctx.db
-            .query("agents")
-            .withIndex("by_slug", (q) => q.eq("slug", slug))
-            .unique()
-        : null;
+      : await ctx.db
+          .query("agents")
+          .withIndex("by_slug", (q) => q.eq("slug", slug as string))
+          .unique();
     if (!agent || !LISTED_STATUSES.includes(agent.status)) return null;
     return toDirectoryCard(ctx, agent);
   },
@@ -143,16 +163,18 @@ export const searchText = action({
     interpretation: TextInterpretation;
     agents: DirectoryCard[];
   }> => {
+    checkLimit(limit);
     const categories: Category[] = await ctx.runQuery(
       api.directory.categories,
       {},
     );
-    const interpretation = await interpretDirectoryText(
-      query,
-      categories,
+    const interpretation = await interpretDirectoryText(query, categories, () =>
       createLlmProvider(),
     );
-    if (!interpretation.category && !interpretation.comuna) {
+    if (
+      interpretation.unresolved.length > 0 ||
+      (!interpretation.category && !interpretation.comuna)
+    ) {
       return { interpretation, agents: [] };
     }
     const agents: DirectoryCard[] = await ctx.runQuery(api.directory.search, {
