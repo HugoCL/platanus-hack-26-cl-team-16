@@ -23,7 +23,7 @@ Next.js 16 (App Router, Turbopack), Convex, Clerk, Tailwind 4, [UI SDK](https://
 
 Code lives in `app/` (UI), `components/`, and `convex/` (backend). Before touching `convex/`, read `convex/_generated/ai/guidelines.md`.
 
-Architecture (Spanish) and the contracts every track builds on: `docs/architecture.md`; the zod schemas in `shared/` are the source of truth for `convex/schema.ts`. Start and test from a clean clone: `docs/development.md`.
+Architecture (Spanish) and the contracts every track builds on: `docs/architecture.md`; the zod schemas in `shared/` are the source of truth for `convex/schema.ts`. Start and test from a clean clone: `docs/development.md`. CI, the production deploy on Render and PR previews, with their costs and the human-only setup: `docs/deploy.md`.
 
 ## UI: UI SDK primitives, your design system
 
