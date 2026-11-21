@@ -16,18 +16,18 @@ export type RuleFinding = {
 const RUT_FORMATTED =
   /(?<![\d.])(\d{1,2}(?:\.\d{3}){2}|\d{7,8})-([\dk])(?![\dk])/gi;
 // A RUT with no dots or hyphen: 7 or 8 digits and the check digit, standing
-// alone, so not part of a longer number. A "+56" before it is dropped, so what
-// follows is read on its own. When the message says RUT or RUN as a word, every
-// such number that passes modulo 11 is a RUT. Otherwise three shapes are not:
-// a price, "$" and a whole token of digits with or without dots; a Chilean
-// phone, "+56" and nine digits starting with 2 to 9; and a mobile, nine digits
-// starting with 9.
+// alone, so not part of a longer number. A "+56" before it is dropped with its
+// separators, so what follows is read on its own. When the message says RUT or
+// RUN as a word, every such number that passes modulo 11 is a RUT. Otherwise
+// three shapes are not: a price, "$" and a whole token of digits with or
+// without dots; a Chilean phone, "+56" and nine digits starting with 2 to 9;
+// and a mobile, nine digits starting with 9.
 const RUT_COMPACT = /(?<![\p{L}\d.,-])(\d{7,8})([\dk])(?![\p{L}\d]|[.,-]\d)/giu;
 const RUT_WORD = /(?<![\p{L}\d])ru[tn](?![\p{L}\d])/iu;
-const COUNTRY_CODE = /\+\p{Zs}*56/gu;
+const COUNTRY_CODE = /\+\p{Zs}*56[\p{Zs}().-]*/gu;
 const PRICE = /\$\p{Zs}*\d[\d.]*(?![\p{L}\d])/giu;
 const CHILEAN_PHONE =
-  /\+\p{Zs}*56[\p{Zs}()-]*[2-9](?:[\p{Zs}()-]*\d){8}(?![\p{L}\d])/gu;
+  /\+\p{Zs}*56[\p{Zs}().-]*[2-9](?:[\p{Zs}().-]*\d){8}(?![\p{L}\d])/gu;
 const CHILEAN_MOBILE = /^9\d{8}$/;
 // A card number has 13 to 19 digits, unbroken or in groups split either by
 // spaces (any Unicode space) and hyphens, mixed freely, or by dots alone. Every

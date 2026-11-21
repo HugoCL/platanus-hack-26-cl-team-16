@@ -185,6 +185,11 @@ describe("RUT", () => {
     ["+56 123456785", true, "a token starting with 1 is never a phone"],
     ["+56123456785", true, "a token starting with 1 is never a phone"],
     ["+56 91234567k", true, "a token ending in k is never a phone"],
+    ["+56-123456785", true, "a dropped +56 takes its hyphen along"],
+    ["+56 -123456785", true, "a dropped +56 takes its separators along"],
+    ["+56.123456785", true, "a dropped +56 takes its dot along"],
+    ["+56-223456707", false, "landline after a hyphen"],
+    ["+56.223456707", false, "landline after a dot"],
   ])("reads %j as a RUT: %s (%s)", (value, isRut) => {
     const findings = rulesFor("hotel", "consumidor", "proveedor", text(value));
     expect(findings).toEqual(
