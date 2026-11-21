@@ -52,20 +52,27 @@ export async function openRoom(
   ctx: ActionCtx,
   args: ObjectType<typeof openArgs>,
 ): Promise<Session> {
-  if (args.human) await requireRoomIdentity(ctx);
+  const identity = args.human ? await requireRoomIdentity(ctx) : null;
+  const opener = identity
+    ? `user:${identity.tokenIdentifier}`
+    : `agent:${args.initiatorAgentId}`;
   const { contract, participants } = await ctx.runQuery(
     internal.rooms.plan,
     args,
   );
   const [initiator] = participants;
-  const { verdict, events } = await moderate({
-    content: { kind: "text", text: contract.intent.description },
-    sender: initiator,
-    recipient: "all",
-    participants,
-    contract,
-    history: [],
-  });
+  const { verdict, events } = await moderate(
+    ctx,
+    {
+      content: { kind: "text", text: contract.intent.description },
+      sender: initiator,
+      recipient: "all",
+      participants,
+      contract,
+      history: [],
+    },
+    { sender: opener, room: `open:${opener}:${args.providerAgentId}` },
+  );
   if (verdict.decision === "block") {
     throw new ConvexError({
       kind: "RequestBlocked",
@@ -299,6 +306,8 @@ export async function closeRoom(
       closedReason: `closed_by_${participant.role}`,
     });
     await publishNotice(ctx, sessionId, "session_closed", "Sala cerrada.");
+  } else if (session.status === "terminated") {
+    return { sessionId, status: "terminated" as const };
   } else if (session.status !== "closed") {
     throw new ConvexError({
       kind: "RoomClosed",
