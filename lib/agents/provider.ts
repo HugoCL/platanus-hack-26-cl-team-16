@@ -135,8 +135,9 @@ export async function providerTurn(
 }
 
 // Books the slot a human picked in one of this provider's pickers, confirms it to that human and
-// closes the room. Only the call that created the booking confirms it, so a repeated or racing
-// choice never confirms twice or confirms a slot the human did not pick.
+// closes the room. A room holds one booking: a choice of another slot gets no answer, and the
+// booked slot is confirmed again only while no confirmation went out, so a turn cut short after
+// booking can be retried.
 async function bookChoice(
   turn: AgentTurn,
   context: ProviderContext,
@@ -174,7 +175,14 @@ async function bookChoice(
       "Ese horario se acaba de tomar. Elige otro",
     );
   }
-  if (!booking.created) return [];
+  if (booking.slotId !== slotId) return [];
+  const confirmed = seen.some(
+    (m) =>
+      m.senderParticipantId === turn.self &&
+      m.content.kind === "ui" &&
+      m.content.spec.type === "confirmation",
+  );
+  if (confirmed) return [{ kind: "close" }];
   const when = formatWhen(booking.start);
   const address = context.card.location?.address;
   return [

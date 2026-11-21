@@ -46,7 +46,7 @@ It acts only on a delivered message addressed to it (or to `all`). For a text, t
 - `reply`: the model's answer goes back to the sender.
 - `decline`: a fixed refusal goes back to the sender.
 
-A `slot_selected` answer, from the human its picker was sent to, books that slot through `bookings.book` without asking the model. The call that created the booking sends that human a `confirmation` card and closes the room, so the scenario ends the same way whatever consumer is in the room. A repeated or racing choice gets no answer, because the room already has its booking. If another room took the slot meanwhile, the human gets a new picker with the same offering's other slots.
+A `slot_selected` answer, from the human its picker was sent to, books that slot through `bookings.book` without asking the model. The provider then sends that human a `confirmation` card and closes the room, so the scenario ends the same way whatever consumer is in the room. A room holds one booking: a choice of another slot gets no answer, and the booked slot is confirmed again only while the room has no confirmation from the provider, so a turn cut short after booking can be retried. If another room took the slot meanwhile, the human gets a new picker with the same offering's other slots.
 
 ## Test
 

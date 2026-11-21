@@ -147,7 +147,7 @@ describe("generic provider agent", () => {
     expect((await availability(chosen))?.booked).toBe(1);
   });
 
-  it("confirms one booking per room, even when two choices race", async () => {
+  it("confirms one booking per room when choices race, and confirms again only a cut-short turn", async () => {
     const room = await openRoom();
     const picker = await askForSlots(room);
     const slots = pickerOf(picker).slots.map((s) => s.id);
@@ -160,13 +160,25 @@ describe("generic provider agent", () => {
       choices.map((choice) => askProvider(t, room, choice, noLlm)),
     );
 
-    const confirmed = answers.findIndex((actions) => actions.length > 0);
+    const won = answers.findIndex((actions) => actions.length > 0);
     expect(answers.flat().filter((a) => a.kind === "send")).toHaveLength(1);
-    expect((await availability(slots[1 - confirmed]))?.booked).toBe(1);
-    expect((await availability(slots[confirmed]))?.booked).toBe(0);
-    for (const choice of choices) {
-      expect(await askProvider(t, room, choice, noLlm)).toEqual([]);
-    }
+    expect((await availability(slots[1 - won]))?.booked).toBe(1);
+    expect((await availability(slots[won]))?.booked).toBe(0);
+    expect(await askProvider(t, room, choices[1 - won], noLlm)).toEqual([]);
+    expect(await askProvider(t, room, choices[won], noLlm)).toEqual(
+      answers[won],
+    );
+
+    const [confirmation] = answers[won];
+    if (confirmation.kind !== "send") throw new Error("expected a send");
+    await room.post(
+      room.recipient,
+      confirmation.recipient,
+      confirmation.content,
+    );
+    expect(await askProvider(t, room, choices[won], noLlm)).toEqual([
+      { kind: "close" },
+    ]);
   });
 
   it("never books a slot it did not offer in that picker", async () => {
