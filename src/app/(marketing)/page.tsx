@@ -5,6 +5,7 @@ import { ListingWall } from "@/components/landing/listing-wall";
 import { RevealWords, revealAt } from "@/components/landing/reveal";
 import { RoomSection } from "@/components/landing/room-section";
 import { ScrollReveal } from "@/components/landing/scroll-reveal";
+import { SectionScroll } from "@/components/landing/section-scroll";
 import { Spotlight } from "@/components/landing/spotlight";
 import { ThemeToggle } from "@/components/toggle-theme";
 
@@ -73,6 +74,7 @@ export default function Home() {
         </nav>
       </footer>
       <ScrollReveal />
+      <SectionScroll />
     </div>
   );
 }
