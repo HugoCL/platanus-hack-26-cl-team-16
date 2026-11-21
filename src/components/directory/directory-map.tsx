@@ -2,7 +2,6 @@
 
 import { Button } from "@ui-sdk/react/button";
 import { Minus, Plus } from "lucide-react";
-import Link from "next/link";
 import {
   type PointerEvent as ReactPointerEvent,
   useEffect,
@@ -10,15 +9,20 @@ import {
   useRef,
   useState,
 } from "react";
-import type { DirectoryCard } from "@/convex/directory";
-import type { Category } from "@/shared/catalog";
 import type { LatLng } from "@/shared/geo";
-import { isProspect } from "./agent-badges";
-import { categoryIcon } from "./directory-format";
+import {
+  type DirectoryMapProps,
+  EmptyMapNote,
+  MapLegend,
+  PinButton,
+  revealCard,
+  SelectedCard,
+  useMapPins,
+} from "./map-parts";
 
 const KM_PER_DEG_LAT = 110.574;
 const MIN_SPAN_KM = 2;
-const PADDING = 56;
+const PADDING = { x: 104, top: 64, bottom: 96 };
 const MAX_ZOOM = 8;
 
 type Size = { width: number; height: number };
@@ -64,14 +68,16 @@ function useProjection(points: LatLng[], size: Size, zoom: number, pan: Point) {
     );
     const pxPerKm =
       Math.min(
-        Math.max(size.width - PADDING * 2, 80) / spanX,
-        Math.max(size.height - PADDING * 2, 80) / spanY,
+        Math.max(size.width - PADDING.x * 2, 80) / spanX,
+        Math.max(size.height - PADDING.top - PADDING.bottom, 80) / spanY,
       ) * zoom;
+    const centerY =
+      PADDING.top + (size.height - PADDING.top - PADDING.bottom) / 2;
     return {
       pxPerKm,
       project: (p: LatLng) => ({
         x: size.width / 2 + pan.x + (p.lng - lng0) * kmPerDegLng * pxPerKm,
-        y: size.height / 2 + pan.y - (p.lat - lat0) * KM_PER_DEG_LAT * pxPerKm,
+        y: centerY + pan.y - (p.lat - lat0) * KM_PER_DEG_LAT * pxPerKm,
       }),
     };
   }, [points, size, zoom, pan]);
@@ -85,23 +91,12 @@ export function DirectoryMap({
   origin,
   radiusKm,
   className = "",
-}: {
-  cards: DirectoryCard[];
-  categories: Category[];
-  selectedId: string | null;
-  onSelect: (agentId: string) => void;
-  origin: LatLng | null;
-  radiusKm: number | null;
-  className?: string;
-}) {
+}: DirectoryMapProps) {
   const [ref, size] = useSize<HTMLDivElement>();
   const [zoom, setZoom] = useState(1);
-  const located = useMemo(
-    () =>
-      cards.filter(
-        (c): c is DirectoryCard & { location: LatLng } => !!c.location,
-      ),
-    [cards],
+  const { located, pins, selectedPin, selected } = useMapPins(
+    cards,
+    selectedId,
   );
 
   const points = useMemo(() => {
@@ -171,8 +166,8 @@ export function DirectoryMap({
     }));
   }, [located]);
 
-  const selected = located.find((c) => c.agentId === selectedId);
   const selectedAt = selected && projection?.project(selected.location);
+  const select = revealCard(onSelect);
 
   return (
     <section
@@ -219,47 +214,27 @@ export function DirectoryMap({
               />
             ) : null}
 
-            {located.map((card) => {
-              const at = projection.project(card.location);
-              const Icon = categoryIcon(card.categories, categories);
-              const isSelected = card.agentId === selectedId;
-              const prospect = isProspect(card);
+            {pins.map((pin) => {
+              const at = projection.project(pin[0].location);
               return (
-                <button
-                  key={card.agentId}
-                  type="button"
-                  aria-label={`${card.name}${prospect ? " (sin reclamar)" : ""}`}
-                  aria-pressed={isSelected}
-                  onClick={() => {
-                    onSelect(card.agentId);
-                    document
-                      .getElementById(`agent-${card.agentId}`)
-                      ?.scrollIntoView({
-                        behavior: "smooth",
-                        block: "nearest",
-                      });
-                  }}
-                  className={`absolute grid -translate-x-1/2 -translate-y-full place-items-center rounded-[50%_50%_50%_0] transition-transform [rotate:-45deg] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
-                    isSelected
-                      ? "z-20 size-11 bg-primary text-primary-foreground shadow-[0_0_0_4px_color-mix(in_oklch,var(--ui-primary)_20%,transparent)]"
-                      : prospect
-                        ? "z-10 size-9 border-2 border-foreground bg-card text-foreground"
-                        : "z-10 size-9 bg-card text-foreground shadow-card"
-                  }`}
+                <PinButton
+                  key={pin[0].agentId}
+                  pin={pin}
+                  selectedId={selectedId}
+                  categories={categories}
+                  onSelect={select}
+                  className="!absolute -translate-x-1/2 -translate-y-full"
                   style={{ left: at.x, top: at.y }}
-                >
-                  <Icon
-                    aria-hidden
-                    size={isSelected ? 20 : 16}
-                    className="rotate-45"
-                  />
-                </button>
+                />
               );
             })}
 
-            {selected && selectedAt ? (
-              <div
-                className="absolute z-30 flex w-70 flex-col gap-2 rounded-3xl bg-card p-4 shadow-card"
+            {selectedPin && selected && selectedAt ? (
+              <SelectedCard
+                pin={selectedPin}
+                selected={selected}
+                onSelect={select}
+                className="absolute z-30"
                 style={{
                   left: Math.min(
                     Math.max(selectedAt.x + 32, 16),
@@ -267,27 +242,14 @@ export function DirectoryMap({
                   ),
                   top: Math.min(
                     Math.max(selectedAt.y - 120, 64),
-                    Math.max(size.height - 200, 16),
+                    Math.max(size.height - 300, 16),
                   ),
                 }}
-              >
-                <span className="font-medium">{selected.name}</span>
-                <span className="line-clamp-2 text-[13px] leading-normal text-subtle-foreground">
-                  {selected.purpose}
-                </span>
-                <Link
-                  href={`/directory/${selected.slug}`}
-                  className="inline-flex h-8 items-center self-start rounded-full border border-input px-3 text-[13px] font-medium text-foreground no-underline hover:bg-muted"
-                >
-                  Ver ficha
-                </Link>
-              </div>
+              />
             ) : null}
           </>
         ) : (
-          <p className="absolute inset-0 m-0 grid place-items-center text-subtle-foreground">
-            Ningún resultado tiene ubicación.
-          </p>
+          <EmptyMapNote cards={cards} />
         )}
       </div>
 
@@ -312,22 +274,7 @@ export function DirectoryMap({
         </Button>
       </div>
 
-      <div className="absolute bottom-4 left-4 flex gap-3.5 rounded-2xl bg-card px-3 py-2 text-xs text-subtle-foreground shadow-card">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="size-2.5 rounded-full bg-foreground" />
-          Activo
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="size-2.5 rounded-full border-2 border-foreground" />
-          Sin reclamar
-        </span>
-        {origin ? (
-          <span className="inline-flex items-center gap-1.5">
-            <span className="size-2.5 rounded-full bg-[var(--sm-map-you)]" />
-            Tú
-          </span>
-        ) : null}
-      </div>
+      <MapLegend origin={origin} />
     </section>
   );
 }

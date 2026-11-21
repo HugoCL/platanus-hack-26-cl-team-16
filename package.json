@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "node scripts/dev.mjs",
+    "demo:agent": "node scripts/demo-agent.mjs",
     "dev:cloud": "convex dev --start 'next dev'",
     "seed": "convex run seed:ensure",
     "seed:reset": "convex run seed:reset",
@@ -26,7 +27,8 @@
     "smoke": "python3 scripts/smoke.py",
     "browser:install": "agent-browser install",
     "test": "vitest run",
-    "eval:moderator": "vitest run --config vitest.eval.config.mts"
+    "eval:moderator": "vitest run --config vitest.eval.config.mts",
+    "scene:run": "node scripts/scene-run.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "7.7.9",
@@ -37,6 +39,7 @@
     "@openrouter/ai-sdk-provider": "3.1.0",
     "@ui-sdk/core": "0.1.0-beta.7",
     "@ui-sdk/react": "0.1.0-beta.7",
+    "@vis.gl/react-google-maps": "1.10.2",
     "ai": "7.0.176",
     "convex": "1.50.0",
     "convex-helpers": "0.1.135",

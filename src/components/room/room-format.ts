@@ -22,6 +22,7 @@ export type RoomParticipant = {
   name: string;
   side: "self" | "other";
   kind: "agent" | "human";
+  verified?: boolean;
   onBehalfOf?: string;
 };
 
