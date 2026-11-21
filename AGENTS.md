@@ -1,5 +1,7 @@
 # hackathon-toolbox
 
+Domain vocabulary: every session uses the terms in [`GLOSSARY.md`](GLOSSARY.md) (code, identifiers and file names in English; UI copy in Spanish).
+
 Template for team hackathons, opened in [Capy](https://capy.ai) and usable from T3 Code, Claude Code, Codex, Cursor and Gemini/Antigravity. A Captain coordinates agent threads; you pick skills with `$`. It ships a Next.js + Convex + Clerk app that runs on a fresh clone, 100+ skills in `.agents/skills/` (catalog and limits: `docs/skills.md`), and the local tools agents use to develop and test.
 
 ## Stack and commands
@@ -14,7 +16,7 @@ Next.js 16 (App Router, Turbopack), Convex, Clerk, Tailwind 4, [UI SDK](https://
 | `pnpm lint`, `pnpm format` | `biome check .`, `biome check --write .`. Markdown is not linted. |
 | `pnpm typecheck`, `pnpm build` | `next typegen` plus `tsc --noEmit`; `pnpm build` runs `pnpm typecheck`, then `next build` (it passes without `.env.local`; running needs `NEXT_PUBLIC_CONVEX_URL`). `pnpm start` serves the build. |
 | `pnpm seed`, `pnpm seed:reset`, `pnpm migrate` | `convex run seed:ensure` (idempotent), a wipe plus reseed (local deployments only), and `convex run migrations:runAll`. They talk to the running deployment, so start `pnpm dev` first. |
-| `pnpm test` | Vitest, offline: contract examples, seed data, fake LLM, business fixture, and `seed:ensure` through convex-test. No network or keys (`fetch` is stubbed to throw). |
+| `pnpm test` | Vitest, offline: contract examples, seed data, fake LLM, business fixture, directory search and text parsing, the moderation set, rules and moderator, the room UI's formatting, and `seed:ensure` and `directory` through convex-test. No network or keys (`fetch` is stubbed to throw). |
 | `pnpm eval:moderator` | Runs the moderation set against the real model on OpenRouter, for the full moderator and for the judge alone, and prints the E3 criteria and the cost. Needs `OPENROUTER_API_KEY` and spends credit, so it never runs in CI or `pnpm test`. `EVAL_RUNS` (default 10), `EVAL_CONCURRENCY` (default 4) and `MODERATOR_MODEL` tune it; the raw samples go to `artifacts/moderator-eval.json`. |
 | `pnpm smoke` | Playwright smoke test. Starts `pnpm dev` itself, bootstraps `.venv` and Chromium on first run, saves `artifacts/smoke.png` and `artifacts/dev.log`. With a server already running: `SMOKE_REUSE=1 pnpm smoke`. `PORT` changes the port. |
 | `pnpm browser:install` | Download Chrome for `agent-browser`. |
@@ -22,7 +24,7 @@ Next.js 16 (App Router, Turbopack), Convex, Clerk, Tailwind 4, [UI SDK](https://
 | `pnpm skills:check` | Validate skill names and frontmatter, the lock, content hashes (a hand-edited vendored skill fails), no symlinks, and that `docs/skills.md` is fresh. |
 | `pnpm skills:link` | Claude Code only: symlink `.agents/skills` into `.claude/skills` (gitignored). |
 
-Code lives in `src/` (`src/app/` routes, `src/components/`, `src/styles/`, `src/proxy.ts`) and `convex/` (backend). `@/*` maps to `src/*`; `@/convex/*` maps to `convex/*`. Before touching `convex/`, read `convex/_generated/ai/guidelines.md`.
+Code lives in `src/` (`src/app/` routes, `src/components/`, `src/styles/`, `src/proxy.ts`), `convex/` (backend), `shared/` (contracts, seed data, moderator) and `lib/` (directory text parsing, shared by Convex and tests). Tests are in `tests/`, the paid moderator eval in `evals/`. `@/*` maps to `src/*`, `@/convex/*` to `convex/*` and `@/shared/*` to `shared/*` (tsconfig and `vitest.config.mts`). Before touching `convex/`, read `convex/_generated/ai/guidelines.md`.
 
 Architecture (Spanish) and the contracts every track builds on: `docs/architecture.md`; the zod schemas in `shared/` are the source of truth for `convex/schema.ts`. Start and test from a clean clone: `docs/development.md`. CI, the production deploy on Render and PR previews, with their costs and the human-only setup: `docs/deploy.md`.
 

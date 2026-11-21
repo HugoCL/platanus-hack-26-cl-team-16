@@ -36,9 +36,12 @@ This runs Vitest offline, with no network and no credentials. `tests/setup.ts` r
 - the valid and invalid examples of every shared contract (`shared/examples.ts`),
 - the seed data: every card and offering validates, including offerings against their category's `attributeSchema`,
 - the fake LLM, model selection from the environment, and the business sources,
+- the directory: text parsing (`lib/directory.ts`), the list view, and `directory.*` against an in-memory Convex,
+- the moderator: the versioned moderation set (`shared/fixtures/moderation-set.ts`), the deterministic rules and the full moderator with the fake LLM,
+- the room demo UI's formatting helpers (`src/components/room/room-format.ts`),
 - `seed:ensure` against an in-memory Convex (convex-test): every seeded agent is a valid card.
 
-`pnpm smoke` is separate. It starts `pnpm dev` and drives the home page in Chromium.
+`pnpm smoke` is separate. It starts `pnpm dev`, drives the home page in Chromium, and checks that `/directorio` lists the seed cards.
 
 ## Configuration
 
