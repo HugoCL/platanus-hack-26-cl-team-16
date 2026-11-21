@@ -19,15 +19,12 @@ try {
     clients[0].query(api.directory.get, { slug: "clinica-providencia-agenda" }),
   ]);
   assert(consumer && provider, "the room smoke needs the two seed cards");
-  const { sessionId, participants } = await clients[0].mutation(
-    api.rooms.open,
-    {
-      initiatorAgentId: consumer.agentId,
-      providerAgentId: provider.agentId,
-      request: "Room subscription smoke",
-      human: { displayName: "Smoke user" },
-    },
-  );
+  const { sessionId, participants } = await clients[0].action(api.rooms.open, {
+    initiatorAgentId: consumer.agentId,
+    providerAgentId: provider.agentId,
+    request: "Room subscription smoke",
+    human: { displayName: "Smoke user" },
+  });
   const participantsByRole = ["initiator", "recipient", "owner"].map((role) => {
     const participant = participants.find((p) => p.role === role);
     assert(participant, `missing room participant with role ${role}`);
