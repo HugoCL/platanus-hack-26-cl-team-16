@@ -78,7 +78,7 @@ The landing sells the product, so it is the one place with a brand voice: the ph
 
 ## 5. Typography
 
-* **Sans only, no serif.** **Geist Sans** for all UI: body, controls, headings, badges, and the wordmark ("Canary Room", bold, no trailing period).
+* **Sans only, no serif.** **Geist Sans** for all UI: body, controls, headings and badges. The one exception is the wordmark: "agora" in **Poppins SemiBold (600)**, all lowercase, no trailing period, its geometry matching the mark's circles and flat cuts. Poppins is used nowhere else. The mark sits on the baseline at 0.85 of the cap height, in the header and the landing footer alike.
 * **Geist Mono, sparingly,** for machine vocabulary: intents, reason codes, field names, slugs, IDs. If an agent would read it as a key, it's mono. On the landing it also sets the listing wall, the small uppercase section labels, and the sample listings; nothing else.
 * **Tabular figures** for counts, turns, violations (`3 / 5`), and times (24h, Santiago time).
 * Geist is a placeholder while we look at alternatives; change the family in `src/app/layout.tsx` and `--ui-font-sans` / `--ui-font-mono` in `src/styles/tokens.css`, nowhere else.

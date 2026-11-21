@@ -79,6 +79,7 @@
   --shadow-float: var(--sm-shadow-float);
   --font-sans: var(--ui-font-sans);
   --font-mono: var(--ui-font-mono);
+  --font-logo: var(--font-poppins), var(--ui-font-sans);
 
   /* Type scale. Body is 14px (text-sm); these cover what sits around it. */
   --text-micro: 0.6875rem;

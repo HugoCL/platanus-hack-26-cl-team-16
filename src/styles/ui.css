@@ -379,6 +379,5 @@
 }
 
 .site-footer-logo {
-  font: 700 1.25rem / 1 var(--ui-font-sans);
-  letter-spacing: -0.03em;
+  font: 600 1.25rem / 1 var(--font-logo);
 }

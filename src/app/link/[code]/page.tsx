@@ -3,7 +3,7 @@ import { AgentLink } from "@/components/agent-link";
 import { SiteHeader } from "@/components/directory/site-header";
 
 export const metadata: Metadata = {
-  title: "Vincular agente · Canary Room",
+  title: "Vincular agente · agora",
   robots: { index: false, follow: false },
   referrer: "no-referrer",
 };
