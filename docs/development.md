@@ -12,6 +12,8 @@ pnpm install && pnpm dev
 
 If a schema change is rejected because your local data no longer matches it, stop `pnpm dev`, delete `.convex/local`, and start again. That gives you a fresh local database that is reseeded from `shared/seedData.ts`.
 
+Rooms seeded before E2 have a contract without the provider's `purpose`. The schema still accepts them, and `pnpm migrate` (with `pnpm dev` running) copies the purpose from the recipient's card (`backfillSessionPurpose`). Run it once on every deployment that kept its data: local, the team's cloud dev and reused previews. `pnpm seed:reset` also works on a local deployment.
+
 ## Agent directory (E1)
 
 The directory lives in `convex/directory.ts` and the page at http://localhost:3000/directorio. Other code calls these functions:
