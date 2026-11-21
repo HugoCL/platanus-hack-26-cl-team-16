@@ -307,10 +307,10 @@ function SessionList({
 }) {
   return (
     <nav
-      aria-label="Sesiones"
+      aria-label="Salas"
       className="hidden w-[280px] shrink-0 flex-col gap-3 p-3 xl:flex"
     >
-      <h2 className="m-0 px-2 pt-1 text-sm font-semibold">Sesiones</h2>
+      <h2 className="m-0 px-2 pt-1 text-sm font-semibold">Salas</h2>
       <a
         href="#thread"
         aria-current="page"
@@ -469,7 +469,7 @@ function Thread({
         ) : null}
         <section
           ref={content}
-          aria-label="Mensajes de la sesión"
+          aria-label="Mensajes de la sala"
           aria-live="polite"
           aria-relevant="additions"
           className="flex flex-col gap-4"
@@ -535,9 +535,9 @@ function Composer({
   if (readOnly) {
     return (
       <div className="flex flex-wrap items-center gap-3 border-t border-border bg-muted px-4 py-3 text-sm">
-        <span className="flex-1">Sesión cerrada · objetivo cumplido</span>
+        <span className="flex-1">Sala cerrada · objetivo cumplido</span>
         <Button data-size="sm" onClick={onRestart}>
-          Abrir nueva sesión
+          Abrir nueva sala
         </Button>
       </div>
     );
@@ -547,7 +547,9 @@ function Composer({
     return (
       <div className="flex flex-wrap items-center gap-3 border-t border-border px-4 py-3">
         <p className="m-0 flex-1 text-sm text-subtle-foreground">
-          Tu agente está conversando. Toma el control para escribir
+          {canControl
+            ? "Tu agente está conversando. Toma el control para escribir."
+            : "Estás observando. Solo el dueño o un operador puede escribir."}
         </p>
         {canControl ? (
           <Button data-variant="solid" onClick={onTakeControl}>
@@ -635,7 +637,7 @@ function SidePanel({
 }) {
   return (
     <Tabs defaultValue="contrato" className="flex flex-col gap-3 p-4">
-      <TabsList aria-label="Detalles de la sesión">
+      <TabsList aria-label="Detalles de la sala">
         <TabsTab value="contrato">Contrato</TabsTab>
         <TabsTab value="auditoria">Auditoría</TabsTab>
         <TabsTab value="participantes">Participantes</TabsTab>
@@ -735,12 +737,10 @@ function ContractView({
         <Chips items={contract.recipientRequests} tone="neutral" mono />
       </Section>
       <Section title="Máximo de violaciones">
-        <p className="m-0">
-          {contract.maxViolations} antes de terminar la sesión
-        </p>
+        <p className="m-0">{contract.maxViolations} antes de cerrar la sala</p>
       </Section>
       <p className="m-0 text-xs text-subtle-foreground">
-        Calculado al abrir la sesión cruzando la intención de tu agente con el
+        Calculado al abrir la sala cruzando la intención de tu agente con el
         scope del proveedor.
       </p>
     </div>

@@ -122,7 +122,7 @@ export function OpenSessionDialog({
                 ) : (
                   <p className="m-0 text-subtle-foreground">
                     Este agente no declara intenciones, así que no se puede
-                    abrir una sesión con él.
+                    abrir una sala con él.
                   </p>
                 )}
 
@@ -168,7 +168,7 @@ export function OpenSessionDialog({
                     Revisa el contrato
                   </DialogTitle>
                   <DialogDescription className="m-0 text-[13px] text-subtle-foreground">
-                    Esto rige la sesión. El moderador revisa cada mensaje contra
+                    Esto rige la sala. El moderador revisa cada mensaje contra
                     este contrato.
                   </DialogDescription>
                 </div>
@@ -231,7 +231,7 @@ export function OpenSessionDialog({
                     ) : (
                       <ShieldCheck aria-hidden size={16} />
                     )}
-                    {pending ? "Negociando contrato…" : "Abrir sesión moderada"}
+                    {pending ? "Negociando contrato…" : "Abrir sala moderada"}
                   </Button>
                 </div>
               </>

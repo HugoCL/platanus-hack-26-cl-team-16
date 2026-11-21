@@ -92,7 +92,7 @@ export const DEMO_SCRIPT: ScriptStep[] = [
       content: {
         kind: "system",
         code: "session_opened",
-        text: "Sesión abierta · contrato: book",
+        text: "Sala abierta · contrato: book",
       },
       status: "allowed",
       verdict: notice,
@@ -315,7 +315,7 @@ export const DEMO_SCRIPT: ScriptStep[] = [
       content: {
         kind: "system",
         code: "session_closed",
-        text: "Sesión cerrada · objetivo cumplido",
+        text: "Sala cerrada · objetivo cumplido",
       },
       status: "allowed",
       verdict: notice,

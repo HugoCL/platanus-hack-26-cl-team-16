@@ -2,7 +2,7 @@ import Link from "next/link";
 
 const NAV = [
   { href: "/directory", label: "Directorio", key: "directory" },
-  { href: "/room/demo", label: "Sesiones", key: "rooms" },
+  { href: "/room/demo", label: "Salas", key: "rooms" },
 ] as const;
 
 export function SiteHeader({
