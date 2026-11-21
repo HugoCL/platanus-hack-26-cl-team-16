@@ -250,7 +250,10 @@ export const close = mutation({
       });
     }
     if (session.status === "active") {
-      await ctx.db.patch("sessions", sessionId, { status: "closed" });
+      await ctx.db.patch("sessions", sessionId, {
+        status: "closed",
+        closedReason: `closed_by_${participant.role}`,
+      });
       await publishNotice(ctx, sessionId, "session_closed", "Sala cerrada.");
     } else if (session.status !== "closed") {
       throw new ConvexError({

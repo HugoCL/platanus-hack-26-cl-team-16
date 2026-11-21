@@ -36,6 +36,9 @@ it("4. closes the room once and rejects a new message without storing it", async
   expect(await t.query(api.rooms.get, { sessionId })).toMatchObject({
     status: "closed",
   });
+  expect(
+    await t.run(async (ctx) => (await ctx.db.get(sessionId))?.closedReason),
+  ).toBe("closed_by_owner");
   await expect(send()).rejects.toThrow(/the room is closed/);
   expect(await notices()).toMatchObject([
     { code: "session_opened" },
