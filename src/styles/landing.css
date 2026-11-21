@@ -1,0 +1,294 @@
+/*
+ * Landing: a dark hero over a wall of phone-book listings.
+ * The wall follows the Vercel 404 (a dense field of tiny names lit around the pointer), the hero
+ * follows Sentry's (two-tone headline, a glow rising from the bottom), with the glow and the call
+ * to action in the phone-book yellow. Always dark. Chrome resolves light-dark() inside a custom
+ * property where it is declared (:root), so `color-scheme` alone does not flip the tokens: the
+ * ones the header and the hero read are redeclared here with their dark values.
+ */
+.landing {
+  --landing-ink: oklch(0.13 0.004 49);
+  --ui-foreground: oklch(0.985 0.001 106.423);
+  --ui-muted: oklch(0.268 0.007 34.298);
+  --ui-border: oklch(1 0 0 / 8%);
+  --ui-ring: oklch(0.709 0.01 56.259);
+  --sm-subtle-foreground: oklch(0.8 0.008 56);
+  color-scheme: dark;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: var(--landing-ink);
+  color: var(--ui-foreground);
+}
+
+.landing-main {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  flex: 1;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 3rem;
+  padding: clamp(3rem, 9vh, 6rem) clamp(1.25rem, 6vw, 6rem) 2rem;
+}
+
+.landing-spotlight {
+  --x: 72%;
+  --y: 38%;
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  color: oklch(0.78 0.012 90);
+  mask-image:
+    radial-gradient(
+      circle 15rem at var(--x) var(--y),
+      rgb(0 0 0 / 0.75),
+      rgb(0 0 0 / 0.07) 100%
+    ),
+    linear-gradient(to bottom, transparent, black 8%, black 88%, transparent);
+  mask-composite: intersect;
+}
+
+.landing-wall {
+  height: 100%;
+  columns: 13rem;
+  column-gap: 1.25rem;
+  column-fill: auto;
+  padding: 0.5rem 1rem;
+  font: 500 0.5625rem / 1.45 var(--ui-font-mono);
+  letter-spacing: -0.01em;
+  user-select: none;
+
+  & section {
+    display: contents;
+  }
+
+  & strong {
+    display: block;
+    margin-block: 0.5rem 0.2rem;
+    padding-top: 0.15rem;
+    border-top: 2px solid var(--sm-yellow);
+    break-after: avoid;
+    color: var(--sm-yellow);
+    font: 800 0.625rem / 1.5 var(--ui-font-sans);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  & p {
+    display: flex;
+    gap: 0.4em;
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  & p > span:first-child {
+    flex: 1;
+    overflow: hidden;
+  }
+
+  & p > span:first-child::after {
+    content: " . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .";
+    opacity: 0.5;
+  }
+
+  & p[data-featured] {
+    padding-inline: 0.2em;
+    background: var(--sm-yellow);
+    color: var(--landing-ink);
+    font-weight: 700;
+  }
+}
+
+.landing-glow {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      85% 60% at 10% 115%,
+      color-mix(in oklch, var(--sm-yellow) 96%, transparent),
+      color-mix(in oklch, var(--sm-yellow) 45%, transparent) 38%,
+      transparent 72%
+    ),
+    linear-gradient(
+      to top,
+      color-mix(in oklch, var(--sm-yellow) 55%, transparent),
+      color-mix(in oklch, var(--sm-yellow) 18%, transparent) 18%,
+      transparent 45%
+    ),
+    radial-gradient(
+      60% 55% at 22% 45%,
+      color-mix(in oklch, var(--landing-ink) 92%, transparent),
+      transparent 80%
+    );
+}
+
+.landing-hero {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.25rem;
+  max-width: 46rem;
+
+  & h1 {
+    margin: 0;
+    color: var(--ui-foreground);
+    font: 500 clamp(2.75rem, 7.2vw, 5.75rem) / 0.98 var(--ui-font-sans);
+    letter-spacing: -0.055em;
+    text-wrap: balance;
+  }
+
+  & h1 > span {
+    display: block;
+    color: oklch(0.7 0.01 70);
+  }
+
+  & > p {
+    max-width: 30rem;
+    margin: 0;
+    color: var(--sm-subtle-foreground);
+    font-size: 1rem;
+    line-height: 1.55;
+    text-wrap: pretty;
+  }
+}
+
+.landing-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  font: 500 0.625rem / 1 var(--ui-font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+
+  & span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid oklch(1 0 0 / 0.1);
+    border-radius: 0.25rem;
+    background: oklch(1 0 0 / 0.05);
+    color: var(--sm-subtle-foreground);
+  }
+
+  & i {
+    width: 6px;
+    height: 6px;
+    border-radius: var(--sm-radius-full);
+    background: var(--sm-yellow);
+  }
+}
+
+.landing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.5rem;
+  margin-top: 0.75rem;
+}
+
+.landing-cta {
+  display: inline-flex;
+  gap: 2px;
+  height: 2.875rem;
+  border-radius: 0.5rem;
+  color: var(--landing-ink);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+
+  & span {
+    display: flex;
+    align-items: center;
+    padding-inline: 1.25rem;
+    border-radius: 0.5rem;
+    background: linear-gradient(
+      to bottom,
+      oklch(0.94 0.15 100),
+      var(--sm-yellow)
+    );
+    transition:
+      background-color 150ms ease-out,
+      filter 150ms ease-out;
+  }
+
+  & span + span {
+    padding-inline: 1rem;
+  }
+
+  &:hover span {
+    filter: brightness(1.06);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sm-yellow);
+    outline-offset: 3px;
+  }
+}
+
+.landing-secondary {
+  color: var(--ui-foreground);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: oklch(1 0 0 / 0.3);
+  text-underline-offset: 0.3em;
+
+  &:hover {
+    text-decoration-color: var(--sm-yellow);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sm-yellow);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+}
+
+.landing-agents {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+
+  & p {
+    margin: 0;
+    color: oklch(0.13 0.004 49 / 0.75);
+    font: 600 0.625rem / 1 var(--ui-font-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  & ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 2rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--landing-ink);
+    font-size: clamp(1rem, 2vw, 1.25rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+  }
+}
+
+@media (max-width: 40rem) {
+  .landing-wall {
+    columns: 9.5rem;
+  }
+
+  .landing-spotlight {
+    --x: 90%;
+    --y: 10%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-cta span {
+    transition: none;
+  }
+}

@@ -8,12 +8,12 @@ const NAV = [
 export function SiteHeader({
   current,
 }: {
-  current: (typeof NAV)[number]["key"];
+  current?: (typeof NAV)[number]["key"];
 }) {
   return (
     <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-border px-4 py-3 sm:px-6">
       <Link
-        href="/directory"
+        href="/"
         className="font-display text-2xl leading-none font-extrabold italic tracking-tight text-foreground no-underline"
       >
         [nombre].

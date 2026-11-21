@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Smoke test: start the dev server (scripts/dev.mjs, what `pnpm dev` runs), open the home page in
-headless Chromium, add a number, then check the agent directory.
+"""Smoke test: start the dev server (scripts/dev.mjs, what `pnpm dev` runs), open the landing page in
+headless Chromium, then check the agent directory.
 
-Run with `pnpm smoke`. It asserts the page renders, clicks `data-testid="add-number"` and waits
-until the Convex-backed `data-testid="numbers"` list changes, so the Convex backend is exercised
-end to end. Then it opens /directory and waits for one data-testid="agent-card" per seed
-card. It writes artifacts/smoke.png (also when the check fails) and the dev server log to
+Run with `pnpm smoke`. It asserts the landing's h1 renders, then opens /directory and waits for one
+data-testid="agent-card" per seed card, which only render once the Convex query returns, so the
+Convex backend is exercised end to end. It writes artifacts/smoke.png (also when the check fails) and the dev server log to
 artifacts/dev.log, and prints the end of that log on failure.
 
 The first run creates .venv, installs requirements-dev.txt and Chromium, then writes
@@ -93,28 +92,6 @@ def bootstrap(with_deps=False):
     STAMP.write_text(requirements_hash() + "\n")
 
 
-def add_number(page):
-    """Click the add button and wait until the newest number is a different document.
-    Returns (count before, count after, numbers shown)."""
-    from playwright.sync_api import expect
-
-    # The button only renders after the first Convex query has returned, so a visible button
-    # means the browser reached the backend.
-    add = page.get_by_test_id("add-number")
-    add.wait_for(state="visible", timeout=60_000)
-    numbers = page.get_by_test_id("numbers")
-    latest = numbers.get_attribute("data-latest-id")
-    count = int(numbers.get_attribute("data-count"))
-    add.click()
-    # data-latest-id is the _id of the newest document, so it changes even when the list is full
-    # and the new number equals the one it pushes out.
-    try:
-        expect(numbers).not_to_have_attribute("data-latest-id", latest, timeout=15_000)
-    except AssertionError:
-        raise AssertionError(f"numbers did not change after adding one, still {numbers.inner_text()}")
-    return count, int(numbers.get_attribute("data-count")), numbers.inner_text()
-
-
 def listed_seed_cards():
     """Count the non-draft cards in SEED_AGENTS (shared/seed-data.ts), read with Node's type
     stripping so the number never drifts from the seed."""
@@ -153,9 +130,8 @@ def check():
             page.on("pageerror", lambda err: page_errors.append(str(err)))
             try:
                 page.goto(URL, wait_until="networkidle", timeout=120_000)
-                heading = page.locator("h1", has_text="Convex + Next.js + Clerk")
+                heading = page.locator("h1", has_text="Las páginas amarillas")
                 heading.wait_for(state="visible", timeout=60_000)
-                before, after, shown = add_number(page)
                 listed = directory(page)
             finally:
                 # Always keep the screenshot, and never let a failure here hide the real error.
@@ -169,8 +145,7 @@ def check():
         print("FAIL: uncaught page errors", *page_errors, sep="\n  ")
         return 1
     print(
-        f"PASS: {URL} rendered the template page and Convex stored a number"
-        f" ({before} -> {after} shown: {shown}), /directory listed {listed} cards,"
+        f"PASS: {URL} rendered the landing, /directory listed {listed} cards,"
         " screenshot of /directory at artifacts/smoke.png"
     )
     return 0

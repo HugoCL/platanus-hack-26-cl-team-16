@@ -4,6 +4,7 @@
 @import "@ui-sdk/core/web.css" layer(components);
 @import "./tokens.css";
 @import "./ui.css";
+@import "./landing.css";
 
 @theme inline {
   --color-background: var(--ui-background);
