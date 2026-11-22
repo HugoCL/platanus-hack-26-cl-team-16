@@ -66,7 +66,7 @@ describe("room invitations", () => {
     expect(await invite()).toEqual({ status: "pending" });
     expect(await members()).toHaveLength(3);
     expect(await beto.query(api.roomInvitations.inbox, {})).toMatchObject([
-      { sessionId, agentName: "Agenda de Beto", inviterName: "Juan" },
+      { sessionId, agentName: "Agenda de Beto", inviterName: "Juan Soto" },
     ]);
     expect(
       await juan.query(api.roomInvitations.forRoom, { sessionId }),
@@ -97,7 +97,7 @@ describe("room invitations", () => {
     expect(history.at(-1)?.content).toMatchObject({
       kind: "system",
       code: "agent_joined",
-      text: "Agenda de Beto se unió a la sala, invitado por Juan.",
+      text: "Agenda de Beto se unió a la sala, invitado por Juan Soto.",
     });
   });
 

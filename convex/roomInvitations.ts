@@ -122,7 +122,8 @@ export const invite = mutation({
       sessionId,
       agentId,
       inviterTokenIdentifier: inviter.tokenIdentifier,
-      inviterName: inviter.displayName,
+      // The name the owner knows the inviter by; the room's own label can be a bare "Tú".
+      inviterName: mine.friendName,
       ownerTokenIdentifier: owner,
     };
     if (mine.autoApprove) {
