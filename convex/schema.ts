@@ -77,6 +77,7 @@ export default defineSchema({
     ownerTokenIdentifier: v.optional(v.string()),
     primaryCategory: v.string(),
     selfRegistered: v.optional(v.boolean()),
+    builderCreated: v.optional(v.boolean()),
     wantsPublic: v.optional(v.boolean()),
     searchText: v.string(),
     embedding: v.optional(v.array(v.float64())),
@@ -160,6 +161,23 @@ export default defineSchema({
   })
     .index("by_sessionId", ["sessionId"])
     .index("by_agentId_and_status", ["agentId", "status"]),
+
+  agentSources: defineTable({
+    agentId: v.id("agents"),
+    kind: v.union(v.literal("website"), v.literal("pdf"), v.literal("text")),
+    label: v.string(),
+    url: v.optional(v.string()),
+    storageId: v.optional(v.id("_storage")),
+    status: v.union(
+      v.literal("processing"),
+      v.literal("ready"),
+      v.literal("failed"),
+    ),
+    text: v.optional(v.string()),
+    error: v.optional(v.string()),
+  })
+    .index("by_agentId", ["agentId"])
+    .index("by_storageId", ["storageId"]),
 
   hostedAgentConfigs: defineTable({
     agentId: v.id("agents"),

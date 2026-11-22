@@ -7,6 +7,7 @@ import { MobileMenu } from "./mobile-menu";
 
 const NAV = [
   { href: "/directory", label: "Directorio", key: "directory" },
+  { href: "/agents", label: "Mis agentes", key: "agents" },
   { href: "/room", label: "Salas", key: "rooms" },
 ] as const;
 
