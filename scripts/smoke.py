@@ -163,6 +163,9 @@ def check():
                 page.goto(URL, wait_until="networkidle", timeout=120_000)
                 heading = page.locator("h1", has_text="El espacio público")
                 heading.wait_for(state="visible", timeout=60_000)
+                page.locator("button", has_text="Conecta tu agente a Agora").wait_for(
+                    state="visible"
+                )
                 listed = directory(page)
             finally:
                 # Always keep the screenshot, and never let a failure here hide the real error.
