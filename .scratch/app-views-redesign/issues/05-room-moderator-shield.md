@@ -4,7 +4,9 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done (PR pending review)
+
+**Notes:** Hover, click and Enter open the panel; focus alone does not, so tabbing through a thread does not open one per message. Not checked on a touch device.
 
 - [ ] The shield is always visible. Edited and blocked messages add a status dot (amber, red) and the sentence under the bubble.
 - [ ] The panel is a Popover with a visible focus ring; it works with keyboard and touch.

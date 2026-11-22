@@ -4,7 +4,9 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done (PR pending review)
+
+**Notes:** "Enviando…" is covered by a render test only: the demo never sends to a server.
 
 - [ ] No disabled text field is shown while the agent is speaking.
 - [ ] "Devolver control" returns to the idle state.

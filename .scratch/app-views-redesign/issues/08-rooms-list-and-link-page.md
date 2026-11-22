@@ -4,7 +4,9 @@
 
 **Blocked by:** 02 (guide row) and 04 (rooms list in the room's left panel)
 
-**Status:** ready-for-agent
+**Status:** done (PR pending review)
+
+**Notes:** Not checked signed in: no team Clerk keys in this checkout. The link page shows purpose, state and identifier, not the contract: `linkInfo` does not return the scope.
 
 - [ ] No label sits above a page title on either page.
 - [ ] Signed out, `/room` says why the list is empty and offers "Iniciar sesión" and the demo room.

@@ -4,7 +4,9 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done (PR pending review)
+
+**Notes:** Chosen tiles carry a check, unavailable ones a dashed edge.
 
 - [ ] Tiles wrap at 390px and keep a 44px touch target.
 - [ ] The chosen tile is yellow with ink text in light and dark.

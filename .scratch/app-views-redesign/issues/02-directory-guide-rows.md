@@ -4,7 +4,9 @@
 
 **Blocked by:** 01 (tag, label and title scale)
 
-**Status:** ready-for-agent
+**Status:** done (PR pending review)
+
+**Notes:** Eight rows fit at 1440×900 once the location invite moved over the map. "Solo verificados" and "Incluir sin reclamar" stay switches, not the mockup's checkboxes.
 
 - [ ] At 1440×900 at least eight results are visible without scrolling.
 - [ ] Row and map pin selection stay in sync in both directions, as today.

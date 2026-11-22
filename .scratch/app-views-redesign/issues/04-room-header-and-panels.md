@@ -4,7 +4,9 @@
 
 **Blocked by:** 01 (contract ledger)
 
-**Status:** ready-for-agent
+**Status:** done (PR pending review)
+
+**Notes:** The faults meter draws one bar per allowed fault (up to 10), not a fixed three. Live room only typechecked: keyless Clerk leaves Convex signed out.
 
 - [ ] The faults meter is always visible in the header and replaces the notice that appeared above the thread after the first block.
 - [ ] The room totals (messages reviewed, interventions, mean latency, model) are in the "Auditoría de la sala" dialog.

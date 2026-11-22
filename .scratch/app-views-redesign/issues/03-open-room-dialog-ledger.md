@@ -4,7 +4,9 @@
 
 **Blocked by:** 01 (contract ledger)
 
-**Status:** ready-for-agent
+**Status:** done (PR pending review)
+
+**Notes:** Checked at 390px with the demo agent.
 
 - [ ] The contract step renders the shared ledger component, not chips.
 - [ ] No intent codes appear in the dialog.

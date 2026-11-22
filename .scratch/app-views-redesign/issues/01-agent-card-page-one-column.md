@@ -4,7 +4,9 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done (PR pending review)
+
+**Notes:** Captures are attached to the PR. Phone and desktop, light and dark, checked in a browser.
 
 - [ ] The page has one column of at most 720px; no column holds only the call to action.
 - [ ] Conversar sits under the purpose. On phones it stays fixed at the bottom of the screen.
