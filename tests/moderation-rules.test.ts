@@ -6,7 +6,7 @@ import {
   type RoomKey,
 } from "../shared/fixtures/moderation-set";
 import type { SendableContent } from "../shared/messages";
-import { checkRules } from "../shared/moderator/rules";
+import { checkRules, maskSensitiveData } from "../shared/moderator/rules";
 import { CLINIC_AGENT_SLUG } from "../shared/seed-data";
 
 type Side = ModerationCase["message"]["from"];
@@ -288,6 +288,52 @@ describe("cards", () => {
     for (const finding of findings) {
       expect(finding.detail).not.toMatch(/\d{4}/);
     }
+  });
+});
+
+describe("masking a blocked message", () => {
+  it.each([
+    [
+      "Pago con la tarjeta 4111 1111 1111 1111, gracias",
+      "Pago con la tarjeta •••• •••• •••• 1111, gracias",
+    ],
+    ["5555-5555-5555-4444", "••••-••••-••••-4444"],
+    ["Pedido 77 4111111111111111 12", "Pedido 77 ••••••••••••1111 12"],
+    ["Mi RUT es 12.345.678-5", "Mi RUT es ••.•••.•••-•"],
+    ["rut 123456785, hora 16:30", "rut •••••••••, hora 16:30"],
+    ["Precios: 59.990 12.990", "Precios: 59.990 12.990"],
+    ["Mi número +56123456785", "Mi número +•••••••••••"],
+  ])("masks %j", (value, masked) => {
+    expect(maskSensitiveData(text(value))).toEqual(text(masked));
+  });
+
+  it("masks inside UI blocks and leaves nothing for the rules to find", () => {
+    const card: SendableContent = {
+      kind: "ui",
+      spec: {
+        type: "card",
+        id: "pago",
+        title: "Pago",
+        fields: [
+          { label: "Tarjeta", value: "4111111111111111" },
+          { label: "RUT", value: "12.345.678-5" },
+        ],
+      },
+    };
+    const masked = maskSensitiveData(card);
+    expect(masked).toEqual({
+      kind: "ui",
+      spec: {
+        type: "card",
+        id: "pago",
+        title: "Pago",
+        fields: [
+          { label: "Tarjeta", value: "••••••••••••1111" },
+          { label: "RUT", value: "••.•••.•••-•" },
+        ],
+      },
+    });
+    expect(rulesFor("hotel", "proveedor", "humano", masked)).toEqual([]);
   });
 });
 

@@ -256,8 +256,14 @@ describe("room invitations", () => {
           ? [m.content.text]
           : [],
       );
-    expect(await texts(juan)).toEqual([card, `${card}.`, card, `${card}.`]);
-    expect(await texts(beto)).toEqual([`${card}.`, `${card}.`]);
+    const masked = "Mi tarjeta es •••• •••• •••• 1111";
+    expect(await texts(juan)).toEqual([
+      masked,
+      `${masked}.`,
+      masked,
+      `${masked}.`,
+    ]);
+    expect(await texts(beto)).toEqual([`${masked}.`, `${masked}.`]);
   });
 
   it("gives the guest a turn when someone writes to it, and the room more turns", async () => {
