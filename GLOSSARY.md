@@ -31,7 +31,7 @@ The canonical domain term is **room** (`sala` in UI copy). "Session" is the lega
 | participant | participante | A member of a room: an agent or a human. | `Participant` in `shared/session.ts`; `participants` table |
 | `initiator` | (lado propio / consumidor) | Agent participant that opened the room; exactly one per room. | `AgentParticipantRole`; `sessions.initiatorAgentId` |
 | `recipient` (role) | (el otro agente / proveedor) | Agent participant the room was opened with. | `AgentParticipantRole` |
-| `guest` | agente invitado | A friend's agent brought into an open room. Its owner joins with it as `owner`. It gets no hosted turn yet. | `AgentParticipantRole`; `join` in `convex/roomInvitations.ts` |
+| `guest` | agente invitado | A friend's agent brought into an open room. Its owner joins with it as `owner`. It answers in text when written to, never books, and its side sees the room only from the moment it joined and never a RUT. | `AgentParticipantRole`; `join` in `convex/roomInvitations.ts`; `guestTurn` in `lib/agents/guest.ts`; `visibleTo` in `convex/visibility.ts` |
 | room invitation | invitación a sala | Request to bring a friend's agent into a room. The agent's owner approves or denies it, or it is approved at once when they auto-approve the inviter. | `roomInvitations` table; `convex/roomInvitations.ts` |
 | `owner` | dueño | Human who owns an agent in the room; may take control and answer UI blocks. | `HumanParticipantRole`; `Viewer.role` in `room-format.ts` |
 | `observer` | observador | Human who watches; every UI block is disabled. | `HumanParticipantRole` |

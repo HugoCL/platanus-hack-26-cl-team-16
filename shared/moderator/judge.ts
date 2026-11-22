@@ -101,6 +101,11 @@ function judgePrompt(
     "<participantes>",
     data(participants.map(label)),
     "</participantes>",
+    ...(participants.some((p) => p.kind === "agent" && p.role === "guest")
+      ? [
+          "Un agente invitado es el agente de otra persona, sumado a la sala para coordinar. No es el proveedor ni el consumidor: los datos personales que el contrato deja entregar al proveedor no son para él.",
+        ]
+      : []),
     "",
     ...(includeHistory
       ? [

@@ -28,6 +28,7 @@ import {
 } from "./_generated/server";
 import { requireLiveCredential } from "./agentKeys";
 import { listedCard } from "./directory";
+import { friendship } from "./friends";
 import { eventValidator, publishNotice } from "./gate";
 import { moderate } from "./moderator";
 import {
@@ -72,6 +73,25 @@ export const openFromCard = action({
     return { sessionId: room.sessionId as Id<"sessions"> };
   },
 });
+
+// Another human, as the viewer knows them: a room stores its creator as a bare "Tú" when the
+// session carries no name, which only reads right to that person.
+async function nameForViewer(
+  ctx: QueryCtx,
+  viewerTokenIdentifier: string | undefined,
+  other: { participantId: string; displayName: string },
+) {
+  const row = await ctx.db.get(
+    "participants",
+    other.participantId as Id<"participants">,
+  );
+  const known =
+    viewerTokenIdentifier && row?.kind === "human" && row.tokenIdentifier
+      ? await friendship(ctx, viewerTokenIdentifier, row.tokenIdentifier)
+      : null;
+  if (known) return known.friendName;
+  return other.displayName === "Tú" ? "Otra persona" : other.displayName;
+}
 
 const roomSummary = v.object({
   sessionId: v.id("sessions"),
@@ -180,7 +200,10 @@ export const view = query({
         if (participant.kind === "human") {
           return {
             participantId: participant.participantId,
-            name: participant.displayName,
+            name:
+              participant.participantId === human._id
+                ? participant.displayName
+                : await nameForViewer(ctx, human.tokenIdentifier, participant),
           };
         }
         const agent = await ctx.db.get(participant.agentId as Id<"agents">);

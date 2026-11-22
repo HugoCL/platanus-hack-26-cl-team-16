@@ -356,11 +356,9 @@ function responders(
   sender: Participant,
   { recipient }: { recipient: Doc<"messages">["recipient"] },
 ) {
-  // A guest agent gets no hosted turn yet: nothing defines what it may say in someone else's room.
   return participants.filter(
     (p) =>
       p.kind === "agent" &&
-      p.role !== "guest" &&
       p.participantId !== sender.participantId &&
       (p.participantId === recipient ||
         (recipient === "all" && sender.kind === "human")),
@@ -401,18 +399,22 @@ export const replyContext = internalQuery({
     const viewer = room.participants.find(
       (p) => p.participantId === recipient._id,
     );
-    if (!viewer) return null;
-    const recent = await recentMessages(ctx, source.sessionId);
+    const message = toMessage(source);
+    if (
+      !viewer ||
+      !visibleTo(message, viewer, room.participants, source._creationTime)
+    ) {
+      return null;
+    }
+    const recent = await recentDocs(ctx, source.sessionId);
     return {
       agent,
       self: recipient._id,
       sessionId: source.sessionId,
-      message: toMessage(source),
+      message,
       contract: room.contract,
       participants: room.participants,
-      history: recent.filter((message) =>
-        visibleTo(message, viewer, room.participants),
-      ),
+      history: visibleMessages(recent, viewer, room.participants),
     };
   },
 });
@@ -431,7 +433,11 @@ export const reply = internalAction({
       await ctx.scheduler.runAfter(retryAfter, internal.gate.reply, args);
       return null;
     }
-    const { agent: roomAgent, llm } = roomAgentFor(agent, ctx);
+    const guest = room.participants.some(
+      (p) =>
+        p.participantId === self && p.kind === "agent" && p.role === "guest",
+    );
+    const { agent: roomAgent, llm } = roomAgentFor(agent, ctx, guest);
     const actions = await roomAgent.reply({ self, ...room, llm });
     const strangers = actions.filter(
       (action) =>
@@ -498,7 +504,24 @@ export const reply = internalAction({
 });
 
 async function recentMessages(ctx: QueryCtx, sessionId: Id<"sessions">) {
-  const recent: Message[] = [];
+  return (await recentDocs(ctx, sessionId)).map(toMessage);
+}
+
+function visibleMessages(
+  docs: Doc<"messages">[],
+  viewer: Participant,
+  participants: Participant[],
+) {
+  return docs.flatMap((doc) => {
+    const message = toMessage(doc);
+    return visibleTo(message, viewer, participants, doc._creationTime)
+      ? [message]
+      : [];
+  });
+}
+
+async function recentDocs(ctx: QueryCtx, sessionId: Id<"sessions">) {
+  const recent: Doc<"messages">[] = [];
   let bytes = 0;
   for await (const doc of ctx.db
     .query("messages")
@@ -506,7 +529,7 @@ async function recentMessages(ctx: QueryCtx, sessionId: Id<"sessions">) {
     .order("desc")) {
     bytes += messageBytes(doc);
     if (bytes > HISTORY_BYTE_BUDGET && recent.length > 0) break;
-    recent.push(toMessage(doc));
+    recent.push(doc);
     if (recent.length === HISTORY_LIMIT) break;
   }
   return recent.reverse();
@@ -544,9 +567,9 @@ async function historyForViewer(
   sessionId: Id<"sessions">,
   viewer: Participant,
 ) {
-  const messages = await recentMessages(ctx, sessionId);
+  const docs = await recentDocs(ctx, sessionId);
   const participants = await roomParticipants(ctx, sessionId);
-  return messages.filter((message) => visibleTo(message, viewer, participants));
+  return visibleMessages(docs, viewer, participants);
 }
 
 export const historyPage = query({
@@ -584,9 +607,7 @@ async function historyPageForViewer(
   const participants = await roomParticipants(ctx, sessionId);
   return {
     ...result,
-    page: result.page
-      .map(toMessage)
-      .filter((message) => visibleTo(message, viewer, participants)),
+    page: visibleMessages(result.page, viewer, participants),
   };
 }
 
