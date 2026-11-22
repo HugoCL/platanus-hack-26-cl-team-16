@@ -116,7 +116,7 @@ function Entry({
       <GenUiBlock
         spec={content.spec}
         answer={answers[content.spec.id]}
-        canInteract={canAnswerUi(viewer)}
+        canInteract={canAnswerUi(viewer, message.recipient)}
         readOnly={readOnly || status === "pending"}
         onRespond={onRespond}
       />

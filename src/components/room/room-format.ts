@@ -201,8 +201,12 @@ export function canSeeContent(
   return viewer.ownParticipantIds.includes(senderParticipantId);
 }
 
-export function canAnswerUi(viewer: Viewer) {
-  return viewer.role === "owner" || viewer.role === "operator";
+// A card sent to one participant is answered by that side only; the server refuses anyone else.
+export function canAnswerUi(viewer: Viewer, recipient: string = "all") {
+  return (
+    (viewer.role === "owner" || viewer.role === "operator") &&
+    (recipient === "all" || viewer.ownParticipantIds.includes(recipient))
+  );
 }
 
 export function countViolations(messages: RoomMessage[]) {

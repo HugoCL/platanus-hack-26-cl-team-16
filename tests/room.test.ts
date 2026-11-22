@@ -147,6 +147,12 @@ describe("visibility", () => {
     expect(canAnswerUi({ ...DEMO_VIEWER, role: "operator" })).toBe(true);
     expect(canAnswerUi({ ...DEMO_VIEWER, role: "observer" })).toBe(false);
   });
+
+  it("lets only the side a card was sent to answer it", () => {
+    const [own] = DEMO_VIEWER.ownParticipantIds;
+    expect(canAnswerUi(DEMO_VIEWER, own)).toBe(true);
+    expect(canAnswerUi(DEMO_VIEWER, "someone-else")).toBe(false);
+  });
 });
 
 describe("GenUI interaction state", () => {
