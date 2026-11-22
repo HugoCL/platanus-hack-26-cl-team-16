@@ -34,6 +34,11 @@ export function RoomComposer({
   onRestart?: () => void;
 }) {
   const [text, setText] = useState("");
+  // Enter sends where there is a keyboard. On a phone it adds a line and the button sends.
+  const [enterSends, setEnterSends] = useState(false);
+  useEffect(() => {
+    setEnterSends(window.matchMedia("(pointer: fine)").matches);
+  }, []);
   const input = useRef<HTMLTextAreaElement>(null);
   const take = useRef<HTMLButtonElement>(null);
   const live = control && canControl && !readOnly;
@@ -136,7 +141,7 @@ export function RoomComposer({
             onValueChange={setText}
             maxLength={MAX_TEXT_LENGTH}
             autoResize
-            submitShortcut="enter"
+            submitShortcut={enterSends ? "enter" : undefined}
             rows={1}
             placeholder="Escribe un mensaje"
             className="room-composer-input min-w-0 flex-1"

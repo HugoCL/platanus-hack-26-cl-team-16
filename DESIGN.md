@@ -58,7 +58,7 @@ These pieces live in `src/styles/guide.css` and `src/components/ledger.tsx`. Use
 * **The ledger** (`Ledger`, `.ledger`): a definition list whose label and value are joined by dot leaders. It is the only way the app draws a contract, and it looks the same on the agent card page, in the open-room dialog and in the room. `scopeRows()` builds the rows every contract shares.
 * **The guide row** (`.guide-row`, `.guide-line`): a result in a list. Selecting it runs the highlighter over its first line.
 * **The tag** (`.tag`): 24px, a hairline edge, one size. Dashed (`.tag-dashed`) for an unclaimed agent.
-* **The label** (`.label-caps`, and `eyebrow` for a section label under its rule): mono caps. One recipe.
+* **The label**: mono caps at 0.08em. 12px bold for counts and section labels (`.label-caps`, and `eyebrow` under its rule); 11px medium for a system notice in a transcript (`.room-notice`) and a place name on the map.
 * **Page titles** use `text-title font-semibold`. No label sits above a page title.
 * **"Ver ficha"** is one text link (`.ficha-link`) in a row and on the map.
 

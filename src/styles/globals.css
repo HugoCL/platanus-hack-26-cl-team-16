@@ -4,7 +4,7 @@
 @import "@ui-sdk/core/web.css" layer(components);
 @import "./tokens.css";
 @import "./ui.css";
-@import "./guide.css";
+@import "./guide.css" layer(components);
 @import "./landing.css";
 
 @custom-variant dark (&:where(.dark, .dark *));

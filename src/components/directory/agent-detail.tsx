@@ -32,7 +32,7 @@ export function AgentDetail({ slug }: { slug: string }) {
   const categories = useQuery(api.directory.categories, {});
 
   return (
-    <div className="flex min-h-dvh flex-col bg-background">
+    <div className="flex min-h-dvh flex-col bg-background has-[[data-fixed-action]]:max-sm:pb-18">
       <SiteHeader current="directory" />
       <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-7 px-4 pt-6 pb-18 sm:px-6">
         <nav aria-label="Ruta" className="text-caption">
@@ -195,7 +195,10 @@ function Detail({
           </div>
         ) : (
           // On a phone the action stays within thumb reach.
-          <div className="mt-6 flex max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:z-20 max-sm:mt-0 max-sm:bg-background max-sm:px-4 max-sm:pt-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:shadow-[0_-1px_0_var(--ui-border)]">
+          <div
+            data-fixed-action
+            className="mt-6 flex max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:z-20 max-sm:mt-0 max-sm:bg-background max-sm:px-4 max-sm:pt-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:shadow-[0_-1px_0_var(--ui-border)]"
+          >
             <Button
               data-variant="brand"
               data-size="xl"

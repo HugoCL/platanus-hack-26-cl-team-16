@@ -1,4 +1,6 @@
 /*
+ * Imported into `components`, so a Tailwind utility on the same element still wins.
+ *
  * The guide vocabulary: what the app views take from the landing's phone book.
  * A ledger of key and value joined by dot leaders, one tag, and the yellow highlighter,
  * which marks the selected thing and nothing else.

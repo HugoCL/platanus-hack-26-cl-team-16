@@ -206,7 +206,7 @@ export function DirectoryMap({
                 <span
                   key={label.comuna}
                   aria-hidden
-                  className="pointer-events-none absolute -translate-x-1/2 translate-y-6 font-mono text-micro font-medium tracking-[0.1em] whitespace-nowrap text-muted-foreground uppercase"
+                  className="pointer-events-none absolute -translate-x-1/2 translate-y-6 font-mono text-micro font-medium tracking-[0.08em] whitespace-nowrap text-muted-foreground uppercase"
                   style={{ left: at.x, top: at.y }}
                 >
                   {label.comuna}

@@ -6,7 +6,7 @@
 
 **Status:** done (PR pending review)
 
-**Notes:** The detector returned no findings. The other reviews were done by reading the changed views against each skill, not as separate runs.
+**Notes:** The impeccable detector ran on `src/app` and `src/components` and returned no findings. `make-interfaces-feel-better`, `web-design-guidelines` and the accessibility review were applied while building and checking each view in the browser; they were not run as separate audits with a written report.
 
 - [ ] §1 to §4 are rewritten and no longer contradict the code. §2 says where codes are shown.
 - [ ] The impeccable detector, `make-interfaces-feel-better`, `web-design-guidelines` and an accessibility review ran on the changed views.
