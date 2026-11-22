@@ -44,7 +44,7 @@ export function SiteHeader({
             <LogoIntro />
           ) : (
             <>
-              <AgoraMark className="h-[0.85cap] w-[0.92cap] shrink-0" />
+              <AgoraMark className="h-[1.02cap] w-[1.1cap] shrink-0" />
               agora
             </>
           )}

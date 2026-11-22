@@ -59,7 +59,7 @@ export function LogoIntro() {
         viewBox="0 0 620 572"
         fill="currentColor"
         aria-hidden="true"
-        className="h-[0.85cap] w-[0.92cap] shrink-0 overflow-visible"
+        className="h-[1.02cap] w-[1.1cap] shrink-0 overflow-visible"
       >
         <path data-half="human" fillRule="evenodd" d={AGORA_MARK_HUMAN} />
         <path data-half="agent" fillRule="evenodd" d={AGORA_MARK_AGENT} />
