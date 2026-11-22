@@ -168,13 +168,16 @@ function members(ctx: QueryCtx, sessionId: Id<"sessions">) {
     .take(MAX_ROOM_ROWS);
 }
 
-// The seat a human holds is the agent they are in the room for.
+type SeatAgents = Record<DemoSeat, Id<"agents">>;
+
+// The seat a human holds is the agent they are in the room for. Someone who came in with an
+// invited agent holds neither seat.
 function seatOf(
   member: Doc<"participants">,
-  providerId: Id<"agents">,
+  agents: SeatAgents,
 ): DemoSeat | null {
   if (member.kind !== "human" || member.leftAt !== undefined) return null;
-  return member.onBehalfOfAgentId === providerId ? "merchant" : "buyer";
+  return SEATS.find((s) => agents[s] === member.onBehalfOfAgentId) ?? null;
 }
 
 async function deleteRoom(ctx: MutationCtx, sessionId: Id<"sessions">) {
@@ -213,7 +216,10 @@ async function rebuild(ctx: MutationCtx, clearSeats: boolean) {
   // Oldest first, so the newest room's seats win.
   for (const room of rooms.reverse()) {
     for (const member of await members(ctx, room.sessionId)) {
-      const held = seatOf(member, providerId);
+      const held = seatOf(member, {
+        buyer: buyerAgentId,
+        merchant: providerId,
+      });
       if (held && member.kind === "human" && !clearSeats) {
         seats[held] = {
           tokenIdentifier: member.tokenIdentifier,
@@ -304,10 +310,12 @@ async function rebuild(ctx: MutationCtx, clearSeats: boolean) {
 async function current(ctx: QueryCtx, tokenIdentifier: string) {
   const provider = await agentBySlug(ctx, DEMO_PROVIDER_SLUG);
   if (!provider) return null;
+  const buyerAgent = await agentBySlug(ctx, CONSUMER_AGENT_SLUG);
   const [room] = await demoRooms(ctx, provider._id);
-  if (!room) return null;
+  if (!room || !buyerAgent) return null;
+  const agents = { buyer: buyerAgent._id, merchant: provider._id };
   const humans = (await members(ctx, room.sessionId)).flatMap((member) => {
-    const held = seatOf(member, provider._id);
+    const held = seatOf(member, agents);
     return held && member.kind === "human" ? [{ seat: held, member }] : [];
   });
   return {

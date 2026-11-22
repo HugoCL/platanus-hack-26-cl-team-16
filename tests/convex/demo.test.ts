@@ -7,7 +7,11 @@ import { api, internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { referenceLlm } from "../../convex/referenceLlm";
 import schema from "../../convex/schema";
-import { DEMO_PROVIDER_SLUG, DEMO_SCRIPT } from "../../shared/demo-pcb";
+import {
+  DEMO_PROVIDER_CARD,
+  DEMO_PROVIDER_SLUG,
+  DEMO_SCRIPT,
+} from "../../shared/demo-pcb";
 import * as providers from "../../shared/providers/llm";
 import { errorKind } from "./roomFixture";
 
@@ -39,7 +43,13 @@ afterEach(() => {
 
 const ana = () => t.withIdentity({ subject: "ana", name: "Ana Rojas" });
 const li = () => t.withIdentity({ subject: "li", name: "Li Wei" });
-const caro = () => t.withIdentity({ subject: "caro", name: "Caro Vidal" });
+const CARO_TOKEN = "https://clerk.test|caro";
+const caro = () =>
+  t.withIdentity({
+    subject: "caro",
+    name: "Caro Vidal",
+    tokenIdentifier: CARO_TOKEN,
+  });
 
 const reset = () => t.mutation(internal.demo.reset, {});
 const history = (as: ReturnType<typeof ana>, sessionId: Id<"sessions">) =>
@@ -123,6 +133,49 @@ describe("demo room", () => {
       mySeat: "merchant",
     });
     expect(await errorKind(history(ana(), first))).toBe("NotParticipant");
+  });
+
+  it("gives no seat to someone who came in with an invited agent", async () => {
+    const sessionId = await seated();
+    await t.run(async (ctx) => {
+      const agentId = await ctx.db.insert("agents", {
+        ...DEMO_PROVIDER_CARD,
+        slug: "agente-de-aduanas",
+        primaryCategory: DEMO_PROVIDER_CARD.categories[0],
+        searchText: "aduanas",
+      });
+      await ctx.db.insert("participants", {
+        sessionId,
+        kind: "agent",
+        agentId,
+        role: "guest",
+      });
+      await ctx.db.insert("participants", {
+        sessionId,
+        kind: "human",
+        tokenIdentifier: CARO_TOKEN,
+        displayName: "Caro Vidal",
+        role: "owner",
+        onBehalfOfAgentId: agentId,
+      });
+    });
+    expect(await caro().query(api.demo.state, {})).toMatchObject({
+      mySeat: null,
+      seats: [
+        { seat: "buyer", displayName: "Ana Rojas" },
+        { seat: "merchant", displayName: "Li Wei" },
+      ],
+    });
+    expect(await errorKind(caro().mutation(api.demo.restart, {}))).toBe(
+      "Forbidden",
+    );
+    await li().mutation(api.demo.restart, {});
+    expect(await ana().query(api.demo.state, {})).toMatchObject({
+      mySeat: "buyer",
+    });
+    expect(await caro().query(api.demo.state, {})).toMatchObject({
+      mySeat: null,
+    });
   });
 
   it("frees both seats when reset is asked to", async () => {
