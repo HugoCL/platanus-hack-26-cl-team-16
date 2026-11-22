@@ -71,6 +71,7 @@ Probado en local el 2026-11-22 con los modelos reales y un cliente MCP de prueba
 ## Si algo falla
 
 - **Aparece "El moderador no respondió a tiempo".** No cuenta como falta. Si era un mensaje tuyo, envíalo de nuevo tal cual antes de seguir: el paso 5 se bloquea si la oferta del paso 4 no llegó. Si era la respuesta del agente, el comerciante la da a mano con las cifras del guion. En las pruebas locales pasó en cerca de una de cada tres pasadas.
+- **El moderador bloquea un mensaje del guion** (aparece tachado y suma una falta). Envíalo de nuevo con otras palabras; desde un asistente, pídele que lo repita. En la prueba en navegador de la variante con asistente pasó una vez, con la aceptación del paso 5; en 12 pasadas posteriores desde la terminal no se repitió.
 - **El agente no responde en 30 segundos.** El comerciante toma el control y responde a mano con las cifras del guion. La demo sigue igual.
 - **La sala se cerró** (tres faltas o 40 turnos). "Reiniciar la sala" en `/demo`.
 - **`/demo` dice que la sala no está preparada.** Falta ejecutar `demo:reset` en ese entorno.
