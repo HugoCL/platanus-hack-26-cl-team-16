@@ -88,11 +88,21 @@ export async function providerTurn(
   ) {
     return [];
   }
+  const me = turn.participants.find((p) => p.participantId === turn.self);
+  const author = turn.participants.find((p) => p.participantId === sender);
+  // A human who speaks for this provider is not a customer: the agent stays quiet.
+  if (
+    me?.kind === "agent" &&
+    author?.kind === "human" &&
+    author.onBehalfOfAgentId === me.agentId
+  ) {
+    return [];
+  }
   const { content } = incoming;
-  if (content.kind === "ui_response") {
+  if (content.kind === "ui_response" && !answersOwnForm(turn, content)) {
     return bookChoice(turn, context, book, content);
   }
-  if (content.kind !== "text") return [];
+  if (content.kind !== "text" && content.kind !== "ui_response") return [];
 
   const canBook = turn.contract.capabilities.includes("booking");
   const keys = new Map(context.offerings.map((o, i) => [`o${i + 1}`, o]));
@@ -164,6 +174,22 @@ export async function providerTurn(
       matchingOfferings.has(slot.offeringId) &&
       (decision.offerings.length === 0 || wanted.has(slot.offeringId)),
     "Elige un horario",
+  );
+}
+
+// A submitted form this provider sent is answered like a text message: the values are the request.
+function answersOwnForm(
+  turn: AgentTurn,
+  { inReplyTo, response }: Extract<Message["content"], { kind: "ui_response" }>,
+) {
+  if (response.type !== "form_submit") return false;
+  const form = delivered(turn.history).find(
+    (m) => m.messageId === inReplyTo && m.senderParticipantId === turn.self,
+  );
+  return (
+    form?.content.kind === "ui" &&
+    form.content.spec.type === "form" &&
+    form.content.spec.id === response.formId
   );
 }
 

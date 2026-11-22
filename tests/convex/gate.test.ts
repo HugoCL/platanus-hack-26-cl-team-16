@@ -172,6 +172,7 @@ describe("E2 success criteria", () => {
       /\binsertMessage\(/.test(readFileSync(path, "utf8")),
     );
     expect(inserters.sort()).toEqual([
+      "convex/demo.ts",
       "convex/gate.ts",
       "convex/roomMessages.ts",
       "convex/seed.ts",
