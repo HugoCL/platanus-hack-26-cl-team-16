@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { DirectoryCard } from "@/convex/directory";
 import type { Category } from "@/shared/catalog";
 import { CONSUMER_AGENT_SLUG } from "@/shared/seed-data";
-import { intentLabel } from "../room/room-format";
+import { hasIntentLabel, intentLabel } from "../room/room-format";
 import { VerifiedBadge } from "../verified-badge";
 import { isProspect, ProspectBadge } from "./agent-badges";
 import { categoryIcon, formatKm, KIND_LABELS } from "./directory-format";
@@ -77,6 +77,8 @@ function AgentResult({
     ? (card.location?.address ?? card.entityName)
     : undefined;
   const detailsId = `agent-${card.agentId}-details`;
+  const namedIntents = card.allowedIntents.filter(hasIntentLabel);
+  const otherIntents = card.allowedIntents.length - namedIntents.length;
 
   return (
     // A guide row: the name is the row's select button and its ::before stretches over the row,
@@ -96,7 +98,7 @@ function AgentResult({
       />
       <div className="guide-line">
         <h2
-          className={`m-0 flex min-w-0 items-center gap-1 text-lead leading-[1.4] tracking-[-0.01em] ${prospect ? "font-normal" : "font-medium"} ${prospect && !selected ? "text-subtle-foreground" : ""}`}
+          className={`m-0 flex min-w-0 gap-1 text-lead ${selected ? "items-start" : "items-center"} leading-[1.4] tracking-[-0.01em] ${prospect ? "font-normal" : "font-medium"} ${prospect && !selected ? "text-subtle-foreground" : ""}`}
         >
           <button
             type="button"
@@ -105,7 +107,7 @@ function AgentResult({
             aria-controls={selected ? detailsId : undefined}
             title={card.name}
             onClick={() => onSelect?.(card.agentId)}
-            className="min-w-0 cursor-pointer truncate border-0 bg-transparent p-0 text-left font-[inherit] tracking-[inherit] text-inherit outline-none before:absolute before:inset-0"
+            className={`min-w-0 cursor-pointer ${selected ? "text-pretty" : "truncate"} border-0 bg-transparent p-0 text-left font-[inherit] tracking-[inherit] text-inherit outline-none before:absolute before:inset-0`}
           >
             {card.name}
           </button>
@@ -125,6 +127,7 @@ function AgentResult({
             : "mt-px truncate text-caption text-subtle-foreground"
         }`}
       >
+        {where ? <span className="sm:hidden">{where} · </span> : null}
         {address ? (
           <span className={selected ? "font-medium" : "text-foreground"}>
             {address}
@@ -144,14 +147,22 @@ function AgentResult({
               aria-label="Qué puede hacer"
               className="m-0 flex list-none flex-wrap gap-1.5 p-0"
             >
-              {card.allowedIntents.map((intent) => (
+              {namedIntents.map((intent) => (
                 <li key={intent} className="tag">
-                  <span className="truncate">{intentLabel(intent)}</span>
+                  {intentLabel(intent)}
                 </li>
               ))}
+              {otherIntents > 0 ? (
+                <li className="tag text-subtle-foreground">
+                  {namedIntents.length > 0
+                    ? `+${otherIntents}`
+                    : `${otherIntents} ${otherIntents === 1 ? "acción" : "acciones"}`}
+                  <span className="sr-only"> más, en la ficha</span>
+                </li>
+              ) : null}
             </ul>
           ) : null}
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             {prospect || card.slug === CONSUMER_AGENT_SLUG ? null : (
               <Button data-variant="solid" onClick={() => onConverse?.(card)}>
                 Conversar

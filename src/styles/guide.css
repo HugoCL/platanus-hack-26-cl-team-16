@@ -120,6 +120,7 @@
   color: var(--ui-foreground);
   font-size: 0.875rem;
   font-weight: 500;
+  white-space: nowrap;
   text-underline-offset: 3px;
 }
 
@@ -174,6 +175,9 @@
 
 .guide-where {
   flex: none;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--sm-subtle-foreground);
   font: 500 0.75rem / 1.4 var(--ui-font-mono);
   font-variant-numeric: tabular-nums;
@@ -181,6 +185,10 @@
 
   [data-selected] > .guide-line > & {
     color: var(--brand-ink);
+  }
+
+  @media (width < 40rem) {
+    display: none;
   }
 }
 

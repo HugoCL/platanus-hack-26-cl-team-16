@@ -41,6 +41,9 @@ const INTENT_LABELS: Record<string, string> = {
   place_order: "Hacer un pedido",
 };
 
+export const hasIntentLabel = (name: string) =>
+  Object.hasOwn(INTENT_LABELS, name);
+
 export function intentLabel(name: string) {
   const label = INTENT_LABELS[name];
   if (label) return label;
