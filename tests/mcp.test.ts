@@ -1191,4 +1191,232 @@ describe("MCP room tools", () => {
     });
     expect(messages[0]?.content).toMatchObject({ code: "session_opened" });
   });
+
+  describe("friends' agents", () => {
+    const ANA = "https://clerk.example|ana";
+    const BETO = "https://clerk.example|beto";
+    const NOT_FRIEND =
+      "NotFriend: you can only invite an agent that a friend owns";
+    let friend: { agentId: Id<"agents">; client: Client };
+
+    // Ana owns the key's agent, Beto owns a second external agent with its own key.
+    async function friends({ autoApprove = false, linked = true } = {}) {
+      const slug = "agenda-de-beto";
+      await t.run(async (ctx) => {
+        await ctx.db.patch("agents", agents.external, {
+          ownerTokenIdentifier: ANA,
+        });
+        const external = await ctx.db.get("agents", agents.external);
+        if (!external) throw new Error("missing external agent");
+        const { _id, _creationTime, ...card } = external;
+        await ctx.db.insert("agents", {
+          ...card,
+          slug,
+          name: "Agenda de Beto",
+          ownerTokenIdentifier: BETO,
+        });
+        if (!linked) return;
+        await ctx.db.insert("friendships", {
+          ownerTokenIdentifier: ANA,
+          friendTokenIdentifier: BETO,
+          friendName: "Beto Paz",
+          autoApprove: false,
+        });
+        await ctx.db.insert("friendships", {
+          ownerTokenIdentifier: BETO,
+          friendTokenIdentifier: ANA,
+          friendName: "Ana Rojas",
+          autoApprove,
+        });
+      });
+      const issued = await t.action(internal.agentKeys.issue, { slug });
+      friend = {
+        agentId: issued.agentId,
+        client: await connect("auto", issued.apiKey),
+      };
+    }
+    afterEach(() => friend?.client.close());
+
+    const asFriend = async <N extends McpToolName>(
+      name: N,
+      args: Record<string, unknown> = {},
+    ) => {
+      const result = await friend.client.callTool({ name, arguments: args });
+      return {
+        error: result.isError ? JSON.stringify(result.content) : null,
+        output: result.isError
+          ? null
+          : (MCP_TOOLS[name].output.parse(
+              result.structuredContent,
+            ) as Output<N>),
+      };
+    };
+    const guests = (sessionId: Id<"sessions">) =>
+      t.run(async (ctx) =>
+        (
+          await ctx.db
+            .query("participants")
+            .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+            .collect()
+        ).filter((p) => p.role === "guest"),
+      );
+
+    it("list_friend_agents lists the agents of the owner's friends, and none without an owner or friends", async () => {
+      expect(await use("list_friend_agents", {})).toEqual({ agents: [] });
+      await friends();
+      expect(await use("list_friend_agents", {})).toEqual({
+        agents: [
+          expect.objectContaining({
+            agentId: friend.agentId,
+            name: "Agenda de Beto",
+            friendName: "Beto Paz",
+          }),
+        ],
+      });
+      expect((await asFriend("list_friend_agents")).output).toEqual({
+        agents: [
+          expect.objectContaining({
+            agentId: agents.external,
+            friendName: "Ana Rojas",
+          }),
+        ],
+      });
+    });
+
+    it("invite_agent leaves the request pending for the owner, and the guest reads the room only once approved", async () => {
+      await friends();
+      const { sessionId, me } = await openRoom();
+
+      expect(
+        await use("invite_agent", { sessionId, agentId: friend.agentId }),
+      ).toEqual({ status: "pending" });
+      expect(await guests(sessionId)).toEqual([]);
+      expect((await asFriend("list_invitations")).output).toEqual({
+        invitations: [
+          { sessionId, status: "pending", inviterName: "Ana Rojas" },
+        ],
+      });
+      expect(
+        (await asFriend("wait_for_messages", { sessionId, timeoutMs: 0 }))
+          .error,
+      ).toContain(NOT_IN_ROOM);
+      expect(
+        await refusal("invite_agent", { sessionId, agentId: friend.agentId }),
+      ).toContain("AlreadyInvited");
+
+      const [{ invitationId }] = await t
+        .withIdentity({ tokenIdentifier: BETO })
+        .query(api.roomInvitations.inbox, {});
+      await t
+        .withIdentity({ tokenIdentifier: BETO })
+        .mutation(api.roomInvitations.respond, { invitationId, approve: true });
+
+      expect((await asFriend("list_invitations")).output).toEqual({
+        invitations: [
+          {
+            sessionId,
+            status: "approved",
+            inviterName: "Ana Rojas",
+            request: REQUEST,
+          },
+        ],
+      });
+      const seen = await asFriend("wait_for_messages", {
+        sessionId,
+        timeoutMs: 0,
+      });
+      expect(seen.output?.messages.map((m) => m.content)).toMatchObject([
+        { kind: "system", code: "agent_joined" },
+      ]);
+      const [guest] = await guests(sessionId);
+      await use("send_message", {
+        sessionId,
+        recipient: guest._id,
+        content: text("¿Puede Beto el martes?"),
+      });
+      const next = await asFriend("wait_for_messages", {
+        sessionId,
+        after: seen.output?.cursor,
+        timeoutMs: 0,
+      });
+      expect(next.output?.messages).toMatchObject([
+        { senderParticipantId: me, content: text("¿Puede Beto el martes?") },
+      ]);
+    });
+
+    it("invite_agent adds the agent at once when its owner auto-approves the caller's owner", async () => {
+      await friends({ autoApprove: true });
+      const { sessionId } = await openRoom();
+
+      expect(
+        await use("invite_agent", { sessionId, agentId: friend.agentId }),
+      ).toEqual({ status: "approved" });
+      expect(await guests(sessionId)).toMatchObject([
+        { agentId: friend.agentId },
+      ]);
+      const { messages } = await use("wait_for_messages", {
+        sessionId,
+        timeoutMs: 0,
+      });
+      expect(messages.at(-1)?.content).toMatchObject({ code: "agent_joined" });
+    });
+
+    it("invite_agent refuses a stranger's agent, an agent that is not there and a key with no owner, all the same way", async () => {
+      await friends({ linked: false });
+      const { sessionId } = await openRoom();
+      expect(
+        await refusal("invite_agent", { sessionId, agentId: friend.agentId }),
+      ).toContain(NOT_FRIEND);
+      expect(
+        await refusal("invite_agent", { sessionId, agentId: "nope" }),
+      ).toContain(NOT_FRIEND);
+      expect(
+        await refusal("invite_agent", { sessionId, agentId: agents.clinic }),
+      ).toContain(NOT_FRIEND);
+      expect(await guests(sessionId)).toEqual([]);
+    });
+
+    it("invite_agent is for the agent that opened the room: not a guest, and not a key outside it", async () => {
+      await friends({ autoApprove: true });
+      const { sessionId } = await openRoom();
+      const other = await hostedRoom();
+
+      expect(
+        await refusal("invite_agent", {
+          sessionId: other.sessionId,
+          agentId: friend.agentId,
+        }),
+      ).toContain(NOT_IN_ROOM);
+      expect(
+        (
+          await asFriend("invite_agent", {
+            sessionId,
+            agentId: agents.external,
+          })
+        ).error,
+      ).toContain(NOT_IN_ROOM);
+
+      await use("invite_agent", { sessionId, agentId: friend.agentId });
+      expect(
+        (
+          await asFriend("invite_agent", {
+            sessionId,
+            agentId: agents.external,
+          })
+        ).error,
+      ).toContain("Forbidden");
+    });
+
+    it("list_invitations drops a room once it is closed and never shows another agent's invitations", async () => {
+      await friends();
+      const { sessionId } = await openRoom();
+      await use("invite_agent", { sessionId, agentId: friend.agentId });
+
+      expect(await use("list_invitations", {})).toEqual({ invitations: [] });
+      await use("close_session", { sessionId });
+      expect((await asFriend("list_invitations")).output).toEqual({
+        invitations: [],
+      });
+    });
+  });
 });

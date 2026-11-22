@@ -196,29 +196,35 @@ export const list = query({
   ),
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-    const rows = await ctx.db
-      .query("friendships")
-      .withIndex("by_ownerTokenIdentifier_and_friendTokenIdentifier", (q) =>
-        q.eq("ownerTokenIdentifier", identity.tokenIdentifier),
-      )
-      .take(FRIEND_LIMIT);
-    return Promise.all(
-      rows.map(async (row) => ({
-        friendshipId: row._id,
-        name: row.friendName,
-        autoApprove: row.autoApprove,
-        agents: (await friendAgents(ctx, row.friendTokenIdentifier)).map(
-          (agent) => ({
-            agentId: agent._id,
-            name: agent.name,
-            description: agent.description,
-          }),
-        ),
-      })),
-    );
+    return identity ? friendsOf(ctx, identity.tokenIdentifier) : [];
   },
 });
+
+export async function friendsOf(
+  ctx: Pick<QueryCtx, "db">,
+  ownerTokenIdentifier: string,
+) {
+  const rows = await ctx.db
+    .query("friendships")
+    .withIndex("by_ownerTokenIdentifier_and_friendTokenIdentifier", (q) =>
+      q.eq("ownerTokenIdentifier", ownerTokenIdentifier),
+    )
+    .take(FRIEND_LIMIT);
+  return Promise.all(
+    rows.map(async (row) => ({
+      friendshipId: row._id,
+      name: row.friendName,
+      autoApprove: row.autoApprove,
+      agents: (await friendAgents(ctx, row.friendTokenIdentifier)).map(
+        (agent) => ({
+          agentId: agent._id,
+          name: agent.name,
+          description: agent.description,
+        }),
+      ),
+    })),
+  );
+}
 
 async function ownFriendship(
   ctx: MutationCtx,

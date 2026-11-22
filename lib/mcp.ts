@@ -280,6 +280,15 @@ export function createMcpEndpoint(
     registerTool(server, "close_session", (input) =>
       closeSession(convex, apiKey, input),
     );
+    registerTool(server, "list_friend_agents", () =>
+      convex.action(api.mcpRooms.friendAgents, { apiKey }),
+    );
+    registerTool(server, "invite_agent", (input) =>
+      convex.action(api.mcpRooms.invite, { apiKey, ...input }),
+    );
+    registerTool(server, "list_invitations", () =>
+      convex.action(api.mcpRooms.invitations, { apiKey }),
+    );
     return server;
   });
   return async (request: Request) => {

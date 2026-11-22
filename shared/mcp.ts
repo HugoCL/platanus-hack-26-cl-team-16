@@ -102,6 +102,36 @@ export const CloseSessionOutput = z.object({
   status: SessionStatus,
 });
 
+// Friends and invitations are those of the human who owns the calling agent.
+export const ListFriendAgentsInput = z.object({});
+export const ListFriendAgentsOutput = z.object({
+  agents: z.array(
+    z.object({
+      agentId,
+      name: z.string(),
+      description: z.string(),
+      friendName: z.string(),
+    }),
+  ),
+});
+
+export const InviteAgentInput = z.object({ sessionId, agentId });
+export const InviteAgentOutput = z.object({
+  status: z.enum(["pending", "approved"]),
+});
+
+export const ListInvitationsInput = z.object({});
+export const ListInvitationsOutput = z.object({
+  invitations: z.array(
+    z.object({
+      sessionId,
+      status: z.enum(["pending", "approved"]),
+      inviterName: z.string(),
+      request: z.string().optional(),
+    }),
+  ),
+});
+
 export const MCP_TOOLS = {
   search_agents: {
     description:
@@ -137,6 +167,24 @@ export const MCP_TOOLS = {
     description: "Close a session you participate in.",
     input: CloseSessionInput,
     output: CloseSessionOutput,
+  },
+  list_friend_agents: {
+    description:
+      "List the agents owned by your owner's friends. Any of them can be asked into a session you opened with invite_agent.",
+    input: ListFriendAgentsInput,
+    output: ListFriendAgentsOutput,
+  },
+  invite_agent: {
+    description:
+      'Ask a friend\'s agent into a session you opened. "pending": its owner has to approve on this site, and the agent joins when they do. "approved": the owner auto-approves your owner, so the agent and its owner are already in. Either way, a join shows up in wait_for_messages as an agent_joined notice.',
+    input: InviteAgentInput,
+    output: InviteAgentOutput,
+  },
+  list_invitations: {
+    description:
+      'List the sessions you were asked into as a guest. "pending": your owner has not answered yet; they approve or reject on this site, you cannot. "approved": you are in the session, so read it with wait_for_messages and answer with send_message. As a guest you see the session from the moment you joined.',
+    input: ListInvitationsInput,
+    output: ListInvitationsOutput,
   },
 } as const;
 export type McpToolName = keyof typeof MCP_TOOLS;

@@ -114,55 +114,74 @@ export const invite = mutation({
     if (inviter.role === "observer") {
       fail("Forbidden", "observers cannot invite agents");
     }
-    await activeRoom(ctx, sessionId);
-    const agent = await ctx.db.get("agents", agentId);
-    const owner = agent?.ownerTokenIdentifier;
-    const theirs =
-      owner && (await friendship(ctx, inviter.tokenIdentifier, owner));
-    const mine =
-      owner && (await friendship(ctx, owner, inviter.tokenIdentifier));
-    // Both directions must exist, and one error covers every miss so agent ids cannot be probed.
-    if (!owner || !theirs || !mine) {
-      fail("NotFriend", "you can only invite an agent that a friend owns");
-    }
-    const pending = await pendingInRoom(ctx, sessionId);
-    if (pending.some((row) => row.agentId === agentId)) {
-      fail("AlreadyInvited", "that agent already has a pending invitation");
-    }
-    if (pending.length >= PENDING_LIMIT) {
-      fail("TooManyInvitations", "this room has too many pending invitations");
-    }
-    const invitation = {
+    return requestInvitation(ctx, {
       sessionId,
       agentId,
       inviterTokenIdentifier: inviter.tokenIdentifier,
-      // The name the owner knows the inviter by; the room's own label can be a bare "Tú".
-      inviterName: mine.friendName,
-      ownerTokenIdentifier: owner,
-    };
-    if (mine.autoApprove) {
-      await join(ctx, invitation, theirs.friendName);
-    } else {
-      const already = await ctx.db
-        .query("participants")
-        .withIndex("by_agentId_and_sessionId", (q) =>
-          q.eq("agentId", agentId).eq("sessionId", sessionId),
-        )
-        .first();
-      if (already)
-        fail("AlreadyParticipant", "the agent is already in the room");
-    }
-    const status = mine.autoApprove
-      ? ("approved" as const)
-      : ("pending" as const);
-    await ctx.db.insert("roomInvitations", {
-      ...invitation,
-      status,
-      autoApproved: mine.autoApprove,
     });
-    return { status };
   },
 });
+
+// Asks for a friend's agent on behalf of `inviterTokenIdentifier`, which the caller has already
+// established: the signed-in human in the room, or the owner of the agent whose key called.
+export async function requestInvitation(
+  ctx: MutationCtx,
+  {
+    sessionId,
+    agentId,
+    inviterTokenIdentifier,
+  }: {
+    sessionId: Id<"sessions">;
+    agentId: Id<"agents">;
+    inviterTokenIdentifier: string;
+  },
+) {
+  await activeRoom(ctx, sessionId);
+  const agent = await ctx.db.get("agents", agentId);
+  const owner = agent?.ownerTokenIdentifier;
+  const theirs =
+    owner && (await friendship(ctx, inviterTokenIdentifier, owner));
+  const mine = owner && (await friendship(ctx, owner, inviterTokenIdentifier));
+  // Both directions must exist, and one error covers every miss so agent ids cannot be probed.
+  if (!owner || !theirs || !mine) {
+    fail("NotFriend", "you can only invite an agent that a friend owns");
+  }
+  const pending = await pendingInRoom(ctx, sessionId);
+  if (pending.some((row) => row.agentId === agentId)) {
+    fail("AlreadyInvited", "that agent already has a pending invitation");
+  }
+  if (pending.length >= PENDING_LIMIT) {
+    fail("TooManyInvitations", "this room has too many pending invitations");
+  }
+  const invitation = {
+    sessionId,
+    agentId,
+    inviterTokenIdentifier,
+    // The name the owner knows the inviter by; the room's own label can be a bare "Tú".
+    inviterName: mine.friendName,
+    ownerTokenIdentifier: owner,
+  };
+  if (mine.autoApprove) {
+    await join(ctx, invitation, theirs.friendName);
+  } else {
+    const already = await ctx.db
+      .query("participants")
+      .withIndex("by_agentId_and_sessionId", (q) =>
+        q.eq("agentId", agentId).eq("sessionId", sessionId),
+      )
+      .first();
+    if (already) fail("AlreadyParticipant", "the agent is already in the room");
+  }
+  const status = mine.autoApprove
+    ? ("approved" as const)
+    : ("pending" as const);
+  await ctx.db.insert("roomInvitations", {
+    ...invitation,
+    status,
+    autoApproved: mine.autoApprove,
+  });
+  return { status };
+}
 
 async function pendingInvitation(
   ctx: MutationCtx,

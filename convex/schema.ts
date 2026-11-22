@@ -147,7 +147,8 @@ export default defineSchema({
       "ownerTokenIdentifier",
       "status",
     ])
-    .index("by_sessionId_and_status", ["sessionId", "status"]),
+    .index("by_sessionId_and_status", ["sessionId", "status"])
+    .index("by_agentId_and_status", ["agentId", "status"]),
 
   agentApiKeys: defineTable({
     agentId: v.id("agents"),
