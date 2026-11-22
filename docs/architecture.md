@@ -74,7 +74,7 @@ Nada del modelo depende de un rubro: la clínica es solo la primera configuraci�
 - `transactions`: una sola tabla para reservas y pedidos. `sessionId`, `agentId`, `kind` (`booking` | `order`), líneas (`offeringId`, `quantity`, `availabilityId` o rango de tiempo, precio unitario), `total` y `status` (`held` | `confirmed` | `cancelled`). **Regla**: reservar incrementa `booked` en la misma mutación que crea la transacción, y nunca por sobre `capacity`.
 
 ### 3.3 Cómo se conecta un agente externo
-- **MCP server** en `/api/mcp` (Streamable HTTP) es la vía principal: Claude, ChatGPT y Grok ya soportan MCP remoto. Tools: `search_agents`, `get_agent`, `open_session`, `send_message`, `wait_for_messages`, `close_session`, con sus inputs y outputs en `shared/mcp.ts`.
+- **MCP server** en `/api/mcp` (Streamable HTTP) es la vía principal: Claude, ChatGPT y Grok ya soportan MCP remoto. Tools: `search_agents`, `get_agent`, `open_session`, `send_message`, `wait_for_messages`, `close_session`, `list_friend_agents`, `invite_agent`, `list_invitations`, con sus inputs y outputs en `shared/mcp.ts`.
 - Auth: API key por agente registrado (`agentApiKeys`: hash SHA-256 y prefijo visible; la key en claro nunca se guarda), enviada como bearer en el header.
 - Fase 2: A2A (agent cards en `/.well-known/agent-card.json` por agente) como export de interoperabilidad, y webhooks salientes para agentes con servidor propio.
 

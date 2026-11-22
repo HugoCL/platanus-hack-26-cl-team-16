@@ -13,7 +13,9 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { credentialForApiKey } from "./agentKeys";
+import { friendsOf } from "./friends";
 import { sendThroughGate } from "./gate";
+import { requestInvitation } from "./roomInvitations";
 import { messagesAfter } from "./roomMessages";
 import { loadSession, toMessage } from "./roomState";
 import { closeRoom, openRoom } from "./rooms";
@@ -80,7 +82,12 @@ async function callerParticipant(
         q.eq("agentId", agent._id).eq("sessionId", id),
       )) {
       if (participant.leftAt === undefined) {
-        return { participant, credentialId: key._id, agentId: agent._id };
+        return {
+          participant,
+          credentialId: key._id,
+          agentId: agent._id,
+          ownerTokenIdentifier: agent.ownerTokenIdentifier,
+        };
       }
     }
   }
@@ -192,6 +199,7 @@ type MessagePage = {
   messages: Message[];
   cursor: string | null;
   sessionStatus: SessionStatus;
+  participants: Session["participants"];
 };
 
 export const messages = action({
@@ -233,6 +241,8 @@ export const readMessages = internalQuery({
       }),
       cursor: page.cursor,
       sessionStatus: room.status,
+      // The agents in the room now: one that joins later is addressed by the id listed here.
+      participants: room.participants.filter((p) => p.kind === "agent"),
     };
   },
 });
@@ -258,5 +268,146 @@ export const closeAsCaller = internalMutation({
       sessionId: participant.sessionId,
       participantId: participant._id,
     });
+  },
+});
+
+// Friends and invitations belong to the human who owns the calling agent. A key never answers an
+// invitation: approving stays with that human, on the site, or with their auto-approve switch.
+const INVITATION_LIMIT = 50;
+const INVITATION_SCAN_LIMIT = 1000;
+
+type FriendAgent = {
+  agentId: Id<"agents">;
+  name: string;
+  description: string;
+  friendName: string;
+};
+
+export const friendAgents = action({
+  args: { apiKey: v.string() },
+  handler: async (ctx, args): Promise<{ agents: FriendAgent[] }> => {
+    await chargeRequest(ctx, args.apiKey);
+    return ctx.runQuery(internal.mcpRooms.readFriendAgents, args);
+  },
+});
+
+export const readFriendAgents = internalQuery({
+  args: { apiKey: v.string() },
+  handler: async (ctx, { apiKey }): Promise<{ agents: FriendAgent[] }> => {
+    const { agent } = await callerCredential(ctx, apiKey);
+    const friends = agent.ownerTokenIdentifier
+      ? await friendsOf(ctx, agent.ownerTokenIdentifier)
+      : [];
+    return {
+      agents: friends.flatMap((friend) =>
+        friend.agents.map((a) => ({ ...a, friendName: friend.name })),
+      ),
+    };
+  },
+});
+
+const inviteArgs = {
+  apiKey: v.string(),
+  sessionId: v.string(),
+  agentId: v.string(),
+};
+type InviteResult = { status: "pending" | "approved" };
+
+export const invite = action({
+  args: inviteArgs,
+  handler: async (ctx, args): Promise<InviteResult> => {
+    await chargeRequest(ctx, args.apiKey);
+    return ctx.runMutation(internal.mcpRooms.inviteAsCaller, args);
+  },
+});
+
+// The agent that opened the room invites for its owner, whose friendships decide the answer. A
+// provider or a guest in the room cannot bring others in.
+export const inviteAsCaller = internalMutation({
+  args: inviteArgs,
+  handler: async (
+    ctx,
+    { apiKey, sessionId, agentId },
+  ): Promise<InviteResult> => {
+    const { participant, ownerTokenIdentifier } = await callerParticipant(
+      ctx,
+      apiKey,
+      sessionId,
+    );
+    if (participant.role !== "initiator") {
+      fail("Forbidden", "only the agent that opened the room can invite");
+    }
+    const target = ctx.db.normalizeId("agents", agentId);
+    if (!ownerTokenIdentifier || !target) {
+      fail("NotFriend", "you can only invite an agent that a friend owns");
+    }
+    return requestInvitation(ctx, {
+      sessionId: participant.sessionId,
+      agentId: target,
+      inviterTokenIdentifier: ownerTokenIdentifier,
+    });
+  },
+});
+
+type AgentInvitation = {
+  sessionId: Id<"sessions">;
+  status: "pending" | "approved";
+  inviterName: string;
+  request?: string;
+};
+
+export const invitations = action({
+  args: { apiKey: v.string() },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ invitations: AgentInvitation[]; truncated: boolean }> => {
+    await chargeRequest(ctx, args.apiKey);
+    return ctx.runQuery(internal.mcpRooms.readInvitations, args);
+  },
+});
+
+// What the calling agent was asked into: requests its owner has not answered yet, and the active
+// rooms it already joined as a guest. What a room is for is shown only once the agent is in it.
+export const readInvitations = internalQuery({
+  args: { apiKey: v.string() },
+  handler: async (
+    ctx,
+    { apiKey },
+  ): Promise<{ invitations: AgentInvitation[]; truncated: boolean }> => {
+    const { agent } = await callerCredential(ctx, apiKey);
+    const invitations: AgentInvitation[] = [];
+    let truncated = false;
+    // Rooms the agent is already in come first, so a backlog of unanswered requests cannot
+    // crowd out the ones it has to act in.
+    for (const status of ["approved", "pending"] as const) {
+      let scanned = 0;
+      const rows = ctx.db
+        .query("roomInvitations")
+        .withIndex("by_agentId_and_status", (q) =>
+          q.eq("agentId", agent._id).eq("status", status),
+        )
+        .order("desc");
+      // Invitations outlive their room, so closed rooms are skipped here instead of counting
+      // against what is returned.
+      for await (const row of rows) {
+        if (
+          invitations.length === INVITATION_LIMIT ||
+          scanned++ === INVITATION_SCAN_LIMIT
+        ) {
+          truncated = true;
+          break;
+        }
+        const session = await ctx.db.get("sessions", row.sessionId);
+        if (session?.status !== "active") continue;
+        invitations.push({
+          sessionId: row.sessionId,
+          status,
+          inviterName: row.inviterName,
+          ...(status === "approved" && { request: session.intent.description }),
+        });
+      }
+    }
+    return { invitations, truncated };
   },
 });

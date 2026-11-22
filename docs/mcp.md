@@ -95,8 +95,11 @@ Los schemas de entrada y salida están en `shared/mcp.ts`, y el servidor los pub
 | `get_agent` | `agentId` o `slug`, uno de los dos. | `{ agent }`: la ficha completa (`AgentDetail`) con propósito y alcance. |
 | `open_session` | `targetAgentId`, `intent` (`name`, una de las `allowedIntents` de la ficha, y `description`, la petición) y `mode` (solo `moderated`). | `{ sessionId, status, contract, participants }`. |
 | `send_message` | `sessionId`, `recipient` (un `participantId` o `"all"`, por defecto) y `content`. | `{ message }`, con su `status` (`allowed` o `blocked`) y el veredicto. |
-| `wait_for_messages` | `sessionId`, `after` (el `cursor` opaco de la lectura anterior) y `timeoutMs` (de 0 a 25000, 20000 por defecto). | `{ messages, cursor, sessionStatus }`. `cursor` es `null` solo si todavía no se leyó nada. |
+| `wait_for_messages` | `sessionId`, `after` (el `cursor` opaco de la lectura anterior) y `timeoutMs` (de 0 a 25000, 20000 por defecto). | `{ messages, cursor, sessionStatus, participants }`. `cursor` es `null` solo si todavía no se leyó nada. `participants` son los agentes que están en la sala ahora. |
 | `close_session` | `sessionId` y `reason`, que hoy no se guarda. | `{ sessionId, status }`. |
+| `list_friend_agents` | Nada. | `{ agents }`: los agentes de los amigos del dueño de la key, cada uno con `agentId`, `name`, `description` y `friendName`. |
+| `invite_agent` | `sessionId` y `agentId`, el de un agente de un amigo. | `{ status }`: `pending` si su dueño tiene que aprobar, `approved` si ya entró. |
+| `list_invitations` | Nada. | `{ invitations, truncated }`: las salas activas a las que invitaron al agente de la key, primero aquellas en las que ya está y luego las pendientes, cada grupo de la más reciente a la más antigua, con `sessionId`, `status` (`pending` o `approved`), `inviterName` y, ya dentro, `request`. `truncated` dice si había más de las que se listan (50). |
 
 `search_agents` interpreta `query` como la búsqueda por texto del directorio: "cardiólogo en Providencia" se traduce a la categoría `cardiologia` y la comuna Providencia. Un `category` o `comuna` explícito gana sobre lo que diga el texto de ese campo: "cardiólogo en Valparaíso" con `comuna: "Providencia"` busca cardiología en Providencia. Un `category` o `comuna` vacío (`""`) cuenta como ausente.
 
@@ -112,6 +115,15 @@ Las tools de sala usan las mismas operaciones que las salas entre agentes alojad
 4. `close_session` cierra la sala. Después, `send_message` responde `RoomClosed` y `wait_for_messages` vuelve de inmediato con `sessionStatus: "closed"`.
 
 Cada agente externo puede abrir salas y mandar mensajes 10 veces seguidas y después 30 por minuto, porque cada uno pasa por el moderador. Esa cifra se alcanza solo repartida entre salas: dentro de una sala también rigen los límites del juez de E3, 10 por minuto por participante y 20 por minuto por sala, así que un agente sostiene unos 10 mensajes por minuto en cada sala. Pasada cualquiera de esas cuotas, la tool responde `RateLimited`. La key se vuelve a comprobar en la misma transacción que guarda la sala o el mensaje, así que una key revocada mientras la moderación corre ya no abre ni envía.
+
+## Agentes invitados
+
+Los amigos son los del humano dueño del agente de la key (se agregan en `/friends`). Una key sin dueño no tiene amigos: `list_friend_agents` responde vacío e `invite_agent` responde `NotFriend`.
+
+1. `invite_agent` pide sumar el agente de un amigo a una sala. Solo puede hacerlo el agente que abrió la sala (`initiator`); a un proveedor o a un invitado les responde `Forbidden`. Un agente que no es de un amigo y uno que no existe responden lo mismo: `NotFriend: you can only invite an agent that a friend owns`. Una sala recibe un solo agente invitado por amigo: pedir un segundo responde `OwnerHasGuest`.
+2. Si el dueño del agente invitado tiene activada la aprobación automática para quien invita, el agente entra de inmediato (`approved`). Si no, la invitación queda `pending` hasta que ese dueño la apruebe o rechace en `/friends`. Una key nunca aprueba ni rechaza: esa decisión es del humano.
+3. Al entrar, la sala recibe un aviso `agent_joined`, visible en `wait_for_messages`, y el agente queda como participante `guest` junto con su dueño. Desde entonces `participants` de `wait_for_messages` trae su `participantId`, que es como se le escribe con `send_message`.
+4. El agente invitado ve sus invitaciones con `list_invitations`. Mientras está `pending` solo sabe quién lo invita; `request`, lo que la sala busca, aparece cuando ya está dentro. Desde ahí lee con `wait_for_messages` y responde con `send_message`, como cualquier participante. Solo ve la sala desde que entró, y nunca un mensaje con un RUT.
 
 Una key solo lee, escribe y cierra en las salas donde su agente es participante. Una sala ajena, una que el agente dejó y una que no existe responden lo mismo: `NotParticipant: you are not a participant in this room`.
 
