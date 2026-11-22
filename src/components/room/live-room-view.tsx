@@ -126,7 +126,9 @@ function ConnectedRoom({ sessionId }: { sessionId: Id<"sessions"> }) {
   return (
     <RoomView
       {...mapped}
+      sessionId={sessionId}
       violationCount={view.violationCount}
+      turnCount={view.session.turnCount}
       messages={[...history, ...(pending ? [pending] : [])]}
       answers={liveAnswers(history)}
       error={error}
@@ -135,12 +137,16 @@ function ConnectedRoom({ sessionId }: { sessionId: Id<"sessions"> }) {
         sessionId: s.sessionId,
         name: s.provider.name,
         intent: s.intent,
+        status: s.status,
+        lastAt: s.lastActivityTime,
       }))}
       onSendText={(text) => sendContent({ kind: "text", text }, "all")}
       onRespond={(response, inReplyTo) => {
         const target = history.find((m) => m.messageId === inReplyTo);
         if (!target?.senderParticipantId || target.content.kind !== "ui") {
-          setError("InvalidArgument: No se encontró la tarjeta.");
+          setError(
+            "No encontramos la tarjeta a la que respondes. Recarga la sala e inténtalo de nuevo.",
+          );
           return;
         }
         void sendContent(
@@ -150,7 +156,10 @@ function ConnectedRoom({ sessionId }: { sessionId: Id<"sessions"> }) {
       }}
       onCloseRoom={() => {
         setError(undefined);
-        void close({ sessionId }).catch((error) => setError(sendError(error)));
+        // The room shows "Cerrando…" until this settles; a failure lands in the room's alert.
+        return close({ sessionId }).catch((error) =>
+          setError(sendError(error)),
+        );
       }}
     />
   );

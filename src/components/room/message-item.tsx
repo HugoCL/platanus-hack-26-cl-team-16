@@ -11,16 +11,19 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import type { UiResponse, UiSpec } from "@/shared/genui";
-import { type GenUiAnswer, GenUiBlock } from "./genui-block";
-import { ModerationBadge, PendingStages } from "./moderation";
+import { type GenUiAnswer, GenUiBlock, isSlotPicker } from "./genui-block";
+import {
+  type Fault,
+  ModeratorShield,
+  PendingStages,
+  Ruling,
+} from "./moderation";
 import {
   canAnswerUi,
   canSeeContent,
   describeUiResponse,
-  formatScore,
   formatTime,
   primaryReason,
-  REASON_LABELS,
   type RoomMessage,
   type RoomParticipant,
   splitRedacted,
@@ -38,6 +41,10 @@ type MessageItemProps = {
   // Same sender as the message right above: the name is not repeated.
   continued?: boolean;
   readOnly?: boolean;
+  // Which fault this blocked message was, out of how many the contract allows.
+  fault?: Fault;
+  // A system notice the room words itself, in place of the stored text.
+  noticeText?: string;
   onRespond: (response: UiResponse) => void;
   onShowAudit: (messageId: string) => void;
   onReview?: (messageId: string, approve: boolean) => void;
@@ -50,14 +57,14 @@ export function MessageItem(props: MessageItemProps) {
       <SystemNotice
         id={message.messageId}
         code={message.content.code}
-        text={message.content.text}
+        text={props.noticeText ?? message.content.text}
       />
     );
   }
-  return <Bubble {...props} />;
+  return <Entry {...props} />;
 }
 
-function Bubble({
+function Entry({
   message,
   sender,
   viewer,
@@ -65,53 +72,47 @@ function Bubble({
   uiSpecsByMessage,
   highlighted,
   continued,
+  fault,
   onRespond,
-  onShowAudit,
   onReview,
   readOnly,
 }: MessageItemProps) {
   const self = sender?.side === "self";
   const { content, status } = message;
-  const isUi = content.kind === "ui";
   const visible = canSeeContent(status, message.senderParticipantId, viewer);
-  const reason = primaryReason(message.reasons);
   const canModerate = viewer.role === "owner" || viewer.role === "operator";
   const slow = useSlowReview(status === "pending");
 
-  const frame =
-    status === "blocked"
-      ? "border-2 border-destructive"
-      : status === "escalated"
-        ? "border-2 border-warning"
-        : "";
-
-  let body: ReactNode;
+  // The bubble, and what hangs under it (a slot picker's tiles sit below their sentence).
+  let bubble: ReactNode;
+  let below: ReactNode = null;
   if (status === "pending" && !visible) {
-    body = (
-      <p className="m-0 text-subtle-foreground">
-        El moderador está revisando este mensaje
-      </p>
+    bubble = (
+      <div className="room-bubble room-pending text-subtle-foreground">
+        El moderador está revisando este mensaje.
+      </div>
     );
   } else if (!visible || (status === "blocked" && content.kind !== "ui")) {
-    body = (
-      <BlockedBody
-        reasonLabel={reason ? REASON_LABELS[reason.code] : undefined}
-        score={reason?.score}
-        moderatorError={reason?.code === "moderator_error"}
-        senderSees={visible}
+    bubble = (
+      <HeldBody
+        moderatorError={
+          primaryReason(message.reasons)?.code === "moderator_error"
+        }
         text={visible && content.kind === "text" ? content.text : undefined}
-        onShowAudit={() => onShowAudit(message.messageId)}
       />
     );
   } else if (content.kind === "text") {
-    body =
-      status === "redacted" && message.redactedText ? (
-        <RedactedText text={message.redactedText} />
-      ) : (
-        <p className="m-0 whitespace-pre-wrap break-words">{content.text}</p>
-      );
+    bubble = (
+      <div className={bubbleClass(status)}>
+        {status === "redacted" && message.redactedText ? (
+          <RedactedText text={message.redactedText} />
+        ) : (
+          <p className="m-0 whitespace-pre-wrap break-words">{content.text}</p>
+        )}
+      </div>
+    );
   } else if (content.kind === "ui") {
-    body = (
+    const block = (
       <GenUiBlock
         spec={content.spec}
         answer={answers[content.spec.id]}
@@ -120,97 +121,106 @@ function Bubble({
         onRespond={onRespond}
       />
     );
+    if (content.spec.type === "slot_picker" && isSlotPicker(content.spec)) {
+      bubble = (
+        <div className={bubbleClass(status)}>
+          <p className="m-0 break-words">{content.spec.title}</p>
+          <p className="m-0 text-xs opacity-70">Hora de Santiago</p>
+        </div>
+      );
+      below = block;
+    } else {
+      bubble = (
+        <div
+          className={`min-w-0 flex-[0_1_520px] ${status === "pending" ? "room-pending" : ""}`}
+        >
+          {block}
+        </div>
+      );
+    }
   } else if (content.kind === "ui_response") {
-    const target = uiSpecsByMessage[content.inReplyTo];
-    body = (
-      <a
-        href={`#msg-${content.inReplyTo}`}
-        className="inline-flex items-center gap-1.5 text-inherit !no-underline"
-      >
-        <ReplyIcon size={14} className="shrink-0 opacity-70" />
-        {describeUiResponse(content.response, target)}
-      </a>
+    bubble = (
+      <div className={bubbleClass(status)}>
+        <a
+          href={`#msg-${content.inReplyTo}`}
+          className="inline-flex items-center gap-1.5 text-inherit !no-underline"
+        >
+          <ReplyIcon size={14} className="shrink-0 opacity-70" />
+          {describeUiResponse(
+            content.response,
+            uiSpecsByMessage[content.inReplyTo],
+          )}
+        </a>
+      </div>
     );
   } else {
-    body = (
-      <p className="m-0 inline-flex items-center gap-1.5 text-subtle-foreground">
-        <LockIcon size={14} />
-        Mensaje cifrado
-      </p>
+    bubble = (
+      <div className={bubbleClass(status)}>
+        <p className="m-0 inline-flex items-center gap-1.5 opacity-80">
+          <LockIcon size={14} />
+          Mensaje cifrado
+        </p>
+      </div>
     );
   }
-
-  const compact = content.kind === "ui_response";
 
   return (
     <article
       id={`msg-${message.messageId}`}
       data-testid="room-message"
       data-status={status}
+      data-mine={self ? "" : undefined}
+      data-continued={continued ? "" : undefined}
       aria-label={`${sender?.name ?? "Desconocido"}, ${formatTime(message.sentAt)}`}
-      className={`flex scroll-mt-24 flex-col gap-1 ${continued ? "-mt-4" : ""} ${self ? "items-end" : "items-start"} ${highlighted ? "room-highlight" : ""}`}
+      className={`room-entry ${highlighted ? "room-highlight" : ""}`}
     >
-      <header
-        className={`flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-subtle-foreground ${self ? "flex-row-reverse" : ""}`}
+      <time
+        className="room-time"
+        dateTime={new Date(message.sentAt).toISOString()}
       >
+        {formatTime(message.sentAt)}
+      </time>
+      <div className="room-msg">
         {continued ? null : <SenderName sender={sender} />}
-        <time dateTime={new Date(message.sentAt).toISOString()}>
-          {formatTime(message.sentAt)}
-        </time>
-        <ModerationBadge status={status} reasons={message.reasons} />
-      </header>
-      <div
-        className={`room-bubble flex max-w-[min(560px,92%)] flex-col gap-2 ${
-          isUi && visible && status !== "blocked"
-            ? "w-full"
-            : `rounded-4xl px-4 py-2.5 ${compact ? "text-sm" : ""} ${
-                self
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-card shadow-card"
-              } ${frame}`
-        } ${status === "pending" ? "room-pending" : ""}`}
-      >
-        {body}
-      </div>
-      {status === "pending" ? <PendingStages /> : null}
-      {slow ? (
-        <p className="m-0 max-w-[min(560px,92%)] text-xs text-subtle-foreground">
-          El moderador está tardando más de lo normal. El mensaje no se entrega
-          hasta que lo revise.
-        </p>
-      ) : null}
-      {status === "redacted" && reason ? (
-        <span className="inline-flex items-center gap-1 rounded-lg bg-warning/15 px-2 py-0.5 text-xs">
-          Se ocultó: {REASON_LABELS[reason.code]}
-          {reason.detail ? ` · ${reason.detail}` : ""}
-        </span>
-      ) : null}
-      {status === "escalated" ? (
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          {reason?.detail ? (
-            <span className="text-subtle-foreground">{reason.detail}</span>
-          ) : null}
-          {canModerate && onReview ? (
-            <>
-              <Button
-                data-size="sm"
-                data-variant="solid"
-                onClick={() => onReview(message.messageId, true)}
-              >
-                Aprobar
-              </Button>
-              <Button
-                data-size="sm"
-                onClick={() => onReview(message.messageId, false)}
-              >
-                Rechazar
-              </Button>
-            </>
-          ) : null}
+        <div className="room-brow">
+          {bubble}
+          <ModeratorShield message={message} />
         </div>
-      ) : null}
+        {below}
+        {status === "pending" ? <PendingStages /> : null}
+        {slow ? (
+          <p className="room-ruling">
+            <span>
+              El moderador está tardando más de lo normal. El mensaje no se
+              entrega hasta que lo revise.
+            </span>
+          </p>
+        ) : null}
+        <Ruling message={message} fault={fault} />
+        {status === "escalated" && canModerate && onReview ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              data-size="sm"
+              data-variant="solid"
+              onClick={() => onReview(message.messageId, true)}
+            >
+              Aprobar
+            </Button>
+            <Button
+              data-size="sm"
+              onClick={() => onReview(message.messageId, false)}
+            >
+              Rechazar
+            </Button>
+          </div>
+        ) : null}
+      </div>
     </article>
   );
+}
+
+function bubbleClass(status: RoomMessage["status"]) {
+  return `room-bubble ${status === "pending" ? "room-pending" : ""}`;
 }
 
 const SLOW_REVIEW_MS = 15_000;
@@ -227,26 +237,19 @@ function useSlowReview(pending: boolean) {
 }
 
 function SenderName({ sender }: { sender?: RoomParticipant }) {
-  if (!sender) return <span>Desconocido</span>;
-  if (sender.kind === "human") {
-    return (
-      <span className="inline-flex items-center gap-1 font-medium text-foreground">
-        <UserIcon size={13} />
-        {sender.name}
-        {sender.onBehalfOf ? (
-          <span className="font-normal text-subtle-foreground">
-            (en nombre de {sender.onBehalfOf})
-          </span>
-        ) : null}
-      </span>
-    );
-  }
+  if (!sender) return <span className="room-who">Desconocido</span>;
   return (
-    <span
-      title={sender.name}
-      className="max-w-[min(28rem,100%)] min-w-0 truncate font-medium text-foreground"
-    >
+    <span className="room-who" title={sender.name}>
+      {sender.kind === "human" ? (
+        <UserIcon size={13} className="mr-1 inline align-[-2px]" />
+      ) : null}
       {sender.name}
+      {sender.kind === "human" && sender.onBehalfOf ? (
+        <span className="font-normal text-subtle-foreground">
+          {" "}
+          (en nombre de {sender.onBehalfOf})
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -258,10 +261,10 @@ function RedactedText({ text }: { text: string }) {
         part.hidden ? (
           <span
             key={part.at}
-            className="rounded-sm bg-current align-middle text-[0.7em] tracking-[-0.1em] select-none"
+            className="room-redact"
+            style={{ width: `${Math.min(part.text.length, 18) * 0.6}em` }}
           >
-            <span className="sr-only">[texto oculto por el moderador]</span>
-            <span aria-hidden="true">{part.text}</span>
+            <span className="sr-only">[texto tachado por el moderador]</span>
           </span>
         ) : (
           <span key={part.at}>{part.text}</span>
@@ -271,45 +274,26 @@ function RedactedText({ text }: { text: string }) {
   );
 }
 
-function BlockedBody({
-  reasonLabel,
-  score,
+// The hatch is what the moderator held back. The sender's side still sees its own text.
+function HeldBody({
   moderatorError,
-  senderSees,
   text,
-  onShowAudit,
 }: {
-  reasonLabel?: string;
-  score?: number;
   moderatorError: boolean;
-  senderSees: boolean;
   text?: string;
-  onShowAudit: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-2 text-foreground">
-      <p className="m-0 inline-flex items-center gap-1.5 font-medium text-destructive-text">
-        <BanIcon size={15} />
+    <div className="room-held">
+      <p className="m-0">
         {moderatorError
-          ? "No se pudo verificar, por seguridad no se entregó"
-          : "Este mensaje no fue entregado"}
+          ? "No se pudo verificar este mensaje. Por seguridad no se entregó."
+          : "El moderador retuvo este mensaje."}
       </p>
-      {senderSees && text ? (
-        <p className="m-0 text-sm text-subtle-foreground line-through decoration-1">
+      {text ? (
+        <p className="m-0 mt-1 whitespace-pre-wrap break-words text-foreground line-through decoration-1">
           {text}
         </p>
       ) : null}
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        {reasonLabel ? (
-          <span className="font-mono text-subtle-foreground">
-            {reasonLabel}
-            {score !== undefined ? ` · ${formatScore(score)}` : ""}
-          </span>
-        ) : null}
-        <Button data-size="sm" onClick={onShowAudit}>
-          Ver detalle
-        </Button>
-      </div>
     </div>
   );
 }
@@ -331,27 +315,15 @@ export function SystemNotice({
   code: string;
   text: string;
 }) {
-  const strong = code === "session_closed" || code === "session_terminated";
-  const danger = code === "session_terminated" || code === "message_blocked";
   return (
     <p
       id={`msg-${id}`}
       data-testid="system-notice"
       data-code={code}
-      className={`mx-auto my-1 inline-flex max-w-[90%] items-center gap-1.5 self-center rounded-lg px-3 py-1 text-center font-mono text-micro tracking-wider uppercase ${
-        strong ? "font-medium" : ""
-      } ${
-        code === "session_terminated"
-          ? "bg-destructive-soft text-destructive-text"
-          : strong
-            ? "bg-muted text-foreground"
-            : danger
-              ? "text-destructive-text"
-              : "text-subtle-foreground"
-      }`}
+      className="room-notice"
     >
       {SYSTEM_ICONS[code] ?? <ShieldCheckIcon size={13} />}
-      {text}
+      <span>{text}</span>
     </p>
   );
 }
