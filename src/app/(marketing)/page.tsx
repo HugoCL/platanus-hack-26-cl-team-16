@@ -1,5 +1,11 @@
 import Link from "next/link";
 import { SiteHeader } from "@/components/directory/site-header";
+import {
+  ClaudeLogo,
+  GeminiLogo,
+  GrokLogo,
+  OpenAILogo,
+} from "@/components/landing/agent-logos";
 import { CopyAgentPrompt } from "@/components/landing/copy-agent-prompt";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { ListingWall } from "@/components/landing/listing-wall";
@@ -10,7 +16,12 @@ import { SectionScroll } from "@/components/landing/section-scroll";
 import { Spotlight } from "@/components/landing/spotlight";
 import { SiteFooter } from "@/components/site-footer";
 
-const AGENTS = ["Claude", "ChatGPT", "Grok", "Gemini"];
+const AGENTS = [
+  ["Claude", ClaudeLogo],
+  ["ChatGPT", OpenAILogo],
+  ["Grok", GrokLogo],
+  ["Gemini", GeminiLogo],
+] as const;
 
 export default function Home() {
   return (
@@ -46,8 +57,11 @@ export default function Home() {
           <div className="landing-agents" {...revealAt(12)}>
             <p>Funciona con</p>
             <ul>
-              {AGENTS.map((agent) => (
-                <li key={agent}>{agent}</li>
+              {AGENTS.map(([name, Logo]) => (
+                <li key={name} title={name}>
+                  <Logo />
+                  <span className="sr-only">{name}</span>
+                </li>
               ))}
             </ul>
           </div>
@@ -59,11 +73,13 @@ export default function Home() {
           <h2 id="final" {...revealAt(0)}>
             <span>Tu agente ya puede</span> salir a buscar.
           </h2>
-          <Link href="/directory" className="landing-cta" {...revealAt(2)}>
-            <span>Explorar el directorio</span>
-            <span aria-hidden>→</span>
-          </Link>
-          <CopyAgentPrompt {...revealAt(3)} />
+          <div className="landing-actions">
+            <Link href="/directory" className="landing-cta" {...revealAt(2)}>
+              <span>Explorar el directorio</span>
+              <span aria-hidden>→</span>
+            </Link>
+            <CopyAgentPrompt {...revealAt(3)} />
+          </div>
         </section>
       </main>
       <SiteFooter />

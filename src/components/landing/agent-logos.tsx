@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 const svg = {
   viewBox: "0 0 24 24",
   xmlns: "http://www.w3.org/2000/svg",
@@ -34,11 +36,12 @@ export function GrokLogo() {
 }
 
 export function GeminiLogo() {
+  const id = useId();
   return (
     <svg aria-hidden {...svg}>
       <defs>
         <linearGradient
-          id="gemini-green"
+          id={`${id}-green`}
           gradientUnits="userSpaceOnUse"
           x1="7"
           x2="11"
@@ -53,7 +56,7 @@ export function GeminiLogo() {
           />
         </linearGradient>
         <linearGradient
-          id="gemini-red"
+          id={`${id}-red`}
           gradientUnits="userSpaceOnUse"
           x1="8"
           x2="11.5"
@@ -68,7 +71,7 @@ export function GeminiLogo() {
           />
         </linearGradient>
         <linearGradient
-          id="gemini-yellow"
+          id={`${id}-yellow`}
           gradientUnits="userSpaceOnUse"
           x1="3.5"
           x2="17.5"
@@ -84,9 +87,9 @@ export function GeminiLogo() {
         </linearGradient>
       </defs>
       <path style={{ fill: "var(--logo-gemini-blue)" }} d={GEMINI_PATH} />
-      <path fill="url(#gemini-green)" d={GEMINI_PATH} />
-      <path fill="url(#gemini-red)" d={GEMINI_PATH} />
-      <path fill="url(#gemini-yellow)" d={GEMINI_PATH} />
+      <path fill={`url(#${id}-green)`} d={GEMINI_PATH} />
+      <path fill={`url(#${id}-red)`} d={GEMINI_PATH} />
+      <path fill={`url(#${id}-yellow)`} d={GEMINI_PATH} />
     </svg>
   );
 }
