@@ -162,7 +162,9 @@ export function SelectedCard({
       className={`flex w-70 flex-col gap-2 rounded-3xl bg-card p-4 text-foreground shadow-card transition-[opacity,scale] duration-200 ease-[var(--ease-out)] starting:scale-[0.96] starting:opacity-0 motion-reduce:transition-none ${className}`}
       style={style}
     >
-      <span className="text-lead font-medium">{selected.name}</span>
+      <span className="text-lead font-medium wrap-anywhere">
+        {selected.name}
+      </span>
       <span className="line-clamp-2 text-caption leading-normal text-subtle-foreground">
         {selected.purpose}
       </span>

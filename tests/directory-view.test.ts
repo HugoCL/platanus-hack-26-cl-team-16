@@ -12,8 +12,44 @@ import {
   PinButton,
   SelectedCard,
 } from "../src/components/directory/map-parts";
+import { fixtureResult } from "../src/components/directory/worst-case-fixture";
 
 const modules = import.meta.glob("../convex/**/*.ts");
+
+it("wraps a selected unbroken agent name in the directory and map popup", () => {
+  const card = fixtureResult("worst", undefined)?.agents.find(
+    (card): card is LocatedCard =>
+      card.slug === "peor-caso-10" && !!card.location,
+  );
+  if (!card) throw new Error("Missing worst-case name fixture");
+  expect(card.name).toMatch(/^\S{80,}$/);
+
+  for (const expanded of [false, true]) {
+    const html = renderToStaticMarkup(
+      createElement(DirectoryList, {
+        cards: [card],
+        categories: [],
+        selectedId: expanded ? card.agentId : null,
+      }),
+    );
+    const button = html.match(
+      /<button[^>]*data-select[^>]*>[^<]*<\/button>/,
+    )?.[0];
+    expect(button).toContain(`aria-expanded="${expanded}"`);
+    expect(button).toContain(`>${card.name}</button>`);
+    expect(button).toContain(expanded ? " wrap-anywhere " : " truncate ");
+    expect(button).not.toContain(expanded ? " truncate " : " wrap-anywhere ");
+  }
+
+  const popup = renderToStaticMarkup(
+    createElement(SelectedCard, {
+      pin: [card],
+      selected: card,
+      onSelect: () => {},
+    }),
+  );
+  expect(popup).toContain(`wrap-anywhere">${card.name}</span>`);
+});
 
 it("puts schematic pin stacking on the button and preserves popup classes", async () => {
   const t = convexTest(schema, modules);
