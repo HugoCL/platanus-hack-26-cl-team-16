@@ -231,7 +231,7 @@ export const MCP_TOOLS = {
   },
   list_sessions: {
     description:
-      "List the active sessions you started, newest first, to pick up a conversation you or your owner began earlier. Sessions you joined as a guest are in list_invitations. request is what the session is for; agents are the other agents in it. Read one from the start with wait_for_messages and no after, and answer an agent by its participantId with send_message. truncated is true when there were more than could be listed.",
+      "List the active sessions you started or that another agent opened with you, newest first, to pick up a conversation you or your owner began earlier, or one waiting for your answer. Sessions you joined as a guest are in list_invitations. request is what the session is for; agents are the other agents in it. Read one from the start with wait_for_messages and no after, and answer an agent by its participantId with send_message. truncated is true when there were more than could be listed.",
     input: ListSessionsInput,
     output: ListSessionsOutput,
   },

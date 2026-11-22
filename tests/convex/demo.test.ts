@@ -264,14 +264,18 @@ describe("demo room", () => {
   });
 });
 
-describe("demo room, buyer through their own agent", () => {
+describe("demo room, a seat through its holder's own agent", () => {
   const SLUG = "grok-de-caro";
   // Caro's own assistant, registered and linked to her account, with a key for MCP.
-  async function ownAgent(ownerTokenIdentifier = CARO_TOKEN) {
+  async function ownAgent(
+    ownerTokenIdentifier = CARO_TOKEN,
+    slug = SLUG,
+    name = "Grok de Caro",
+  ) {
     const agentId = await t.run((ctx) =>
       ctx.db.insert("agents", {
-        slug: SLUG,
-        name: "Grok de Caro",
+        slug,
+        name,
         description: "Asistente personal de Caro.",
         purpose: "Ayudar a Caro con sus compras.",
         categories: ["asistente_personal"],
@@ -292,7 +296,7 @@ describe("demo room, buyer through their own agent", () => {
       }),
     );
     const { apiKey } = await t.action(internal.agentKeys.issue, {
-      slug: SLUG,
+      slug,
       label: "test",
     });
     return { agentId, apiKey };
@@ -312,7 +316,7 @@ describe("demo room, buyer through their own agent", () => {
     expect(await caro().query(api.demo.state, {})).toMatchObject({
       sessionId,
       mySeat: "buyer",
-      buyerAgent: { agentId, name: "Grok de Caro" },
+      agents: { buyer: { agentId, name: "Grok de Caro" }, merchant: null },
     });
     expect(await li().query(api.demo.state, {})).toMatchObject({
       sessionId,
@@ -370,7 +374,7 @@ describe("demo room, buyer through their own agent", () => {
     expect((await rooms(apiKey)).sessions).toEqual([]);
     expect(await caro().query(api.demo.state, {})).toMatchObject({
       mySeat: "buyer",
-      buyerAgent: null,
+      agents: { buyer: null, merchant: null },
     });
     expect(await history(caro(), back.sessionId)).toHaveLength(
       DEMO_SCRIPT.length + 1,
@@ -381,14 +385,184 @@ describe("demo room, buyer through their own agent", () => {
     expect((await rooms(apiKey)).sessions).toEqual([]);
     expect(await li().query(api.demo.state, {})).toMatchObject({
       mySeat: "merchant",
-      buyerAgent: null,
+      agents: { buyer: null, merchant: null },
       seats: expect.arrayContaining([
         { seat: "buyer", taken: false, displayName: "Comprador" },
       ]),
     });
   });
 
-  it("takes only the buyer's own external agent", async () => {
+  const LI_TOKEN = "https://clerk.test|li-wei";
+  const liWei = () =>
+    t.withIdentity({
+      subject: "li-wei",
+      name: "Li Wei",
+      tokenIdentifier: LI_TOKEN,
+    });
+  const merchantAgent = () => ownAgent(LI_TOKEN, "bot-de-li", "Bot de Li");
+
+  it("replaces the manufacturer's hosted agent with the merchant's own, which has to quote by itself", async () => {
+    const { sessionId: first } = await reset();
+    await ana().mutation(api.demo.join, { seat: "buyer" });
+    const { agentId, apiKey } = await merchantAgent();
+    expect((await rooms(apiKey)).sessions).toEqual([]);
+    const { sessionId } = await liWei().mutation(api.demo.join, {
+      seat: "merchant",
+      agentId,
+    });
+    expect(sessionId).not.toBe(first);
+    expect(await ana().query(api.demo.state, {})).toMatchObject({
+      sessionId,
+      mySeat: "buyer",
+      agents: { buyer: null, merchant: { agentId, name: "Bot de Li" } },
+    });
+    const view = await ana().query(api.rooms.view, { sessionId });
+    const names = view?.participantNames.map((p) => p.name);
+    expect(names).toContain("Bot de Li");
+    expect(names).not.toContain(DEMO_PROVIDER_CARD.name);
+
+    // The merchant's agent finds the room it did not open, and reads what its side said.
+    expect((await rooms(apiKey)).sessions).toMatchObject([{ sessionId }]);
+    const page = await t.action(api.mcpRooms.messages, { apiKey, sessionId });
+    const form = page.messages.at(-1);
+    expect(form?.content).toMatchObject({ kind: "ui", spec: { type: "form" } });
+
+    // Nobody answers the buyer's form for it.
+    await ana().action(api.gate.send, {
+      sessionId,
+      recipient: form?.senderParticipantId as Id<"participants">,
+      content: {
+        kind: "ui_response",
+        inReplyTo: form?.messageId as string,
+        response: {
+          type: "form_submit",
+          formId: "pedido-pcb",
+          values: { cantidad: "100", acabado: "enig", envio: "dhl" },
+        },
+      },
+    });
+    await settle();
+    expect(await texts(ana(), sessionId)).not.toContain(QUOTE);
+    const order = await t.action(api.mcpRooms.messages, {
+      apiKey,
+      sessionId,
+      after: page.cursor ?? undefined,
+    });
+    expect(order.messages.map((m) => m.content.kind)).toEqual(["ui_response"]);
+
+    await t.action(api.mcpRooms.send, {
+      apiKey,
+      sessionId,
+      recipient: "all",
+      content: { kind: "text", text: "Total: USD 468." },
+    });
+    await settle();
+    expect((await texts(ana(), sessionId)).at(-1)).toBe("Total: USD 468.");
+
+    // A restart keeps the agent; leaving the seat brings the hosted one back.
+    const again = await ana().mutation(api.demo.restart, {});
+    expect((await rooms(apiKey)).sessions).toMatchObject([
+      { sessionId: again.sessionId },
+    ]);
+    await liWei().mutation(api.demo.leave, {});
+    expect((await rooms(apiKey)).sessions).toEqual([]);
+    const state = await ana().query(api.demo.state, {});
+    expect(state).toMatchObject({
+      mySeat: "buyer",
+      agents: { buyer: null, merchant: null },
+    });
+    const back = await ana().query(api.rooms.view, {
+      sessionId: state?.sessionId as Id<"sessions">,
+    });
+    expect(back?.participantNames.map((p) => p.name)).toContain(
+      DEMO_PROVIDER_CARD.name,
+    );
+  });
+
+  it("lets both seats talk through their own agents, with no hosted agent answering", async () => {
+    await reset();
+    const buyer = await ownAgent();
+    const merchant = await merchantAgent();
+    await caro().mutation(api.demo.join, {
+      seat: "buyer",
+      agentId: buyer.agentId,
+    });
+    const { sessionId } = await liWei().mutation(api.demo.join, {
+      seat: "merchant",
+      agentId: merchant.agentId,
+    });
+    expect(await caro().query(api.demo.state, {})).toMatchObject({
+      sessionId,
+      agents: {
+        buyer: { agentId: buyer.agentId },
+        merchant: { agentId: merchant.agentId },
+      },
+    });
+    const mine = await rooms(buyer.apiKey);
+    expect(mine.sessions).toMatchObject([
+      { sessionId, agents: [{ name: "Bot de Li" }] },
+    ]);
+    expect((await rooms(merchant.apiKey)).sessions).toMatchObject([
+      { sessionId, agents: [{ name: "Grok de Caro" }] },
+    ]);
+    const seen = await t.action(api.mcpRooms.messages, {
+      apiKey: merchant.apiKey,
+      sessionId,
+    });
+    expect(seen.messages.slice(1).map((m) => m.content)).toEqual(
+      DEMO_AGENT_SCRIPT.map((line) => line.content),
+    );
+
+    await t.action(api.mcpRooms.send, {
+      apiKey: buyer.apiKey,
+      sessionId,
+      recipient: mine.sessions[0].agents[0].participantId,
+      content: { kind: "text", text: "100 unidades, ENIG y DHL Express." },
+    });
+    await settle();
+    expect(await texts(caro(), sessionId)).not.toContain(QUOTE);
+    const order = await t.action(api.mcpRooms.messages, {
+      apiKey: merchant.apiKey,
+      sessionId,
+      after: seen.cursor ?? undefined,
+    });
+    expect(order.messages.map((m) => m.content)).toEqual([
+      { kind: "text", text: "100 unidades, ENIG y DHL Express." },
+    ]);
+    await t.action(api.mcpRooms.send, {
+      apiKey: merchant.apiKey,
+      sessionId,
+      recipient: "all",
+      content: { kind: "text", text: "Total: USD 468." },
+    });
+    const reply = await t.action(api.mcpRooms.messages, {
+      apiKey: buyer.apiKey,
+      sessionId,
+    });
+    expect(reply.messages.at(-1)?.content).toEqual({
+      kind: "text",
+      text: "Total: USD 468.",
+    });
+  });
+
+  it("still finds, and replaces, a room made before demo rooms were marked", async () => {
+    const sessionId = await seated();
+    await t.run((ctx) =>
+      ctx.db.patch("sessions", sessionId, { demo: undefined }),
+    );
+    expect(await ana().query(api.demo.state, {})).toMatchObject({
+      sessionId,
+      mySeat: "buyer",
+    });
+    const next = await li().mutation(api.demo.restart, {});
+    expect(await t.run((ctx) => ctx.db.get("sessions", sessionId))).toBeNull();
+    expect(await ana().query(api.demo.state, {})).toMatchObject({
+      sessionId: next.sessionId,
+      mySeat: "buyer",
+    });
+  });
+
+  it("takes only the seat holder's own external agent", async () => {
     await reset();
     const { agentId } = await ownAgent("https://clerk.test|someone-else");
     expect(
@@ -396,9 +570,6 @@ describe("demo room, buyer through their own agent", () => {
         caro().mutation(api.demo.join, { seat: "buyer", agentId }),
       ),
     ).toBe("NotYourAgent");
-    await t.run((ctx) =>
-      ctx.db.patch("agents", agentId, { ownerTokenIdentifier: CARO_TOKEN }),
-    );
     expect(
       await errorKind(
         caro().mutation(api.demo.join, { seat: "merchant", agentId }),
@@ -419,7 +590,7 @@ describe("demo room, buyer through their own agent", () => {
     ).toBe("NotYourAgent");
     expect(await caro().query(api.demo.state, {})).toMatchObject({
       mySeat: null,
-      buyerAgent: null,
+      agents: { buyer: null, merchant: null },
     });
   });
 });

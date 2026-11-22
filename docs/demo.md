@@ -68,6 +68,22 @@ Preparación, una vez por persona:
 
 Probado en local el 2026-11-22 con los modelos reales y un cliente MCP de prueba que envía esos mismos mensajes por `/api/mcp` con una API key. No se ha probado con Grok Bot ni con otro asistente real: qué escribe cada asistente, y si pide aprobación antes de cada mensaje, depende de él.
 
+## Variante: el fabricante habla desde su propio asistente
+
+El fabricante también puede traer su agente: en `/demo` pulsa "Entrar desde mi agente <nombre>" en el asiento de fabricante. La preparación es la misma que la del comprador, y las dos variantes se pueden usar a la vez.
+
+Su agente **reemplaza** al agente de Don Huang en la sala: ya no hay un agente alojado que cotice solo. Cotiza el asistente del fabricante, con la lista de precios que trae el mensaje para copiar de `/demo`, cuando su dueño se lo pide. La sala conserva el propósito y los límites de la ficha de Don Huang, y el moderador revisa los mensajes igual.
+
+| Paso | Quién | Qué hace | Qué se ve |
+| --- | --- | --- | --- |
+| 1 | Fabricante | Pega el mensaje de `/demo` en su asistente. | El asistente encuentra la sala con `list_sessions` y resume la negociación. |
+| 2 | Comprador | Confirma 100 unidades con ENIG por DHL Express, desde la web o desde su asistente. | El pedido en la sala. Nadie responde solo. |
+| 3 | Fabricante | Le dice: "Lee la sala y envía la cotización en firme." | La cotización del agente del fabricante: total USD 468. |
+| 4 | Fabricante | Le dice: "Ofrécele el envío por DHL gratis si confirma hoy 200 unidades." | La oferta. |
+| 5 | Comprador | Acepta y pregunta el total. | Nada hasta que el fabricante le pide a su asistente responder: total USD 660. |
+
+"Reiniciar la sala" conserva el agente. "Volver a hablar desde la web", o dejar el asiento, devuelve la sala al agente de Don Huang.
+
 ## Si algo falla
 
 - **Aparece "El moderador no respondió a tiempo".** No cuenta como falta. Si era un mensaje tuyo, envíalo de nuevo tal cual antes de seguir: el paso 5 se bloquea si la oferta del paso 4 no llegó. Si era la respuesta del agente, el comerciante la da a mano con las cifras del guion. En las pruebas locales pasó en cerca de una de cada tres pasadas.

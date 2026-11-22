@@ -245,7 +245,10 @@ export default defineSchema({
     turnCount: v.number(),
     violationCount: v.number(),
     closedReason: v.optional(v.string()),
+    // The resettable demo room (convex/demo.ts).
+    demo: v.optional(v.literal(true)),
   })
+    .index("by_demo", ["demo"])
     .index("by_initiatorAgentId_and_status", ["initiatorAgentId", "status"])
     .index("by_initiatorAgentId", ["initiatorAgentId"])
     .index("by_status", ["status"]),
@@ -271,6 +274,8 @@ export default defineSchema({
     ),
   )
     .index("by_sessionId", ["sessionId"])
+    // An agent's rooms by when it entered each, which the next index cannot give.
+    .index("by_agentId", ["agentId"])
     .index("by_agentId_and_sessionId", ["agentId", "sessionId"])
     .index("by_tokenIdentifier_and_leftAt", ["tokenIdentifier", "leftAt"])
     .index("by_tokenIdentifier_and_sessionId", [
