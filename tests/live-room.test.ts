@@ -126,6 +126,43 @@ describe("live room mapping", () => {
     expect(mapped.contract).toBe(DEMO_CONTRACT);
   });
 
+  it("puts an invited friend on the side of their guest agent", () => {
+    const mapped = mapLiveRoom(
+      {
+        ...session,
+        participants: [
+          ...session.participants,
+          {
+            participantId: "guest",
+            kind: "agent",
+            agentId: "a3",
+            role: "guest",
+          },
+          {
+            participantId: "friend",
+            kind: "human",
+            displayName: "Beto",
+            role: "owner",
+            onBehalfOfAgentId: "a3",
+          },
+        ],
+      },
+      [...names, { participantId: "guest", name: "Agenda de Beto" }],
+      "friend",
+    );
+    expect(mapped.viewer.ownParticipantIds).toEqual(["friend", "guest"]);
+    expect(
+      mapped.participants.map((p) => [p.participantId, p.side, p.onBehalfOf]),
+    ).toEqual([
+      ["consumer", "other", undefined],
+      ["provider", "other", undefined],
+      ["human", "other", undefined],
+      ["observer", "other", undefined],
+      ["guest", "self", undefined],
+      ["friend", "self", "Agenda de Beto"],
+    ]);
+  });
+
   it.each(["active", "closed", "terminated", "requested"] as const)(
     "preserves %s so only active rooms allow input",
     (status) => {

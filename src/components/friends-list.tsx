@@ -17,6 +17,7 @@ import { Switch, SwitchThumb } from "@ui-sdk/react/switch";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { type ReactNode, useState } from "react";
 import { api } from "@/convex/_generated/api";
 
@@ -60,9 +61,77 @@ export function FriendsList() {
       prompt="Inicia sesión para agregar amigos y coordinar con sus agentes."
       redirectUrl="/friends"
     >
+      <RoomInvitations />
       <InviteLink />
       <Friends />
     </SignedIn>
+  );
+}
+
+// Requests to bring one of your agents into a friend's room. Approving takes you there.
+function RoomInvitations() {
+  const invitations = useQuery(api.roomInvitations.inbox, {});
+  const respond = useMutation(api.roomInvitations.respond);
+  const router = useRouter();
+  const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
+  if (!invitations?.length) return null;
+  async function answer(
+    { invitationId, sessionId }: (typeof invitations & object)[number],
+    approve: boolean,
+  ) {
+    setPending(true);
+    setError("");
+    try {
+      await respond({ invitationId, approve });
+      if (approve) router.push(`/room/${sessionId}`);
+    } catch {
+      setError(
+        "No pudimos responder la invitación. Puede que la sala ya esté cerrada.",
+      );
+    } finally {
+      setPending(false);
+    }
+  }
+  return (
+    <section className="mb-8 rounded-lg border border-border bg-card p-5">
+      <h2 className="text-xl font-semibold">Invitaciones a salas</h2>
+      <ul className="m-0 mt-4 flex list-none flex-col gap-4 p-0">
+        {invitations.map((invitation) => (
+          <li
+            key={invitation.invitationId}
+            className="flex flex-wrap items-center gap-3"
+          >
+            <p className="m-0 min-w-0 flex-1 basis-64 break-words text-pretty">
+              <b className="font-medium">{invitation.inviterName}</b> quiere
+              sumar a <b className="font-medium">{invitation.agentName}</b> a su
+              sala
+              {invitation.request ? `: “${invitation.request}”` : "."}
+            </p>
+            <div className="flex flex-none gap-2">
+              <Button
+                disabled={pending}
+                onClick={() => answer(invitation, false)}
+              >
+                Rechazar
+              </Button>
+              <Button
+                data-variant="brand"
+                disabled={pending}
+                onClick={() => answer(invitation, true)}
+              >
+                Aprobar y entrar
+              </Button>
+            </div>
+          </li>
+        ))}
+      </ul>
+      {error ? (
+        <p role="alert" className="mt-3 text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+    </section>
   );
 }
 

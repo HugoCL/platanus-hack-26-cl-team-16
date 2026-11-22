@@ -52,6 +52,7 @@ function label(turn: AgentTurn, id: string | null): string {
   const participant = turn.participants.find((p) => p.participantId === id);
   if (!participant) return "desconocido";
   if (participant.kind === "human") return `humano ${participant.displayName}`;
+  if (participant.role === "guest") return "agente invitado";
   return participant.role === "initiator"
     ? "agente consumidor"
     : "agente proveedor";

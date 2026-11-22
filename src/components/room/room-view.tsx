@@ -157,6 +157,7 @@ export function RoomView({
   onRestart,
   onReview,
   demoControls,
+  headerActions,
   error,
   sessions,
   sending = false,
@@ -180,6 +181,7 @@ export function RoomView({
   onRestart?: () => void;
   onReview?: (messageId: string, approve: boolean) => void;
   demoControls?: ReactNode;
+  headerActions?: ReactNode;
   error?: string;
   sending?: boolean;
   answersReadOnly?: boolean;
@@ -287,6 +289,7 @@ export function RoomView({
             onOnlyInterventions={setOnlyInterventions}
             onOpenAudit={() => setRoomAuditOpen(true)}
             onCloseRoom={onCloseRoom}
+            actions={headerActions}
           />
           <ShieldProvider value={shields}>
             <Thread

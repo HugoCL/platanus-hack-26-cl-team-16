@@ -30,6 +30,7 @@ export const SystemContent = z.object({
     "message_blocked",
     "escalation_requested",
     "human_joined",
+    "agent_joined",
     "human_took_control",
     "turn_limit_reached",
   ]),

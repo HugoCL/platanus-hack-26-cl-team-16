@@ -21,7 +21,7 @@ import {
   EllipsisIcon,
   UserIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import type { SessionContract, SessionStatus } from "@/shared/session";
 import { Ledger, scopeRows } from "../ledger";
 import { VerifiedBadge } from "../verified-badge";
@@ -54,6 +54,7 @@ export function RoomHeader({
   onOnlyInterventions,
   onOpenAudit,
   onCloseRoom,
+  actions,
 }: {
   self?: RoomParticipant;
   other?: RoomParticipant;
@@ -67,6 +68,7 @@ export function RoomHeader({
   onOnlyInterventions: (only: boolean) => void;
   onOpenAudit: () => void;
   onCloseRoom?: () => unknown;
+  actions?: ReactNode;
 }) {
   const [closing, setClosing] = useState(false);
   const closed = status !== "active";
@@ -148,6 +150,8 @@ export function RoomHeader({
           </PopoverContent>
         </Popover>
       ) : null}
+
+      {actions}
 
       <Popover>
         <PopoverTrigger className="room-head-btn">

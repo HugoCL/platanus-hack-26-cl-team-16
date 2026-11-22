@@ -303,6 +303,7 @@ const SYSTEM_ICONS: Partial<Record<string, ReactNode>> = {
   escalation_requested: <TriangleAlertIcon size={13} />,
   session_terminated: <BanIcon size={13} />,
   human_joined: <UserIcon size={13} />,
+  agent_joined: <UserIcon size={13} />,
   human_took_control: <UserIcon size={13} />,
 };
 

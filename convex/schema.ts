@@ -127,6 +127,28 @@ export default defineSchema({
     "friendTokenIdentifier",
   ]),
 
+  // A request to bring a friend's agent into a room. The agent's owner answers it, unless their
+  // auto-approve for the inviter was on, in which case the row is created already approved.
+  roomInvitations: defineTable({
+    sessionId: v.id("sessions"),
+    agentId: v.id("agents"),
+    inviterTokenIdentifier: v.string(),
+    inviterName: v.string(),
+    ownerTokenIdentifier: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("denied"),
+      v.literal("cancelled"),
+    ),
+    autoApproved: v.boolean(),
+  })
+    .index("by_ownerTokenIdentifier_and_status", [
+      "ownerTokenIdentifier",
+      "status",
+    ])
+    .index("by_sessionId_and_status", ["sessionId", "status"]),
+
   agentApiKeys: defineTable({
     agentId: v.id("agents"),
     keyHash: v.string(),

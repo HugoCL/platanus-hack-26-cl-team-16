@@ -355,9 +355,11 @@ function responders(
   sender: Participant,
   { recipient }: { recipient: Doc<"messages">["recipient"] },
 ) {
+  // A guest agent gets no hosted turn yet: nothing defines what it may say in someone else's room.
   return participants.filter(
     (p) =>
       p.kind === "agent" &&
+      p.role !== "guest" &&
       p.participantId !== sender.participantId &&
       (p.participantId === recipient ||
         (recipient === "all" && sender.kind === "human")),
