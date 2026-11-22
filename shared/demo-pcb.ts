@@ -191,3 +191,22 @@ export const DEMO_SCRIPT: {
     content: { kind: "ui", spec: DEMO_ORDER_FORM },
   },
 ];
+
+// The same conversation when the buyer talks through their own agent (docs/demo.md): the
+// person never wrote in the room, their agent did. An agent reads only what is addressed to it
+// or to everyone and cannot answer a form, so the request still waiting is a question in text.
+export const DEMO_AGENT_SCRIPT: typeof DEMO_SCRIPT = [
+  ...DEMO_SCRIPT.slice(0, -1).map((line) =>
+    line.from === "providerAgent"
+      ? { ...line, to: "buyerAgent" as const }
+      : { ...line, from: "buyerAgent" as const, to: "providerAgent" as const },
+  ),
+  {
+    from: "providerAgent",
+    to: "buyerAgent",
+    content: {
+      kind: "text",
+      text: "Para enviarte la cotización en firme, con el total y el plazo, confírmame tres datos: cantidad (50, 100 o 200 unidades), acabado (HASL sin plomo o ENIG) y envío a Chile (DHL Express, 4 a 6 días, o courier económico, 12 a 15 días).",
+    },
+  },
+];

@@ -307,6 +307,9 @@ export function createMcpEndpoint(
     registerTool(server, "list_invitations", () =>
       convex.action(api.mcpRooms.invitations, { apiKey }),
     );
+    registerTool(server, "list_sessions", () =>
+      convex.action(api.mcpRooms.sessions, { apiKey }),
+    );
     return server;
   });
   return async (request: Request) => {
