@@ -1,11 +1,24 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { DataToggle } from "@/components/room/data-toggle";
 import { RoomIndex } from "@/components/room/room-index";
+import {
+  isRoomsDataset,
+  ROOMS_DATASETS,
+} from "@/components/room/worst-case-rooms";
 import { SiteFooter } from "@/components/site-footer";
 
 export const metadata: Metadata = { title: "Tus salas" };
 
-export default function RoomsPage() {
+const DEV = process.env.NODE_ENV === "development";
+
+export default async function RoomsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ data?: string | string[] }>;
+}) {
+  const { data } = await searchParams;
+  const dataset = DEV && isRoomsDataset(data) ? data : "real";
   return (
     <>
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 py-10">
@@ -18,7 +31,7 @@ export default function RoomsPage() {
             revisa cada mensaje antes de entregarlo.
           </p>
         </header>
-        <RoomIndex />
+        <RoomIndex fixture={ROOMS_DATASETS[dataset].rooms} />
         <nav
           aria-label="Explorar salas"
           className="flex flex-wrap gap-x-5 gap-y-1 text-sm"
@@ -28,6 +41,7 @@ export default function RoomsPage() {
         </nav>
       </main>
       <SiteFooter />
+      {DEV ? <DataToggle datasets={ROOMS_DATASETS} current={dataset} /> : null}
     </>
   );
 }

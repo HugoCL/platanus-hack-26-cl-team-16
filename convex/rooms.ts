@@ -1,3 +1,7 @@
+import {
+  paginationOptsValidator,
+  paginationResultValidator,
+} from "convex/server";
 import { ConvexError, convexToJson, type ObjectType, v } from "convex/values";
 import { zodToConvex } from "convex-helpers/server/zod4";
 import { effectiveAllowedIntents } from "../shared/agent";
@@ -10,7 +14,7 @@ import {
   SessionStatus,
 } from "../shared/session";
 import { api, internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import {
   type ActionCtx,
   action,
@@ -69,58 +73,83 @@ export const openFromCard = action({
   },
 });
 
+const roomSummary = v.object({
+  sessionId: v.id("sessions"),
+  status: zodToConvex(SessionStatus),
+  intent: v.string(),
+  provider: v.object({ name: v.string(), slug: v.string() }),
+  lastActivityTime: v.number(),
+});
+
+function myMemberships(ctx: QueryCtx, tokenIdentifier: string) {
+  return ctx.db
+    .query("participants")
+    .withIndex("by_tokenIdentifier_and_leftAt", (q) =>
+      q.eq("tokenIdentifier", tokenIdentifier).eq("leftAt", undefined),
+    )
+    .order("desc");
+}
+
+async function summarize(ctx: QueryCtx, memberships: Doc<"participants">[]) {
+  const rooms = await Promise.all(
+    memberships.map(async (membership) => {
+      if (membership.kind !== "human" || membership.leftAt !== undefined)
+        return null;
+      const session = await ctx.db.get(membership.sessionId);
+      if (!session) return null;
+      const participants = await ctx.db
+        .query("participants")
+        .withIndex("by_sessionId", (q) => q.eq("sessionId", session._id))
+        .take(10);
+      const recipient = participants.find(
+        (p) => p.kind === "agent" && p.role === "recipient",
+      );
+      if (recipient?.kind !== "agent") return null;
+      const provider = await ctx.db.get(recipient.agentId);
+      if (!provider) return null;
+      const lastMessage = await ctx.db
+        .query("messages")
+        .withIndex("by_sessionId", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .first();
+      return {
+        sessionId: session._id,
+        status: session.status,
+        intent: session.intent.name,
+        provider: { name: provider.name, slug: provider.slug },
+        lastActivityTime: lastMessage?._creationTime ?? session._creationTime,
+      };
+    }),
+  );
+  return rooms.filter((room) => room !== null);
+}
+
 export const mine = query({
   args: {},
-  returns: v.array(
-    v.object({
-      sessionId: v.id("sessions"),
-      status: zodToConvex(SessionStatus),
-      intent: v.string(),
-      provider: v.object({ name: v.string(), slug: v.string() }),
-      lastActivityTime: v.number(),
-    }),
-  ),
+  returns: v.array(roomSummary),
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
-    const memberships = await ctx.db
-      .query("participants")
-      .withIndex("by_tokenIdentifier_and_leftAt", (q) =>
-        q
-          .eq("tokenIdentifier", identity.tokenIdentifier)
-          .eq("leftAt", undefined),
-      )
-      .order("desc")
-      .take(100);
-    const rooms = await Promise.all(
-      memberships.map(async (membership) => {
-        if (membership.kind !== "human" || membership.leftAt !== undefined)
-          return null;
-        const session = await ctx.db.get(membership.sessionId);
-        if (!session) return null;
-        const participants = await ctx.db
-          .query("participants")
-          .withIndex("by_sessionId", (q) => q.eq("sessionId", session._id))
-          .take(10);
-        const recipient = participants.find(
-          (p) => p.kind === "agent" && p.role === "recipient",
-        );
-        if (recipient?.kind !== "agent") return null;
-        const provider = await ctx.db.get(recipient.agentId);
-        if (!provider) return null;
-        return {
-          sessionId: session._id,
-          status: session.status,
-          intent: session.intent.name,
-          provider: { name: provider.name, slug: provider.slug },
-          lastActivityTime: session._creationTime,
-        };
-      }),
+    const memberships = await myMemberships(ctx, identity.tokenIdentifier).take(
+      100,
     );
-    return rooms
-      .filter((room) => room !== null)
+    return (await summarize(ctx, memberships))
       .sort((a, b) => b.lastActivityTime - a.lastActivityTime)
       .slice(0, 20);
+  },
+});
+
+// Every room of the caller, newest membership first, for the rooms page.
+export const minePage = query({
+  args: { paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(roomSummary),
+  handler: async (ctx, { paginationOpts }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return { page: [], isDone: true, continueCursor: "" };
+    const result = await myMemberships(ctx, identity.tokenIdentifier).paginate(
+      paginationOpts,
+    );
+    return { ...result, page: await summarize(ctx, result.page) };
   },
 });
 
