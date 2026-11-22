@@ -103,7 +103,9 @@ export default defineSchema({
     codeHash: v.string(),
     expiresAt: v.number(),
     usedAt: v.optional(v.number()),
-  }).index("by_codeHash", ["codeHash"]),
+  })
+    .index("by_codeHash", ["codeHash"])
+    .index("by_agentId", ["agentId"]),
 
   friendInvites: defineTable({
     codeHash: v.string(),

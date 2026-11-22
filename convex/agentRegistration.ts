@@ -20,6 +20,8 @@ import {
 } from "./_generated/server";
 import { generateApiKey, sha256Hex, storeApiKey } from "./agentKeys";
 
+const LINK_TTL_MS = 24 * HOUR;
+
 export const SELF_REGISTERED_SCOPE = {
   allowedIntents: [],
   forbiddenTopics: [],
@@ -241,14 +243,55 @@ export const create = internalMutation({
       keyHash: args.keyHash,
       prefix: args.prefix,
     });
-    await ctx.db.insert("agentLinkCodes", {
-      agentId,
-      codeHash: args.codeHash,
-      expiresAt: Date.now() + 24 * HOUR,
-    });
+    await insertLinkCode(ctx, agentId, args.codeHash);
     return agentId;
   },
 });
+
+// An agent has one link code at a time: a new one replaces the previous one, so a link that leaked
+// stops working once the agent asks for another.
+async function insertLinkCode(
+  ctx: MutationCtx,
+  agentId: Id<"agents">,
+  codeHash: string,
+) {
+  for (const row of await ctx.db
+    .query("agentLinkCodes")
+    .withIndex("by_agentId", (q) => q.eq("agentId", agentId))
+    .take(10)) {
+    await ctx.db.delete("agentLinkCodes", row._id);
+  }
+  const expiresAt = Date.now() + LINK_TTL_MS;
+  await ctx.db.insert("agentLinkCodes", { agentId, codeHash, expiresAt });
+  return expiresAt;
+}
+
+// A new link code for an agent that has no human yet, for when the one from registration expired
+// or was lost.
+export async function renewLinkCode(ctx: MutationCtx, agent: Doc<"agents">) {
+  if (agent.ownerTokenIdentifier) {
+    fail("AlreadyLinked", "you are already linked to a human");
+  }
+  const code = crypto.randomUUID() + crypto.randomUUID();
+  const expiresAt = await insertLinkCode(ctx, agent._id, await sha256Hex(code));
+  return { code, expiresAt };
+}
+
+// When the agent's link is still waiting for its human: an unused code that has not expired.
+export async function pendingLinkExpiry(
+  ctx: Pick<QueryCtx, "db">,
+  agentId: Id<"agents">,
+) {
+  const rows = await ctx.db
+    .query("agentLinkCodes")
+    .withIndex("by_agentId", (q) => q.eq("agentId", agentId))
+    .take(10);
+  const now = Date.now();
+  return (
+    rows.find((row) => row.usedAt === undefined && row.expiresAt > now)
+      ?.expiresAt ?? null
+  );
+}
 
 async function codeRow(ctx: QueryCtx, code: string) {
   const codeHash = await sha256Hex(code);

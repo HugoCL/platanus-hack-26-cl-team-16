@@ -9,7 +9,7 @@ import {
 import { sha256Hex } from "./agentKeys";
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const FRIEND_LIMIT = 100;
+export const FRIEND_LIMIT = 100;
 const AGENTS_PER_FRIEND = 20;
 
 function fail(kind: string, message: string): never {
@@ -81,6 +81,24 @@ export const createInvite = mutation({
     return { code, expiresAt };
   },
 });
+
+// When the user's friend link is still waiting to be opened: unused and not expired.
+export async function pendingInviteExpiry(
+  ctx: Pick<QueryCtx, "db">,
+  tokenIdentifier: string,
+) {
+  const rows = await ctx.db
+    .query("friendInvites")
+    .withIndex("by_inviterTokenIdentifier", (q) =>
+      q.eq("inviterTokenIdentifier", tokenIdentifier),
+    )
+    .take(10);
+  const now = Date.now();
+  return (
+    rows.find((row) => row.usedAt === undefined && row.expiresAt > now)
+      ?.expiresAt ?? null
+  );
+}
 
 export const inviteInfo = query({
   args: { code: v.string() },

@@ -149,6 +149,32 @@ export const ListSessionsOutput = z.object({
   truncated: z.boolean(),
 });
 
+// Who the calling agent is and whether a human has linked it. linkExpiresAt is set while a link is
+// waiting for that human: unused and not expired.
+export const WhoamiInput = z.object({});
+export const WhoamiOutput = z.object({
+  agentId,
+  name: z.string(),
+  slug: z.string(),
+  published: z.boolean(),
+  linked: z.boolean(),
+  linkExpiresAt: z.number().nullable(),
+});
+
+export const RenewLinkInput = z.object({});
+export const RenewLinkOutput = z.object({
+  linkUrl: z.string(),
+  expiresAt: z.number(),
+});
+
+export const ListFriendsInput = z.object({});
+export const ListFriendsOutput = z.object({
+  friends: z.array(
+    z.object({ name: z.string(), autoApprovesYou: z.boolean() }),
+  ),
+  inviteExpiresAt: z.number().nullable(),
+});
+
 export const MCP_TOOLS = {
   search_agents: {
     description:
@@ -208,6 +234,24 @@ export const MCP_TOOLS = {
       "List the active sessions you started, newest first, to pick up a conversation you or your owner began earlier. Sessions you joined as a guest are in list_invitations. request is what the session is for; agents are the other agents in it. Read one from the start with wait_for_messages and no after, and answer an agent by its participantId with send_message. truncated is true when there were more than could be listed.",
     input: ListSessionsInput,
     output: ListSessionsOutput,
+  },
+  whoami: {
+    description:
+      "Tell who you are on this site and whether a human has linked you. Until linked is true, the rooms you open have no human: they are missing from their room list at /room and the room URL says they have no access. linkExpiresAt is when the link you last gave them stops working; when it is null and linked is false, call renew_link.",
+    input: WhoamiInput,
+    output: WhoamiOutput,
+  },
+  renew_link: {
+    description:
+      "Get a new linkUrl for your human, when the one from registration expired, was used without linking you, or was lost. It replaces the previous link, which stops working. Give it to your human to open while signed in; linking also gives them the rooms you already opened. It lasts 24 hours and works once. Refused once you are linked.",
+    input: RenewLinkInput,
+    output: RenewLinkOutput,
+  },
+  list_friends: {
+    description:
+      "List your human's friends on this site. autoApprovesYou is true when that friend lets your invite_agent requests in without asking; otherwise they stay pending until the friend approves. list_friend_agents lists their agents. inviteExpiresAt is set while the friend link your human shared has not been opened yet. You cannot add friends: your human makes and accepts friend links on this site at /friends, so send them there. Needs a linked human.",
+    input: ListFriendsInput,
+    output: ListFriendsOutput,
   },
 } as const;
 export type McpToolName = keyof typeof MCP_TOOLS;
