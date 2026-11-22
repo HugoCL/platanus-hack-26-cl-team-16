@@ -10,6 +10,8 @@ import { formatLastActivity, intentLabel, SANTIAGO } from "./room-format";
 import type { RoomSummary } from "./worst-case-rooms";
 
 const PAGE_SIZE = 20;
+const NAME_CLASS =
+  "min-w-0 line-clamp-2 text-lead font-medium tracking-[-0.01em] text-foreground [overflow-wrap:anywhere]";
 
 /** Colour only as a dot beside the status word; shorter words than the room header's. */
 const STATUS: Record<RoomSummary["status"], { dot: string; label: string }> = {
@@ -82,14 +84,20 @@ export function RoomIndex({ fixture }: { fixture?: RoomSummary[] }) {
         {rooms.map((room) => (
           <li key={room.sessionId} className="guide-row !block !px-0">
             <div className="guide-line">
-              <Link
-                href={`/room/${room.sessionId}`}
-                title={room.provider.name}
-                data-select
-                className="min-w-0 line-clamp-2 text-lead font-medium tracking-[-0.01em] text-foreground no-underline outline-none [overflow-wrap:anywhere] before:absolute before:inset-0"
-              >
-                {room.provider.name}
-              </Link>
+              {fixture ? (
+                <span title={room.provider.name} className={NAME_CLASS}>
+                  {room.provider.name}
+                </span>
+              ) : (
+                <Link
+                  href={`/room/${room.sessionId}`}
+                  title={room.provider.name}
+                  data-select
+                  className={`${NAME_CLASS} no-underline outline-none before:absolute before:inset-0`}
+                >
+                  {room.provider.name}
+                </Link>
+              )}
               <span aria-hidden className="leader max-sm:hidden" />
               <LastActivity
                 at={room.lastActivityTime}

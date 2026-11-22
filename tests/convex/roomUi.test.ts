@@ -177,6 +177,40 @@ describe("room UI API", () => {
     ).toEqual({ page: [], isDone: true, continueCursor: "" });
   });
 
+  it("updates an older room's activity without moving it across list pages", async () => {
+    const caller = rooms.t.withIdentity(owner);
+    const older = await open();
+    const newer = await open();
+    const paginationOpts = { numItems: 1, cursor: null };
+    const before = await caller.query(api.rooms.mine, {});
+    expect(before.map((room) => room.sessionId)).toEqual([
+      newer.sessionId,
+      older.sessionId,
+    ]);
+
+    const message = await caller.action(api.gate.send, {
+      ...older,
+      recipient: "all",
+      content: { kind: "text", text: "Prefiero el jueves" },
+    });
+    expect(message.status).toBe("allowed");
+    const stored = await rooms.t.run((ctx) =>
+      ctx.db.get(message.messageId as Id<"messages">),
+    );
+    if (!stored) throw new Error("missing later message");
+    expect(stored._creationTime).toBeGreaterThan(before[0].lastActivityTime);
+
+    const first = await caller.query(api.rooms.minePage, { paginationOpts });
+    expect(first.page.map((room) => room.sessionId)).toEqual([newer.sessionId]);
+    const second = await caller.query(api.rooms.minePage, {
+      paginationOpts: { ...paginationOpts, cursor: first.continueCursor },
+    });
+    expect(second.page).toMatchObject([
+      { sessionId: older.sessionId, lastActivityTime: stored._creationTime },
+    ]);
+    expect((await caller.query(api.rooms.mine, {}))[0]).toEqual(second.page[0]);
+  });
+
   it.each([
     { identity: { givenName: "Ana", email: "ana@example.com" }, name: "Ana" },
     { identity: { email: "ana@example.com" }, name: "Tú" },
