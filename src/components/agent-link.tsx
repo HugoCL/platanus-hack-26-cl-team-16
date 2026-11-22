@@ -18,10 +18,12 @@ import {
   usePaginatedQuery,
   useQuery,
 } from "convex/react";
+import { ArrowRightIcon } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useState, useSyncExternalStore } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { Ledger } from "./ledger";
 
 function useExpired(expiresAt: number | undefined) {
   const subscribe = useCallback(
@@ -67,9 +69,24 @@ export function AgentLink({ code }: { code: string }) {
 
   if (info === undefined || !isLoaded)
     return (
-      <p className="mt-8" role="status">
-        Cargando agente…
-      </p>
+      <div
+        role="status"
+        className="mt-8 flex flex-col gap-3 border-t border-border pt-6"
+      >
+        <span className="sr-only">Cargando agente…</span>
+        <span
+          aria-hidden
+          className="h-6 w-1/2 rounded-sm bg-muted motion-safe:animate-pulse"
+        />
+        <span
+          aria-hidden
+          className="h-4 w-4/5 rounded-sm bg-muted motion-safe:animate-pulse"
+        />
+        <span
+          aria-hidden
+          className="mt-3 h-9 w-40 rounded-2xl bg-muted motion-safe:animate-pulse"
+        />
+      </div>
     );
   if (
     !info ||
@@ -77,20 +94,45 @@ export function AgentLink({ code }: { code: string }) {
       (expired || info.usedAt !== undefined || info.alreadyLinked))
   )
     return (
-      <p className="mt-8 rounded-2xl border border-border p-6">
-        Link inválido o vencido
-      </p>
+      <div className="mt-8 flex flex-col items-start gap-2 border-t border-border pt-6">
+        <p className="m-0 font-medium">Este enlace no es válido o ya venció.</p>
+        <p className="m-0 max-w-120 text-pretty text-subtle-foreground">
+          Cada enlace sirve una vez y por poco tiempo. Pídele a tu agente que
+          genere uno nuevo y ábrelo desde ahí.
+        </p>
+      </div>
     );
 
   return (
     <section
-      className="mt-8 rounded-2xl border border-border p-6 sm:p-8"
+      className="mt-8 border-t border-border pt-6"
       aria-label="Vinculación del agente"
     >
-      <div className="mb-6 border-b border-border pb-6">
-        <h2 className="text-xl font-semibold">{info.name}</h2>
-        <p className="mt-2 text-subtle-foreground">{info.description}</p>
-        <p className="mt-3 text-xs text-subtle-foreground">{info.slug}</p>
+      <div className="mb-6 border-b border-border pb-4">
+        <h2 className="m-0 text-xl font-semibold tracking-tight">
+          {info.name}
+        </h2>
+        <p className="mt-2 mb-0 text-pretty text-subtle-foreground">
+          {info.description}
+        </p>
+        <Ledger
+          className="mt-3 text-caption"
+          rows={[
+            { label: "Propósito", value: info.purpose },
+            {
+              label: "Estado",
+              value: info.linkedToCurrentUser
+                ? info.status === "active"
+                  ? "Vinculado y publicado"
+                  : "Vinculado, sin publicar"
+                : "Sin vincular",
+            },
+            {
+              label: "Identificador",
+              value: <span className="font-mono text-xs">{info.slug}</span>,
+            },
+          ]}
+        />
       </div>
       {!isSignedIn ? (
         <div className="space-y-4">
@@ -149,8 +191,9 @@ export function AgentLink({ code }: { code: string }) {
               <p className="text-subtle-foreground">
                 Tu agente aparece en el directorio público.
               </p>
-              <Link href={`/directory/${info.slug}`}>
-                Ver ficha en el directorio →
+              <Link href={`/directory/${info.slug}`} className="ficha-link">
+                Ver ficha en el directorio
+                <ArrowRightIcon aria-hidden size={14} />
               </Link>
               <div>
                 <Button
@@ -175,7 +218,7 @@ export function AgentLink({ code }: { code: string }) {
         </div>
       )}
       {error && (
-        <p role="alert" className="mt-4 text-destructive">
+        <p role="alert" className="mt-4 text-destructive-text">
           {error}
         </p>
       )}
@@ -331,7 +374,7 @@ function PublishForm({
         </FieldDescription>
       </Field>
       {error && (
-        <p role="alert" className="text-destructive">
+        <p role="alert" className="text-destructive-text">
           {error}
         </p>
       )}

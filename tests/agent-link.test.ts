@@ -60,7 +60,7 @@ const render = () =>
 it("shows a loading state and an invalid-link message", () => {
   expect(render()).toContain("Cargando agente");
   state.info = null;
-  expect(render()).toContain("Link inválido o vencido");
+  expect(render()).toContain("Este enlace no es válido o ya venció");
 });
 
 it("shows the agent and sign-in action without publishing controls when signed out", () => {
@@ -191,7 +191,7 @@ it.each([false, true])(
     expect(onChange).not.toHaveBeenCalled();
     vi.advanceTimersByTime(1);
     expect(onChange).toHaveBeenCalledTimes(1);
-    expect(html).toContain("Link inválido o vencido");
+    expect(html).toContain("Este enlace no es válido o ya venció");
     expect(html).not.toContain("Vincular");
     expect(html).not.toContain("Solo vincular");
     unsubscribe();
@@ -207,14 +207,14 @@ it("hides expired signed-out and used non-owner links but preserves linked-owner
     linkedToCurrentUser: false,
     expiresAt: Date.now() - 1,
   };
-  expect(render()).toContain("Link inválido o vencido");
+  expect(render()).toContain("Este enlace no es válido o ya venció");
   expect(render()).not.toContain("Iniciar sesión");
   state.info = {
     ...(state.info as object),
     expiresAt: Date.now() + 1000,
     usedAt: Date.now(),
   };
-  expect(render()).toContain("Link inválido o vencido");
+  expect(render()).toContain("Este enlace no es válido o ya venció");
   state.signedIn = true;
   state.info = {
     ...(state.info as object),

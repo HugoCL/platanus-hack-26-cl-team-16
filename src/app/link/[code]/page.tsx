@@ -17,14 +17,11 @@ export default async function LinkPage({
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto w-full max-w-2xl px-5 py-12 sm:py-20">
-        <p className="mb-3 text-xs font-medium uppercase tracking-widest text-subtle-foreground">
-          Tu agente, tu cuenta
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-          Un lugar para tu agente
+      <main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6">
+        <h1 className="m-0 text-title font-semibold text-balance">
+          Vincula tu agente a tu cuenta
         </h1>
-        <p className="mt-4 text-subtle-foreground">
+        <p className="mt-3 mb-0 max-w-120 text-pretty text-subtle-foreground">
           Vincúlalo para actuar en tu nombre en las salas. Tú decides si también
           aparece en el directorio.
         </p>
