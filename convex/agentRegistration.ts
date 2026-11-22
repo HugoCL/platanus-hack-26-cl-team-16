@@ -406,11 +406,10 @@ const RETIRE_BATCH = 100;
 // keys stop working, its pending invitations are cancelled, the rooms it opened are closed, and
 // it is no longer anyone's. The card and the closed rooms stay, so their history still reads.
 export async function retireAgent(ctx: MutationCtx, agent: Doc<"agents">) {
-  const keys = await ctx.db
+  // Every key, however many: one left alive would still read the agent's rooms.
+  for await (const key of ctx.db
     .query("agentApiKeys")
-    .withIndex("by_agentId", (q) => q.eq("agentId", agent._id))
-    .take(RETIRE_BATCH);
-  for (const key of keys) {
+    .withIndex("by_agentId", (q) => q.eq("agentId", agent._id))) {
     if (key.revokedAt === undefined)
       await ctx.db.patch("agentApiKeys", key._id, { revokedAt: Date.now() });
   }

@@ -605,6 +605,16 @@ describe("demo room, a seat through its holder's own agent", () => {
       seat: "buyer",
       agentId: old.agentId,
     });
+    // More keys than one batch of rows, the last of them the one to check.
+    let spare = "";
+    for (let i = 0; i < 101; i++) {
+      spare = (
+        await t.action(internal.agentKeys.issue, {
+          slug: "grok-viejo",
+          label: `extra ${i}`,
+        })
+      ).apiKey;
+    }
     // What else the old agent left behind: a room it opened and an invitation nobody answered.
     const left = await t.run(async (ctx) => {
       const session = await ctx.db.get("sessions", demo.sessionId);
@@ -638,6 +648,7 @@ describe("demo room, a seat through its holder's own agent", () => {
       { sessionId: state?.sessionId },
     ]);
     expect(await errorKind(rooms(old.apiKey))).toBe("Unauthorized");
+    expect(await errorKind(rooms(spare))).toBe("Unauthorized");
     expect(
       (await caro().query(api.agentRegistration.mine, {})).map((a) => a.slug),
     ).toEqual(["grok-nuevo"]);
