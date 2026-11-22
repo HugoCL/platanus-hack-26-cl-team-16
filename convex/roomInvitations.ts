@@ -28,6 +28,47 @@ async function activeRoom(ctx: MutationCtx, sessionId: Id<"sessions">) {
   return session;
 }
 
+// Checks the room can take the agent, and returns whether its owner is already in the room.
+// A human is in a room for one agent, and sees what the moderator withholds from that side only,
+// so a second guest of theirs would have nobody able to see its blocked messages.
+async function seat(
+  ctx: MutationCtx,
+  {
+    sessionId,
+    agentId,
+    ownerTokenIdentifier,
+  }: Pick<
+    Doc<"roomInvitations">,
+    "sessionId" | "agentId" | "ownerTokenIdentifier"
+  >,
+) {
+  const members = await ctx.db
+    .query("participants")
+    .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+    .take(MAX_PARTICIPANTS + 1);
+  if (members.some((p) => p.kind === "agent" && p.agentId === agentId)) {
+    fail("AlreadyParticipant", "the agent is already in the room");
+  }
+  const owner = members.find(
+    (p) => p.kind === "human" && p.tokenIdentifier === ownerTokenIdentifier,
+  );
+  if (
+    owner?.kind === "human" &&
+    members.some(
+      (p) =>
+        p.kind === "agent" &&
+        p.role === "guest" &&
+        p.agentId === owner.onBehalfOfAgentId,
+    )
+  ) {
+    fail("OwnerHasGuest", "that friend already has an agent in the room");
+  }
+  if (members.length + (owner ? 1 : 2) > MAX_PARTICIPANTS) {
+    fail("RoomFull", `a room holds at most ${MAX_PARTICIPANTS} participants`);
+  }
+  return owner !== undefined;
+}
+
 // Adds the agent as a guest and its owner as a human on its behalf. A guest is not the room's
 // provider, so the moderation rules that let personal data reach the provider do not cover it.
 async function join(
@@ -44,19 +85,7 @@ async function join(
   if (agent?.ownerTokenIdentifier !== ownerTokenIdentifier) {
     fail("NotFound", "the agent no longer belongs to that friend");
   }
-  const members = await ctx.db
-    .query("participants")
-    .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
-    .take(MAX_PARTICIPANTS + 1);
-  if (members.some((p) => p.kind === "agent" && p.agentId === agentId)) {
-    fail("AlreadyParticipant", "the agent is already in the room");
-  }
-  const ownerPresent = members.some(
-    (p) => p.kind === "human" && p.tokenIdentifier === ownerTokenIdentifier,
-  );
-  if (members.length + (ownerPresent ? 1 : 2) > MAX_PARTICIPANTS) {
-    fail("RoomFull", `a room holds at most ${MAX_PARTICIPANTS} participants`);
-  }
+  const ownerPresent = await seat(ctx, invitation);
   await ctx.db.insert("participants", {
     sessionId,
     kind: "agent",
@@ -129,14 +158,7 @@ export const invite = mutation({
     if (mine.autoApprove) {
       await join(ctx, invitation, theirs.friendName);
     } else {
-      const already = await ctx.db
-        .query("participants")
-        .withIndex("by_agentId_and_sessionId", (q) =>
-          q.eq("agentId", agentId).eq("sessionId", sessionId),
-        )
-        .first();
-      if (already)
-        fail("AlreadyParticipant", "the agent is already in the room");
+      await seat(ctx, invitation);
     }
     const status = mine.autoApprove
       ? ("approved" as const)
