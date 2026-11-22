@@ -9,6 +9,7 @@ const NAV = [
   { href: "/directory", label: "Directorio", key: "directory" },
   { href: "/agents", label: "Mis agentes", key: "agents" },
   { href: "/room", label: "Salas", key: "rooms" },
+  { href: "/friends", label: "Amigos", key: "friends" },
 ] as const;
 
 export function SiteHeader({

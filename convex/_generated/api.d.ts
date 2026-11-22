@@ -14,6 +14,7 @@ import type * as agentKeys from "../agentKeys.js";
 import type * as agentRegistration from "../agentRegistration.js";
 import type * as bookings from "../bookings.js";
 import type * as directory from "../directory.js";
+import type * as friends from "../friends.js";
 import type * as gate from "../gate.js";
 import type * as jobs from "../jobs.js";
 import type * as mcpRooms from "../mcpRooms.js";
@@ -44,6 +45,7 @@ declare const fullApi: ApiFromModules<{
   agentRegistration: typeof agentRegistration;
   bookings: typeof bookings;
   directory: typeof directory;
+  friends: typeof friends;
   gate: typeof gate;
   jobs: typeof jobs;
   mcpRooms: typeof mcpRooms;

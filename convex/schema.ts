@@ -105,6 +105,28 @@ export default defineSchema({
     usedAt: v.optional(v.number()),
   }).index("by_codeHash", ["codeHash"]),
 
+  friendInvites: defineTable({
+    codeHash: v.string(),
+    inviterTokenIdentifier: v.string(),
+    inviterName: v.string(),
+    expiresAt: v.number(),
+    usedAt: v.optional(v.number()),
+  })
+    .index("by_codeHash", ["codeHash"])
+    .index("by_inviterTokenIdentifier", ["inviterTokenIdentifier"]),
+
+  // One row per direction: `autoApprove` is the owner's switch for invocations that come from
+  // that friend, so each side sets its own.
+  friendships: defineTable({
+    ownerTokenIdentifier: v.string(),
+    friendTokenIdentifier: v.string(),
+    friendName: v.string(),
+    autoApprove: v.boolean(),
+  }).index("by_ownerTokenIdentifier_and_friendTokenIdentifier", [
+    "ownerTokenIdentifier",
+    "friendTokenIdentifier",
+  ]),
+
   agentApiKeys: defineTable({
     agentId: v.id("agents"),
     keyHash: v.string(),
