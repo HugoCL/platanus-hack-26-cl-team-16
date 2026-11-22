@@ -19,6 +19,7 @@ import {
   query,
 } from "./_generated/server";
 import { generateApiKey, sha256Hex, storeApiKey } from "./agentKeys";
+import { publishNotice } from "./gate";
 
 const LINK_TTL_MS = 24 * HOUR;
 
@@ -398,6 +399,60 @@ export const link = mutation({
     return null;
   },
 });
+
+const RETIRE_BATCH = 100;
+
+// Takes a linked agent away from its human for good, for an assistant that no longer exists: its
+// keys stop working, its pending invitations are cancelled, the rooms it opened are closed, and
+// it is no longer anyone's. The card and the closed rooms stay, so their history still reads.
+export async function retireAgent(ctx: MutationCtx, agent: Doc<"agents">) {
+  const keys = await ctx.db
+    .query("agentApiKeys")
+    .withIndex("by_agentId", (q) => q.eq("agentId", agent._id))
+    .take(RETIRE_BATCH);
+  for (const key of keys) {
+    if (key.revokedAt === undefined)
+      await ctx.db.patch("agentApiKeys", key._id, { revokedAt: Date.now() });
+  }
+  const codes = await ctx.db
+    .query("agentLinkCodes")
+    .withIndex("by_agentId", (q) => q.eq("agentId", agent._id))
+    .take(RETIRE_BATCH);
+  for (const code of codes) await ctx.db.delete("agentLinkCodes", code._id);
+  const invitations = await ctx.db
+    .query("roomInvitations")
+    .withIndex("by_agentId_and_status", (q) =>
+      q.eq("agentId", agent._id).eq("status", "pending"),
+    )
+    .take(RETIRE_BATCH);
+  for (const invitation of invitations) {
+    await ctx.db.patch("roomInvitations", invitation._id, {
+      status: "cancelled",
+    });
+  }
+  const rooms = await ctx.db
+    .query("sessions")
+    .withIndex("by_initiatorAgentId_and_status", (q) =>
+      q.eq("initiatorAgentId", agent._id).eq("status", "active"),
+    )
+    .take(RETIRE_BATCH);
+  for (const room of rooms) {
+    await ctx.db.patch("sessions", room._id, {
+      status: "closed",
+      closedReason: "agent_removed",
+    });
+    await publishNotice(
+      ctx,
+      room._id,
+      "session_closed",
+      "Sala cerrada: el agente que la abrió ya no existe.",
+    );
+  }
+  await ctx.db.patch("agents", agent._id, {
+    ownerTokenIdentifier: undefined,
+    status: "draft",
+  });
+}
 
 async function owned(
   ctx: Pick<QueryCtx, "auth" | "db">,

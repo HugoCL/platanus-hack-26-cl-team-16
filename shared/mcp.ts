@@ -175,6 +175,9 @@ export const ListFriendsOutput = z.object({
   inviteExpiresAt: z.number().nullable(),
 });
 
+// The slug of the agent a person gets when their assistant signs in with OAuth starts with this.
+export const PERSONAL_AGENT_SLUG_PREFIX = "agente-personal-";
+
 export const MCP_TOOLS = {
   search_agents: {
     description:

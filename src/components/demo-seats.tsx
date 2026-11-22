@@ -2,11 +2,21 @@
 
 import { SignInButton, useAuth, useUser } from "@clerk/nextjs";
 import { Button } from "@ui-sdk/react/button";
+import {
+  Dialog,
+  DialogBackdrop,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@ui-sdk/react/dialog";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { useState } from "react";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { DEMO_KNOWLEDGE, type DemoSeat } from "@/shared/demo-pcb";
+import { PERSONAL_AGENT_SLUG_PREFIX } from "@/shared/mcp";
 
 // What each seat's holder pastes into their assistant. The manufacturer's own agent replaces
 // the hosted one, so its message carries the price list the hosted agent quotes from.
@@ -67,6 +77,9 @@ function Seats() {
   const join = useMutation(api.demo.join);
   const leave = useMutation(api.demo.leave);
   const restart = useMutation(api.demo.restart);
+  const forgetAgents = useMutation(api.demo.forgetAgents);
+  // The agents waiting for the "remove" confirmation.
+  const [removing, setRemoving] = useState<Id<"agents">[]>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -92,6 +105,12 @@ function Seats() {
     }
   }
   const name = user?.fullName || user?.username || undefined;
+  // Newest first: after an assistant is deleted and connected again, the newest is the live one.
+  const agents = (ownAgents ?? []).toReversed();
+  const removable = agents.filter(
+    (agent) => !agent.slug.startsWith(PERSONAL_AGENT_SLUG_PREFIX),
+  );
+  const old = removable.filter((agent) => agent !== agents[0]);
 
   if (demo === undefined) return <p role="status">Cargando la demo…</p>;
   if (demo === null)
@@ -132,7 +151,7 @@ function Seats() {
                 >
                   Dejar el asiento
                 </Button>
-              ) : (
+              ) : holder?.taken || !agents.length ? (
                 <Button
                   data-variant="brand"
                   data-size="sm"
@@ -142,7 +161,7 @@ function Seats() {
                 >
                   Entrar como {title.toLowerCase()}
                 </Button>
-              )}
+              ) : null}
               {mine || !holder?.taken ? (
                 <div className="flex flex-col items-start gap-2 border-t border-border pt-3">
                   {brought && mine ? (
@@ -170,23 +189,7 @@ function Seats() {
                         </Button>
                       </div>
                     </>
-                  ) : ownAgents?.length ? (
-                    ownAgents.toReversed().map((agent) => (
-                      <Button
-                        key={agent.agentId}
-                        data-size="sm"
-                        disabled={busy}
-                        onClick={() =>
-                          run(() =>
-                            join({ seat, name, agentId: agent.agentId }),
-                          )
-                        }
-                      >
-                        {mine ? "Hablar" : "Entrar"} desde mi agente{" "}
-                        {agent.name}
-                      </Button>
-                    ))
-                  ) : (
+                  ) : agents.length ? null : (
                     <p className="m-0 text-sm text-subtle-foreground">
                       Para hablar desde tu propio asistente, conéctalo con
                       «Conecta tu agente a Agora» en la{" "}
@@ -196,6 +199,39 @@ function Seats() {
                       y vincúlalo a tu cuenta.
                     </p>
                   )}
+                  {agents
+                    .filter((agent) => agent.agentId !== brought?.agentId)
+                    .map((agent, index) => (
+                      <Button
+                        key={agent.agentId}
+                        data-variant={
+                          !mine && index === 0 ? "brand" : undefined
+                        }
+                        data-size="sm"
+                        disabled={busy}
+                        onClick={() =>
+                          run(() =>
+                            join({ seat, name, agentId: agent.agentId }),
+                          )
+                        }
+                      >
+                        {mine
+                          ? brought
+                            ? "Cambiar a"
+                            : "Hablar desde"
+                          : "Entrar con"}{" "}
+                        mi agente {agent.name}
+                      </Button>
+                    ))}
+                  {!mine && agents.length ? (
+                    <Button
+                      data-size="sm"
+                      disabled={busy}
+                      onClick={() => run(() => join({ seat, name }))}
+                    >
+                      Entrar desde la web
+                    </Button>
+                  ) : null}
                 </div>
               ) : null}
             </li>
@@ -237,6 +273,90 @@ function Seats() {
         <p role="alert" className="m-0 text-sm text-destructive">
           {error}
         </p>
+      ) : null}
+      {agents.length ? (
+        <section className="space-y-3 border-t border-border pt-6">
+          <h2 className="text-xl font-semibold">Tus agentes vinculados</h2>
+          <p className="m-0 text-sm text-subtle-foreground">
+            Si borraste un asistente y lo conectaste de nuevo, quita aquí el
+            agente anterior para que no siga apareciendo.
+          </p>
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
+            {agents.map((agent, index) => (
+              <li
+                key={agent.agentId}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1"
+              >
+                <span className="min-w-0 break-words">
+                  <strong>{agent.name}</strong>
+                  {index === 0 ? " — el más reciente" : null}
+                </span>
+                {removable.includes(agent) ? (
+                  <Button
+                    data-size="sm"
+                    disabled={busy}
+                    onClick={() => setRemoving([agent.agentId])}
+                  >
+                    Quitar
+                  </Button>
+                ) : (
+                  <span className="text-sm text-subtle-foreground">
+                    Es el de tu inicio de sesión desde el asistente; no se
+                    quita.
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+          {old.length ? (
+            <Button
+              data-size="sm"
+              disabled={busy}
+              onClick={() => setRemoving(old.map((agent) => agent.agentId))}
+            >
+              Quitar los antiguos ({old.length})
+            </Button>
+          ) : null}
+          <Dialog
+            open={removing !== undefined}
+            onOpenChange={(open) => {
+              if (!open) setRemoving(undefined);
+            }}
+          >
+            <DialogBackdrop />
+            <DialogContent>
+              <DialogTitle>
+                {removing?.length === 1
+                  ? "¿Quitar este agente?"
+                  : `¿Quitar ${removing?.length} agentes?`}
+              </DialogTitle>
+              <DialogDescription>
+                {agents
+                  .filter((agent) => removing?.includes(agent.agentId))
+                  .map((agent) => agent.name)
+                  .join(", ")}
+                . Su API key deja de funcionar, las salas que abrió se cierran y
+                deja de estar vinculado a tu cuenta. No se puede deshacer.
+              </DialogDescription>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <DialogClose disabled={busy}>Cancelar</DialogClose>
+                <Button
+                  data-variant="solid"
+                  disabled={busy}
+                  onClick={() =>
+                    run(async () => {
+                      const agentIds = removing ?? [];
+                      setRemoving(undefined);
+                      await forgetAgents({ agentIds });
+                    })
+                  }
+                >
+                  Quitar definitivamente
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </section>
       ) : null}
     </div>
   );
