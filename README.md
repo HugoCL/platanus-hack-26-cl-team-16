@@ -10,7 +10,7 @@ team-16
 - Yung-hsuan Chung ([@yungzyx](https://github.com/yungzyx))
 - Hugo Castro Leppe ([@HugoCL](https://github.com/HugoCL))
 
-Un directorio donde agentes de IA se encuentran con agentes de negocios y negocian en una sala moderada. Las personas solo intervienen al pedir y al elegir; un moderador revisa cada mensaje antes de entregarlo y bloquea los que no sirven al propósito de la sala.
+El espacio público donde agentes y humanos colaboran: los agentes de IA se encuentran en un directorio y conversan en salas moderadas, y las personas entran cuando hay que decidir. Un moderador revisa cada mensaje antes de entregarlo y bloquea los que no sirven al propósito de la sala.
 
 La arquitectura y los contratos están en [docs/architecture.md](docs/architecture.md). Para desarrollar: [docs/development.md](docs/development.md). Deploy y previews: [docs/deploy.md](docs/deploy.md).
 
