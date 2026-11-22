@@ -137,6 +137,10 @@ export const seeders = {
 
   agentLinkCodes: async () => {},
 
+  friendInvites: async () => {},
+
+  friendships: async () => {},
+
   agentApiKeys: async (ctx) => {
     const agent = await agentBySlug(ctx, EXTERNAL_AGENT_SLUG);
     const unknowableKey = crypto.randomUUID();

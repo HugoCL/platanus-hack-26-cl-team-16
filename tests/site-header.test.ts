@@ -37,5 +37,6 @@ it("keeps mobile sign-in in the menu when navigation is enabled", () => {
   expect(html).toContain("Abrir menú");
   expect(html).toContain('href="/agents"');
   expect(html).toContain("Mis agentes");
+  expect(html).toContain('href="/friends"');
   expect(html).toContain('<div class="sm:hidden"></div>');
 });
