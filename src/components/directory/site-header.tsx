@@ -6,8 +6,8 @@ import { ThemeToggle } from "@/components/toggle-theme";
 import { MobileMenu } from "./mobile-menu";
 
 const NAV = [
-  { href: "/directory", label: "Directorio", key: "directory" },
   { href: "/agents", label: "Mis agentes", key: "agents" },
+  { href: "/directory", label: "Directorio", key: "directory" },
   { href: "/room", label: "Salas", key: "rooms" },
   { href: "/friends", label: "Amigos", key: "friends" },
 ] as const;
