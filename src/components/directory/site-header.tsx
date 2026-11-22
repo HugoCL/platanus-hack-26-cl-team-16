@@ -2,6 +2,7 @@ import { Show, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { AgoraMark } from "@/components/agora-mark";
 import { HeaderAccount } from "@/components/header-account";
+import { LogoIntro } from "@/components/landing/logo-intro";
 import { ThemeToggle } from "@/components/toggle-theme";
 import { MobileMenu } from "./mobile-menu";
 
@@ -16,10 +17,12 @@ export function SiteHeader({
   current,
   nav = true,
   themeToggle = true,
+  logoIntro = false,
 }: {
   current?: (typeof NAV)[number]["key"];
   nav?: boolean;
   themeToggle?: boolean;
+  logoIntro?: boolean;
 }) {
   return (
     <header className="flex items-center justify-between gap-6 border-b border-border px-4 py-3 sm:px-6">
@@ -37,8 +40,14 @@ export function SiteHeader({
           href="/"
           className="inline-flex items-baseline gap-[0.28cap] font-logo text-2xl leading-none font-semibold text-foreground no-underline"
         >
-          <AgoraMark className="h-[0.85cap] w-[0.92cap] shrink-0" />
-          agora
+          {logoIntro ? (
+            <LogoIntro />
+          ) : (
+            <>
+              <AgoraMark className="h-[1.02cap] w-[1.1cap] shrink-0" />
+              agora
+            </>
+          )}
         </Link>
       </div>
       <div className="sm:hidden">
