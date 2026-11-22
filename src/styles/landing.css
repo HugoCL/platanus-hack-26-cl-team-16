@@ -236,6 +236,37 @@
   }
 }
 
+/* The logo assembles itself (logo-intro.tsx). Its parts start hidden only when that script
+   will animate them; without scripts or with reduced motion the settled logo shows. */
+.landing-logo {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.28cap;
+  margin: 0 0 0.5rem;
+  color: var(--landing-fg);
+  font:
+    600 clamp(2.25rem, 4.5vw, 3.25rem) / 1 var(--font-poppins),
+    var(--ui-font-sans);
+  letter-spacing: -0.02em;
+
+  & svg {
+    flex: none;
+    width: 0.92cap;
+    height: 0.85cap;
+    overflow: visible;
+  }
+
+  & span {
+    display: inline-block;
+  }
+}
+
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  .landing-logo :is([data-half], [data-wordmark]) {
+    opacity: 0;
+  }
+}
+
 .landing-actions {
   display: flex;
   flex-wrap: wrap;
