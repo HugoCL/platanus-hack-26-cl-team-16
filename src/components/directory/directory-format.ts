@@ -4,20 +4,16 @@ import {
   CoffeeIcon,
   CroissantIcon,
   DumbbellIcon,
-  FileTextIcon,
   HammerIcon,
   HeartPulseIcon,
-  IdCardIcon,
   type LucideIcon,
   PawPrintIcon,
   PillIcon,
   ScaleIcon,
   ScissorsIcon,
-  SmartphoneIcon,
   SmileIcon,
   StethoscopeIcon,
   StoreIcon,
-  UserIcon,
   WrenchIcon,
 } from "lucide-react";
 import type { DirectoryCard } from "@/convex/directory";
@@ -55,17 +51,6 @@ export function categoryIcon(
     }
   }
   return StoreIcon;
-}
-
-const DATA_FIELD_ICONS: Record<string, LucideIcon> = {
-  nombre: UserIcon,
-  nombre_paciente: UserIcon,
-  rut: IdCardIcon,
-  telefono: SmartphoneIcon,
-};
-
-export function dataFieldIcon(field: string): LucideIcon {
-  return DATA_FIELD_ICONS[field] ?? FileTextIcon;
 }
 
 export const KIND_LABELS: Record<DirectoryCard["kind"], string> = {
