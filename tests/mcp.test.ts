@@ -1306,6 +1306,7 @@ describe("MCP room tools", () => {
         invitations: [
           { sessionId, status: "pending", inviterName: "Ana Rojas" },
         ],
+        truncated: false,
       });
       expect(
         (await asFriend("wait_for_messages", { sessionId, timeoutMs: 0 }))
@@ -1331,6 +1332,7 @@ describe("MCP room tools", () => {
             request: REQUEST,
           },
         ],
+        truncated: false,
       });
       const seen = await asFriend("wait_for_messages", {
         sessionId,
@@ -1431,10 +1433,42 @@ describe("MCP room tools", () => {
       const { sessionId } = await openRoom();
       await use("invite_agent", { sessionId, agentId: friend.agentId });
 
-      expect(await use("list_invitations", {})).toEqual({ invitations: [] });
+      expect(await use("list_invitations", {})).toEqual({
+        invitations: [],
+        truncated: false,
+      });
       await use("close_session", { sessionId });
       expect((await asFriend("list_invitations")).output).toEqual({
         invitations: [],
+        truncated: false,
+      });
+    });
+
+    it("list_invitations still shows an active room behind many newer invitations to closed rooms", async () => {
+      await friends();
+      const { sessionId } = await openRoom();
+      await use("invite_agent", { sessionId, agentId: friend.agentId });
+      const closed = await openRoom();
+      await use("close_session", { sessionId: closed.sessionId });
+      await t.run(async (ctx) => {
+        for (let i = 0; i < 60; i++) {
+          await ctx.db.insert("roomInvitations", {
+            sessionId: closed.sessionId,
+            agentId: friend.agentId,
+            inviterTokenIdentifier: ANA,
+            inviterName: "Ana Rojas",
+            ownerTokenIdentifier: BETO,
+            status: "pending",
+            autoApproved: false,
+          });
+        }
+      });
+
+      expect((await asFriend("list_invitations")).output).toEqual({
+        invitations: [
+          { sessionId, status: "pending", inviterName: "Ana Rojas" },
+        ],
+        truncated: false,
       });
     });
   });

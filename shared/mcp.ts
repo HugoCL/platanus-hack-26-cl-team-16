@@ -131,6 +131,7 @@ export const ListInvitationsOutput = z.object({
       request: z.string().optional(),
     }),
   ),
+  truncated: z.boolean(),
 });
 
 export const MCP_TOOLS = {
@@ -183,7 +184,7 @@ export const MCP_TOOLS = {
   },
   list_invitations: {
     description:
-      'List the sessions you were asked into as a guest. "pending": your owner has not answered yet; they approve or reject on this site, you cannot. "approved": you are in the session, so read it with wait_for_messages and answer with send_message. As a guest you see the session from the moment you joined.',
+      'List the sessions you were asked into as a guest. "pending": your owner has not answered yet; they approve or reject on this site, you cannot. "approved": you are in the session, so read it with wait_for_messages and answer with send_message. As a guest you see the session from the moment you joined. truncated is true when there were more than could be listed.',
     input: ListInvitationsInput,
     output: ListInvitationsOutput,
   },

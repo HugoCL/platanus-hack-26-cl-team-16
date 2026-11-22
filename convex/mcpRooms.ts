@@ -274,6 +274,7 @@ export const closeAsCaller = internalMutation({
 // Friends and invitations belong to the human who owns the calling agent. A key never answers an
 // invitation: approving stays with that human, on the site, or with their auto-approve switch.
 const INVITATION_LIMIT = 50;
+const INVITATION_SCAN_LIMIT = 1000;
 
 type FriendAgent = {
   agentId: Id<"agents">;
@@ -357,7 +358,10 @@ type AgentInvitation = {
 
 export const invitations = action({
   args: { apiKey: v.string() },
-  handler: async (ctx, args): Promise<{ invitations: AgentInvitation[] }> => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ invitations: AgentInvitation[]; truncated: boolean }> => {
     await chargeRequest(ctx, args.apiKey);
     return ctx.runQuery(internal.mcpRooms.readInvitations, args);
   },
@@ -370,44 +374,38 @@ export const readInvitations = internalQuery({
   handler: async (
     ctx,
     { apiKey },
-  ): Promise<{ invitations: AgentInvitation[] }> => {
+  ): Promise<{ invitations: AgentInvitation[]; truncated: boolean }> => {
     const { agent } = await callerCredential(ctx, apiKey);
-    const rows = (
-      await Promise.all(
-        (["pending", "approved"] as const).map((status) =>
-          ctx.db
-            .query("roomInvitations")
-            .withIndex("by_agentId_and_status", (q) =>
-              q.eq("agentId", agent._id).eq("status", status),
-            )
-            .order("desc")
-            .take(INVITATION_LIMIT),
-        ),
-      )
-    ).flat();
-    const listed = await Promise.all(
-      rows.map(async (row): Promise<AgentInvitation[]> => {
-        const session = await ctx.db.get("sessions", row.sessionId);
-        if (session?.status !== "active") return [];
-        if (row.status !== "approved") {
-          return [
-            {
-              sessionId: row.sessionId,
-              status: "pending",
-              inviterName: row.inviterName,
-            },
-          ];
+    const invitations: AgentInvitation[] = [];
+    let truncated = false;
+    for (const status of ["pending", "approved"] as const) {
+      let scanned = 0;
+      const rows = ctx.db
+        .query("roomInvitations")
+        .withIndex("by_agentId_and_status", (q) =>
+          q.eq("agentId", agent._id).eq("status", status),
+        )
+        .order("desc");
+      // Invitations outlive their room, so closed rooms are skipped here instead of counting
+      // against what is returned.
+      for await (const row of rows) {
+        if (
+          invitations.length === INVITATION_LIMIT ||
+          scanned++ === INVITATION_SCAN_LIMIT
+        ) {
+          truncated = true;
+          break;
         }
-        return [
-          {
-            sessionId: row.sessionId,
-            status: "approved",
-            inviterName: row.inviterName,
-            request: session.intent.description,
-          },
-        ];
-      }),
-    );
-    return { invitations: listed.flat() };
+        const session = await ctx.db.get("sessions", row.sessionId);
+        if (session?.status !== "active") continue;
+        invitations.push({
+          sessionId: row.sessionId,
+          status,
+          inviterName: row.inviterName,
+          ...(status === "approved" && { request: session.intent.description }),
+        });
+      }
+    }
+    return { invitations, truncated };
   },
 });
