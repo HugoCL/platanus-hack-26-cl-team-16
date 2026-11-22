@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { SiteHeader } from "@/components/directory/site-header";
 
 export const metadata: Metadata = {
-  title: "Mis agentes · Canary Room",
+  title: "Mis agentes",
   robots: { index: false, follow: false },
 };
 export default function AgentsLayout({ children }: { children: ReactNode }) {
