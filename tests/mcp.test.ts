@@ -1528,5 +1528,100 @@ describe("MCP room tools", () => {
       });
       expect(output?.truncated).toBe(true);
     });
+
+    it("create_friend_invite and accept_friend_invite make the two owners friends, and list_friends shows them", async () => {
+      await friends({ linked: false });
+      const invite = await use("create_friend_invite", {
+        ownerName: "Ana Rojas",
+      });
+      expect(invite.inviteUrl).toMatch(
+        new RegExp(`^${PUBLIC_ORIGIN}/friends/[0-9a-f-]+$`),
+      );
+      expect(await use("list_friends", {})).toEqual({
+        friends: [],
+        inviteExpiresAt: invite.expiresAt,
+      });
+
+      expect(
+        (
+          await asFriend("accept_friend_invite", {
+            invite: `${invite.inviteUrl}?from=chat`,
+            ownerName: "Beto Paz",
+          })
+        ).output,
+      ).toEqual({ friendName: "Ana Rojas" });
+      expect(await use("list_friends", {})).toEqual({
+        friends: [{ name: "Beto Paz", autoApprove: false, agentCount: 1 }],
+        inviteExpiresAt: null,
+      });
+      expect((await asFriend("list_friends")).output).toEqual({
+        friends: [{ name: "Ana Rojas", autoApprove: false, agentCount: 1 }],
+        inviteExpiresAt: null,
+      });
+      expect(
+        (
+          await asFriend("accept_friend_invite", {
+            invite: invite.inviteUrl.split("/").at(-1),
+            ownerName: "Beto Paz",
+          })
+        ).error,
+      ).toContain("invalid, used or expired friend link");
+    });
+
+    it("the friend tools need a linked human", async () => {
+      const NOT_LINKED = "NotLinked: you have no human yet";
+      expect(await refusal("list_friends", {})).toContain(NOT_LINKED);
+      expect(
+        await refusal("create_friend_invite", { ownerName: "Ana" }),
+      ).toContain(NOT_LINKED);
+      expect(
+        await refusal("accept_friend_invite", {
+          invite: "abc",
+          ownerName: "Ana",
+        }),
+      ).toContain(NOT_LINKED);
+    });
+  });
+
+  describe("whoami and renew_link", () => {
+    const ANA = "https://clerk.example|ana";
+    const codeOf = (url: string) => url.split("/").at(-1) ?? "";
+
+    it("tells an unlinked agent so, and renew_link hands out a link that replaces the previous one", async () => {
+      expect(await use("whoami", {})).toEqual({
+        agentId: agents.external,
+        name: expect.any(String),
+        slug: EXTERNAL_AGENT_SLUG,
+        published: expect.any(Boolean),
+        linked: false,
+        linkExpiresAt: null,
+      });
+
+      const first = await use("renew_link", {});
+      expect(first.linkUrl).toMatch(
+        new RegExp(`^${PUBLIC_ORIGIN}/link/[0-9a-f-]+$`),
+      );
+      expect((await use("whoami", {})).linkExpiresAt).toBe(first.expiresAt);
+
+      const second = await use("renew_link", {});
+      expect(
+        await t.query(api.agentRegistration.linkInfo, {
+          code: codeOf(first.linkUrl),
+        }),
+      ).toBeNull();
+
+      await t
+        .withIdentity({ tokenIdentifier: ANA })
+        .mutation(api.agentRegistration.link, {
+          code: codeOf(second.linkUrl),
+        });
+      expect(await use("whoami", {})).toMatchObject({
+        linked: true,
+        linkExpiresAt: null,
+      });
+      expect(await refusal("renew_link", {})).toContain(
+        "AlreadyLinked: you are already linked to a human",
+      );
+    });
   });
 });

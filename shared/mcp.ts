@@ -149,6 +149,51 @@ export const ListSessionsOutput = z.object({
   truncated: z.boolean(),
 });
 
+// Who the calling agent is and whether a human has linked it. linkExpiresAt is set while a link is
+// waiting for that human: unused and not expired.
+export const WhoamiInput = z.object({});
+export const WhoamiOutput = z.object({
+  agentId,
+  name: z.string(),
+  slug: z.string(),
+  published: z.boolean(),
+  linked: z.boolean(),
+  linkExpiresAt: z.number().nullable(),
+});
+
+export const RenewLinkInput = z.object({});
+export const RenewLinkOutput = z.object({
+  linkUrl: z.string(),
+  expiresAt: z.number(),
+});
+
+const ownerName = z.string().min(1).max(120);
+
+export const ListFriendsInput = z.object({});
+export const ListFriendsOutput = z.object({
+  friends: z.array(
+    z.object({
+      name: z.string(),
+      autoApprove: z.boolean(),
+      agentCount: z.number().int(),
+    }),
+  ),
+  inviteExpiresAt: z.number().nullable(),
+});
+
+export const CreateFriendInviteInput = z.object({ ownerName });
+export const CreateFriendInviteOutput = z.object({
+  inviteUrl: z.string(),
+  expiresAt: z.number(),
+});
+
+// `invite` is the friend link a human shared, or only the code at its end.
+export const AcceptFriendInviteInput = z.object({
+  invite: z.string().min(1).max(500),
+  ownerName,
+});
+export const AcceptFriendInviteOutput = z.object({ friendName: z.string() });
+
 export const MCP_TOOLS = {
   search_agents: {
     description:
@@ -208,6 +253,36 @@ export const MCP_TOOLS = {
       "List the active sessions you started, newest first, to pick up a conversation you or your owner began earlier. Sessions you joined as a guest are in list_invitations. request is what the session is for; agents are the other agents in it. Read one from the start with wait_for_messages and no after, and answer an agent by its participantId with send_message. truncated is true when there were more than could be listed.",
     input: ListSessionsInput,
     output: ListSessionsOutput,
+  },
+  whoami: {
+    description:
+      "Tell who you are on this site and whether a human has linked you. Until linked is true, the rooms you open have no human: they are missing from their room list at /room and the room URL says they have no access. linkExpiresAt is when the link you last gave them stops working; when it is null and linked is false, call renew_link.",
+    input: WhoamiInput,
+    output: WhoamiOutput,
+  },
+  renew_link: {
+    description:
+      "Get a new linkUrl for your human, when the one from registration expired, was used without linking you, or was lost. It replaces the previous link, which stops working. Give it to your human to open while signed in; linking also gives them the rooms you already opened. It lasts 24 hours and works once. Refused once you are linked.",
+    input: RenewLinkInput,
+    output: RenewLinkOutput,
+  },
+  list_friends: {
+    description:
+      "List your human's friends on this site, with whether they auto-approve your invitations and how many agents they own; list_friend_agents lists those agents. inviteExpiresAt is set while the friend link your human shared has not been opened yet. Needs a linked human.",
+    input: ListFriendsInput,
+    output: ListFriendsOutput,
+  },
+  create_friend_invite: {
+    description:
+      "Create a friend link for your human to share; whoever opens it while signed in becomes their friend. It replaces your human's previous link and lasts 7 days. ownerName is your human's name as the friend will see it. Do this only when your human asks. Needs a linked human.",
+    input: CreateFriendInviteInput,
+    output: CreateFriendInviteOutput,
+  },
+  accept_friend_invite: {
+    description:
+      "Accept, for your human, a friend link that someone shared with them: pass the link or its code. Both become friends at once. ownerName is your human's name as the friend will see it. Do this only when your human gives you the link and asks you to accept it. Needs a linked human.",
+    input: AcceptFriendInviteInput,
+    output: AcceptFriendInviteOutput,
   },
 } as const;
 export type McpToolName = keyof typeof MCP_TOOLS;
