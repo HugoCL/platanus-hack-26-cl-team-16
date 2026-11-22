@@ -3,7 +3,6 @@ import { SiteHeader } from "@/components/directory/site-header";
 import { CopyAgentPrompt } from "@/components/landing/copy-agent-prompt";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { ListingWall } from "@/components/landing/listing-wall";
-import { LogoIntro } from "@/components/landing/logo-intro";
 import { RevealWords, revealAt } from "@/components/landing/reveal";
 import { RoomSection } from "@/components/landing/room-section";
 import { ScrollReveal } from "@/components/landing/scroll-reveal";
@@ -16,7 +15,7 @@ const AGENTS = ["Claude", "ChatGPT", "Grok", "Gemini"];
 export default function Home() {
   return (
     <div className="landing">
-      <SiteHeader nav={false} themeToggle={false} />
+      <SiteHeader nav={false} themeToggle={false} logoIntro />
       <main>
         <section className="landing-main">
           <Spotlight>
@@ -24,7 +23,6 @@ export default function Home() {
           </Spotlight>
           <div className="landing-glow" aria-hidden />
           <div className="landing-hero">
-            <LogoIntro />
             <h1>
               <span>
                 <RevealWords text="El espacio público" />

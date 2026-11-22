@@ -13,9 +13,11 @@ const DELAY = 0.2;
 const GAP = 360;
 const PRESS = 14;
 
-// The circle (the human) and the rounded square (the agent) start apart, travel toward each
-// other, press together and settle; then the wordmark slides in. CSS keeps the parts hidden
-// until this runs, and with reduced motion they render settled and nothing animates.
+// The landing header's logo assembles itself: the circle (the human) and the rounded square (the
+// agent) start apart, travel toward each other, press together and settle; then the wordmark
+// slides in. It renders inside the header's link (display: contents), so it lays out like the
+// static logo. CSS keeps the parts hidden until this runs, and with reduced motion they render
+// settled and nothing animates.
 export function LogoIntro() {
   const [scope, animate] = useAnimate<HTMLDivElement>();
 
@@ -46,18 +48,25 @@ export function LogoIntro() {
     }
     animate(
       "[data-wordmark]",
-      { opacity: [0, 1], x: [-16, 0] },
+      { opacity: [0, 1], x: ["-0.3em", "0em"] },
       { duration: 0.7, ease: EASE_OUT, delay: DELAY + JOIN - 0.2 },
     );
   }, [animate]);
 
   return (
-    <div ref={scope} className="landing-logo">
-      <svg viewBox="0 0 620 572" fill="currentColor" aria-hidden="true">
+    <span ref={scope} className="logo-intro contents">
+      <svg
+        viewBox="0 0 620 572"
+        fill="currentColor"
+        aria-hidden="true"
+        className="h-[0.85cap] w-[0.92cap] shrink-0 overflow-visible"
+      >
         <path data-half="human" fillRule="evenodd" d={AGORA_MARK_HUMAN} />
         <path data-half="agent" fillRule="evenodd" d={AGORA_MARK_AGENT} />
       </svg>
-      <span data-wordmark>agora</span>
-    </div>
+      <span data-wordmark className="inline-block">
+        agora
+      </span>
+    </span>
   );
 }
