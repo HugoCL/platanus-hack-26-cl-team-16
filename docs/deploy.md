@@ -116,6 +116,7 @@ Clerk keyless mode works only under `next dev`. A deployed build runs `next star
    | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Step 5 | Build and runtime |
    | `CLERK_SECRET_KEY` | Step 5 | Runtime |
    | `AGENT_REGISTRATION_SECRET` | Same private random value as Convex; add manually (see below) | Registration runtime, production and previews |
+   | `MCP_OAUTH_SECRET` | Same private random value as Convex; add manually. Leave unset to keep MCP on API keys only (`docs/mcp.md`) | MCP runtime, production and previews |
 
 10. Leave the workspace without a payment method. If it has one, set a spend limit under Workspace Settings, Build Pipeline.
 11. After the first deploy, open the service's Previews tab and check that pull request previews are set to Manual.

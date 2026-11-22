@@ -165,6 +165,52 @@ export const register = action({
   },
 });
 
+// The draft card every self-registered agent starts from: the seed's external agent with an empty
+// scope. `ownerTokenIdentifier` links it at once, for an owner who is already known.
+export async function insertSelfRegistered(
+  ctx: MutationCtx,
+  args: {
+    name: string;
+    description: string;
+    slug: string;
+    purpose?: string;
+    category?: string;
+    wantsPublic?: boolean;
+    ownerTokenIdentifier?: string;
+  },
+) {
+  const template = SEED_AGENTS.find(
+    ({ card }) => card.slug === EXTERNAL_AGENT_SLUG,
+  );
+  if (!template) throw new Error("external agent template is missing");
+  const category = args.category ?? template.card.categories[0];
+  const categoryRow = await ctx.db
+    .query("categories")
+    .withIndex("by_slug", (q) => q.eq("slug", category))
+    .unique();
+  if (!categoryRow) fail("InvalidArgument", "unknown category");
+  const card = AgentCard.parse({
+    ...template.card,
+    name: text(args.name, 120),
+    description: text(args.description, 1000),
+    purpose: text(args.purpose ?? args.description, 1000),
+    categories: [category],
+    scope: SELF_REGISTERED_SCOPE,
+    verified: false,
+    slug: args.slug,
+    status: "draft",
+  });
+  const agentId = await ctx.db.insert("agents", {
+    ...card,
+    selfRegistered: true,
+    wantsPublic: args.wantsPublic,
+    ownerTokenIdentifier: args.ownerTokenIdentifier,
+    primaryCategory: card.categories[0],
+    searchText: searchText(card),
+  });
+  return agentId;
+}
+
 export const create = internalMutation({
   args: {
     ...registrationArgs,
@@ -189,34 +235,7 @@ export const create = internalMutation({
         .unique()
     )
       fail("Conflict", "slug already exists; retry registration");
-    const template = SEED_AGENTS.find(
-      ({ card }) => card.slug === EXTERNAL_AGENT_SLUG,
-    );
-    if (!template) throw new Error("external agent template is missing");
-    const category = args.category ?? template.card.categories[0];
-    const categoryRow = await ctx.db
-      .query("categories")
-      .withIndex("by_slug", (q) => q.eq("slug", category))
-      .unique();
-    if (!categoryRow) fail("InvalidArgument", "unknown category");
-    const card = AgentCard.parse({
-      ...template.card,
-      name: text(args.name, 120),
-      description: text(args.description, 1000),
-      purpose: text(args.purpose ?? args.description, 1000),
-      categories: [category],
-      scope: SELF_REGISTERED_SCOPE,
-      verified: false,
-      slug: args.slug,
-      status: "draft",
-    });
-    const agentId = await ctx.db.insert("agents", {
-      ...card,
-      selfRegistered: true,
-      wantsPublic: args.wantsPublic,
-      primaryCategory: card.categories[0],
-      searchText: searchText(card),
-    });
+    const agentId = await insertSelfRegistered(ctx, args);
     await storeApiKey(ctx, {
       slug: args.slug,
       keyHash: args.keyHash,

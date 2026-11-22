@@ -18,6 +18,7 @@ import type * as directory from "../directory.js";
 import type * as friends from "../friends.js";
 import type * as gate from "../gate.js";
 import type * as jobs from "../jobs.js";
+import type * as mcpOauth from "../mcpOauth.js";
 import type * as mcpRooms from "../mcpRooms.js";
 import type * as migrations from "../migrations.js";
 import type * as moderator from "../moderator.js";
@@ -51,6 +52,7 @@ declare const fullApi: ApiFromModules<{
   friends: typeof friends;
   gate: typeof gate;
   jobs: typeof jobs;
+  mcpOauth: typeof mcpOauth;
   mcpRooms: typeof mcpRooms;
   migrations: typeof migrations;
   moderator: typeof moderator;

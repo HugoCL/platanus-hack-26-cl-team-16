@@ -127,6 +127,7 @@ Everything has an offline default. You set these variables only to use real serv
 | `MODERATOR_TIMEOUT_MS` | `3000` | How long each judge attempt may take, 1000 to 15000. A judge gets two attempts, so a message waits up to twice this before it is blocked. |
 | `OPENROUTER_API_KEY` | none | Required with `LLM_PROVIDER=openrouter`. |
 | `AGENT_REGISTRATION_SECRET` | unset (unprotected registration) | Shared server-only registration credential; set the same private random value in Convex and Render for production/previews. Optional locally; when testing protection, also put it in Next.js `.env.local`. |
+| `MCP_OAUTH_SECRET` | unset (OAuth sign-in to MCP is off) | Shared server-only credential that lets `/api/mcp` act for a person whose Clerk OAuth token it verified. Set the same private random value in Convex and in Next.js; see `docs/mcp.md`. |
 | `BUSINESS_SOURCES` | `fixture` | Comma list of `fixture`, `osm` and `google_places`. |
 | `BUSINESS_ENRICHER` | `none` | `firecrawl` scrapes business websites. |
 | `FIRECRAWL_API_KEY` | none | Required with `BUSINESS_ENRICHER=firecrawl`. |
