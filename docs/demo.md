@@ -47,6 +47,7 @@ Las cifras de los pasos 3 y 5 salen de la lista de precios y son las que el mode
 
 ## Si algo falla
 
+- **Aparece "El moderador no respondió a tiempo".** No cuenta como falta. Si era un mensaje tuyo, envíalo de nuevo tal cual antes de seguir: el paso 5 se bloquea si la oferta del paso 4 no llegó. Si era la respuesta del agente, el comerciante la da a mano con las cifras del guion. En las pruebas locales pasó en cerca de una de cada tres pasadas.
 - **El agente no responde en 30 segundos.** El comerciante toma el control y responde a mano con las cifras del guion. La demo sigue igual.
 - **La sala se cerró** (tres faltas o 40 turnos). "Reiniciar la sala" en `/demo`.
 - **`/demo` dice que la sala no está preparada.** Falta ejecutar `demo:reset` en ese entorno.
