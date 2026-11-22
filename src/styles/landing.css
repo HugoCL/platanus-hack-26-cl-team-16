@@ -88,15 +88,13 @@
   isolation: isolate;
   overflow: hidden;
   display: grid;
-  grid-template-rows: 1fr auto;
-  gap: 3rem;
   min-height: calc(100svh - 61px);
   padding: clamp(3rem, 9vh, 6rem) var(--landing-pad) 3.5rem;
 }
 
 /*
  * The wall is one canvas (listing-wall.tsx) under the hero. It fades in once drawn and fades out
- * at the top and bottom edges, so the header and the trust row sit on clean background.
+ * at the top and bottom edges, so the header and the next section sit on clean background.
  */
 .landing-spotlight {
   --x: 72%;
@@ -389,48 +387,6 @@
     outline: 2px solid light-dark(var(--landing-ink), var(--brand-yellow));
     outline-offset: 3px;
     border-radius: 2px;
-  }
-}
-
-/* Trust row, quiet like Sentry's logos: the agent names in muted type, no color. */
-.landing-agents {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem 2rem;
-
-  & p {
-    margin: 0;
-    color: var(--landing-subtle);
-    font-size: 0.8125rem;
-  }
-
-  /* Overlapping dark chips, each ringed in the page background so it reads as stacked on the next. */
-  & ul {
-    display: flex;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  & li {
-    display: grid;
-    place-items: center;
-    width: 2.75rem;
-    height: 2.75rem;
-    border: 3px solid var(--landing-bg);
-    border-radius: 999px;
-    background: light-dark(oklch(0.2 0.006 49), oklch(0.27 0.006 49));
-    color: oklch(0.96 0 0);
-  }
-
-  & li + li {
-    margin-left: -0.625rem;
-  }
-
-  & svg {
-    width: 1.25rem;
-    height: 1.25rem;
   }
 }
 
