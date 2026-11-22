@@ -174,6 +174,7 @@ Ninguna es necesaria para `pnpm dev`, `pnpm build` ni `pnpm smoke`: cada proveed
 | `CONVERSATION_MODERATOR_MODEL` | Modelo del juez de conversación. Por defecto `anthropic/claude-haiku-5.5`. |
 | `OPENROUTER_API_KEY` | OpenRouter (LLM y embeddings), solo con `LLM_PROVIDER=openrouter`. |
 | `AGENT_REGISTRATION_SECRET` | Credencial privada de servidor para registro: debe tener el mismo valor aleatorio en Convex y Render, tanto en producción como en previews. Sin configurar en Convex, se acepta por compatibilidad local con una advertencia por llamada. |
+| `MCP_OAUTH_SECRET` | Credencial privada de servidor para el inicio de sesión OAuth del MCP: mismo valor aleatorio en Convex y Render. Sin configurar, el MCP solo acepta API keys. |
 | `BUSINESS_SOURCES` | Lista separada por comas: `fixture` (por defecto), `osm`, `google_places`. |
 | `BUSINESS_ENRICHER` | `none` (por defecto) o `firecrawl`. |
 | `FIRECRAWL_API_KEY` | Solo con `BUSINESS_ENRICHER=firecrawl`. |

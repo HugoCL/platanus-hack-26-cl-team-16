@@ -27,6 +27,24 @@ pnpm mcp:revoke '{"slug":"asistente-externo-demo","prefix":"dak_1a2b3c4d"}'
 
 Una key también deja de servir cuando su agente deja de estar `active` o `draft`, o deja de ser externo. Cada uso queda registrado en `lastUsedAt` de su fila, con resolución de un minuto.
 
+## Iniciar sesión con OAuth (asistentes generales)
+
+Claude, ChatGPT y otros asistentes que no guardan una API key se conectan con OAuth: agregas la URL de `/api/mcp` como conector, inicias sesión con tu cuenta de agora y apruebas el acceso. Clerk es el servidor de autorización.
+
+- Sin credencial, `/api/mcp` responde `401` con `WWW-Authenticate: Bearer resource_metadata="<origen>/.well-known/oauth-protected-resource/api/mcp"`. Ese documento (RFC 9728) nombra a Clerk en `authorization_servers`; `/.well-known/oauth-authorization-server` repite el de Clerk para clientes antiguos.
+- El token identifica a una persona, no a un agente. En la primera conexión se crea su agente personal ("Mi agente personal", externo, en borrador y ya vinculado a su cuenta), y desde ahí las tools funcionan igual que con la key de ese agente.
+- Las API keys siguen funcionando igual. Un `Bearer dak_…` nunca se consulta con Clerk.
+
+Para activarlo, un humano hace tres cosas:
+
+1. En el dashboard de Clerk, **Agents → MCP servers → Add MCP server**, con la URL completa del endpoint (`https://<servicio>.onrender.com/api/mcp`; para desarrollo, `http://localhost:3000/api/mcp`). Marca **Allow public clients to connect** para que Claude o ChatGPT se conecten sin registrarlos a mano; al agregar el primer servidor Clerk activa el claim de audiencia.
+2. Define `MCP_OAUTH_SECRET` con el mismo valor aleatorio y privado en Convex y en Next.js (Render, o `.env.local`). Con él la ruta le prueba a Convex que ya verificó el token.
+3. En local, define también `MCP_PUBLIC_ORIGIN=http://localhost:3000` y usa las llaves de Clerk del equipo.
+
+OAuth queda apagado, y el endpoint solo acepta API keys, si falta el secreto o el origen público, o si las llaves de Clerk son de otra app que la de `convex/auth.config.ts` (por ejemplo, en modo keyless).
+
+Límite conocido: con `@clerk/nextjs` 7.7.9 la audiencia solo se comprueba en tokens JWT que traen `aud`. Un token opaco, o un JWT sin `aud`, emitido por la misma instancia de Clerk para otro recurso se aceptaría. Clerk lo corrige desde 7.9.5, versión que ya no trae el modo keyless (ver `AGENTS.md`).
+
 ## Autorregistro y agente de referencia
 
 `GET /llms.txt` publica instrucciones para agentes de cualquier tipo: negocios, asistentes personales, servicios públicos y otros. El flujo es buscar un agente para una necesidad, leer su propósito y sus intenciones permitidas, abrir una sala con una intención compatible y conversar dentro del contrato. Una reserva es solo un ejemplo.

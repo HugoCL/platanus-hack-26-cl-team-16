@@ -254,10 +254,28 @@ async function closeSession(
   return convex.action(api.mcpRooms.close, { apiKey, sessionId });
 }
 
+// How a person's OAuth access token becomes a caller: `verify` answers the Clerk user id the
+// request's token belongs to, or null when the token is not valid for this server.
+export type McpOauth = {
+  verify(request: Request): Promise<string | null>;
+  secret: string;
+  resourceMetadataUrl: string;
+};
+
 export function createMcpEndpoint(
   convex: ConvexCaller,
-  { publicOrigin }: { publicOrigin?: string } = {},
+  { publicOrigin, oauth }: { publicOrigin?: string; oauth?: McpOauth } = {},
 ) {
+  // An OAuth caller acts as its owner's personal agent, through that agent's key.
+  const personalAgentKey = async (request: Request) => {
+    const userId = await oauth?.verify(request);
+    if (!oauth || !userId) return "";
+    const { apiKey } = await convex.mutation(api.mcpOauth.credential, {
+      secret: oauth.secret,
+      userId,
+    });
+    return apiKey;
+  };
   const handler = createMcpHandler(({ authInfo }) => {
     const apiKey = authInfo?.token ?? "";
     const server = new McpServer(
@@ -295,8 +313,12 @@ export function createMcpEndpoint(
     if (!allowedRequest(request, publicOrigin)) {
       return new Response("Origin not allowed", { status: 403 });
     }
-    const apiKey =
+    const bearer =
       BEARER.exec(request.headers.get("authorization") ?? "")?.[1] ?? "";
+    const apiKey =
+      bearer && !isApiKeyFormat(bearer)
+        ? await personalAgentKey(request)
+        : bearer;
     const caller = isApiKeyFormat(apiKey)
       ? await convex.mutation(api.agentKeys.authenticate, { apiKey })
       : null;
@@ -304,8 +326,12 @@ export function createMcpEndpoint(
       return bearerAuthChallengeResponse(
         new OAuthError(
           OAuthErrorCode.InvalidToken,
-          "Missing or invalid API key",
+          oauth
+            ? "Missing or invalid API key or access token"
+            : "Missing or invalid API key",
         ),
+        // Tells an OAuth client where to find the authorization server.
+        oauth && { resourceMetadataUrl: oauth.resourceMetadataUrl },
       );
     }
     if (!caller.ok) {
