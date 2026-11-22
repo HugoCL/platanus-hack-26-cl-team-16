@@ -6,6 +6,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectItemIndicator,
   SelectLabel,
   SelectTrigger,
   SelectValue,
@@ -22,14 +23,14 @@ import { Toggle } from "@ui-sdk/react/toggle";
 import { useAction, useQueries, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
 import {
-  Check,
-  List,
-  LoaderCircle,
-  LocateFixed,
-  Map as MapIcon,
-  Search,
-  SlidersHorizontal,
-  X,
+  CheckIcon,
+  ListIcon,
+  LoaderCircleIcon,
+  LocateFixedIcon,
+  MapIcon,
+  SearchIcon,
+  SlidersHorizontalIcon,
+  XIcon,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import {
@@ -187,6 +188,11 @@ export function DirectorySearch() {
     sort,
   ]);
 
+  // The picked row stays open; until someone picks, the first result is.
+  const picked =
+    selectedId !== null && cards.some((card) => card.agentId === selectedId);
+  const openId = picked ? selectedId : (cards[0]?.agentId ?? null);
+
   const categoryLabel = categories?.find((c) => c.slug === category)?.label;
 
   const isDesktop = useIsDesktop();
@@ -312,6 +318,46 @@ export function DirectorySearch() {
     .filter(Boolean)
     .join(" · ");
 
+  // On a phone the invite sits under the filters; with the map in view it floats over it.
+  const invite =
+    offerLocation && geo.state === "off" ? (
+      <div className="flex items-center gap-x-3 self-start rounded-2xl bg-card py-1.5 pr-1.5 pl-3.5 text-caption shadow-card max-sm:self-stretch">
+        <LocateFixedIcon aria-hidden size={15} className="flex-none" />
+        <span className="min-w-0 flex-1">
+          <span className="sm:hidden">¿Ver lo cercano?</span>
+          <span className="max-sm:hidden">
+            Comparte tu ubicación y te mostramos primero lo que está cerca.
+          </span>
+        </span>
+        <div className="flex flex-none gap-1">
+          <Button
+            data-variant="solid"
+            data-size="sm"
+            onClick={() => startLocating(false)}
+          >
+            Usar mi ubicación
+          </Button>
+          <Button
+            data-variant="ghost"
+            data-size="sm"
+            aria-label="Ahora no"
+            onClick={() => {
+              setOfferLocation(false);
+              try {
+                localStorage.setItem(INVITE_DISMISSED_KEY, "1");
+              } catch {
+                // The invite is dismissed for this visit without storage.
+              }
+            }}
+            className="max-sm:!w-8 max-sm:!px-0"
+          >
+            <XIcon aria-hidden size={14} className="sm:hidden" />
+            <span className="max-sm:hidden">Ahora no</span>
+          </Button>
+        </div>
+      </div>
+    ) : null;
+
   return (
     <div
       className={`flex min-h-dvh flex-col bg-background lg:h-dvh lg:min-h-0 lg:overflow-hidden ${view === "map" ? "max-lg:h-dvh max-lg:min-h-0 max-lg:overflow-hidden" : ""}`}
@@ -320,7 +366,7 @@ export function DirectorySearch() {
 
       <section
         aria-label="Búsqueda"
-        className={`flex flex-col gap-3.5 border-b border-border px-4 sm:px-6 ${view === "map" ? "py-3 lg:py-5 [&>:not(:first-child)]:max-lg:hidden" : "py-5"}`}
+        className={`flex flex-col gap-3 border-b border-border bg-paper px-4 sm:px-6 ${view === "map" ? "py-3 lg:pt-5 lg:pb-4 [&>:not(:first-child)]:max-lg:hidden" : "py-3 sm:pt-5 sm:pb-4"}`}
       >
         <TextSearch
           onInterpreted={({ category, comuna }) => {
@@ -331,12 +377,12 @@ export function DirectorySearch() {
             view === "map" ? null : (
               <Button
                 data-size="icon"
-                className="relative !size-12 flex-none sm:!hidden"
+                className="relative !size-12 flex-none !bg-card sm:!hidden"
                 aria-expanded={filtersOpen}
                 aria-controls="directory-filters"
                 onClick={() => setFiltersOpen((open) => !open)}
               >
-                <SlidersHorizontal aria-hidden size={18} />
+                <SlidersHorizontalIcon aria-hidden size={18} />
                 <span className="sr-only">
                   Filtros{active.length > 0 ? ` · ${active.length}` : ""}
                 </span>
@@ -355,189 +401,143 @@ export function DirectorySearch() {
 
         <div
           id="directory-filters"
-          className={`${filtersOpen ? "flex" : "hidden"} flex-col gap-3 sm:flex`}
+          className={`${filtersOpen ? "flex" : "hidden"} flex-wrap items-center gap-2 sm:flex`}
         >
-          <div className="flex flex-wrap items-center gap-2">
-            {categories ? (
-              <Select
-                value={category ?? ALL}
-                onValueChange={(value) =>
-                  setCategory(!value || value === ALL ? null : value)
-                }
-              >
-                <SelectLabel className="sr-only">Categoría</SelectLabel>
-                <SelectTrigger
-                  className={`!h-9 !text-caption ${category ? "!border-foreground" : ""}`}
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>Todas las categorías</SelectItem>
-                  {categoryTree(categories).map(({ category: c, depth }) => (
-                    <SelectItem
-                      key={c.slug}
-                      value={c.slug}
-                      className={depth > 0 ? "!ps-6" : ""}
-                    >
-                      {c.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : null}
-
+          {categories ? (
             <Select
-              value={comuna ?? ALL}
+              value={category ?? ALL}
               onValueChange={(value) =>
-                setComuna(!value || value === ALL ? null : value)
+                setCategory(!value || value === ALL ? null : value)
               }
             >
-              <SelectLabel className="sr-only">Comuna</SelectLabel>
+              <SelectLabel className="sr-only">Categoría</SelectLabel>
               <SelectTrigger
-                className={`!h-9 !text-caption ${comuna ? "!border-foreground" : ""}`}
+                className={`!h-9 !bg-card !text-caption ${category ? "!border-foreground" : ""}`}
               >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL}>Todas las comunas</SelectItem>
-                {COMUNAS.map((name) => (
-                  <SelectItem key={name} value={name}>
-                    {name}
+                <SelectItem value={ALL}>Todas las categorías</SelectItem>
+                {categoryTree(categories).map(({ category: c, depth }) => (
+                  <SelectItem
+                    key={c.slug}
+                    value={c.slug}
+                    className={depth > 0 ? "!ps-6" : ""}
+                  >
+                    {c.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+          ) : null}
 
-            <Toggle
-              pressed={geo.state === "on" || geo.state === "locating"}
-              onPressedChange={locate}
-              className="inline-flex !h-9 items-center gap-1.5 !rounded-lg !px-3 text-caption data-pressed:!border-primary data-pressed:!bg-primary data-pressed:!text-primary-foreground"
+          <Select
+            value={comuna ?? ALL}
+            onValueChange={(value) =>
+              setComuna(!value || value === ALL ? null : value)
+            }
+          >
+            <SelectLabel className="sr-only">Comuna</SelectLabel>
+            <SelectTrigger
+              className={`!h-9 !bg-card !text-caption ${comuna ? "!border-foreground" : ""}`}
             >
-              <LocateFixed aria-hidden size={15} />
-              {geo.state === "locating" ? "Ubicando…" : "Cerca de mí"}
-            </Toggle>
-
-            {origin ? (
-              <div className="inline-flex h-9 items-center gap-2.5 rounded-lg bg-muted px-3.5">
-                <span
-                  id="radius-label"
-                  className="text-caption text-subtle-foreground"
-                >
-                  Radio
-                </span>
-                <Slider
-                  min={1}
-                  max={50}
-                  value={radiusKm}
-                  onValueChange={(value) => {
-                    setRadiusKm(Array.isArray(value) ? value[0] : value);
-                    setWithinRadius(true);
-                  }}
-                  className="w-30"
-                >
-                  <SliderControl>
-                    <SliderTrack>
-                      <SliderIndicator />
-                      <SliderThumb aria-labelledby="radius-label" />
-                    </SliderTrack>
-                  </SliderControl>
-                </Slider>
-                <span className="min-w-12 text-caption tabular-nums">
-                  {withinRadius ? `${radiusKm} km` : "Sin límite"}
-                </span>
-              </div>
-            ) : null}
-
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 sm:ml-auto">
-              <label className="inline-flex min-h-9 items-center gap-2 text-caption text-subtle-foreground">
-                <Switch
-                  checked={verifiedOnly}
-                  onCheckedChange={setVerifiedOnly}
-                >
-                  <SwitchThumb />
-                </Switch>
-                Solo verificados
-              </label>
-              <label className="inline-flex min-h-9 items-center gap-2 text-caption text-subtle-foreground">
-                <Switch
-                  checked={includeProspects}
-                  onCheckedChange={setIncludeProspects}
-                >
-                  <SwitchThumb />
-                </Switch>
-                Incluir sin reclamar
-              </label>
-            </div>
-          </div>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>Todas las comunas</SelectItem>
+              {COMUNAS.map((name) => (
+                <SelectItem key={name} value={name}>
+                  {name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
           {intentOptions.length > 0 ? (
-            <fieldset className="m-0 flex flex-wrap items-center gap-1.5 border-0 p-0">
-              <legend className="float-left mr-1.5 text-xs text-subtle-foreground">
-                Qué puede hacer
-              </legend>
-              {intentOptions.map((intent) => {
-                const pressed = intents.includes(intent);
-                return (
-                  <Toggle
-                    key={intent}
-                    pressed={pressed}
-                    onPressedChange={(next) =>
-                      setIntents((list) =>
-                        next
-                          ? [...list, intent]
-                          : list.filter((i) => i !== intent),
-                      )
-                    }
-                    className="inline-flex !h-8 items-center gap-1.5 !rounded-lg !px-3 text-caption text-subtle-foreground data-pressed:text-foreground"
-                  >
-                    {pressed ? (
-                      <Check aria-hidden size={13} strokeWidth={2} />
-                    ) : null}
+            <Select
+              multiple
+              value={intents}
+              onValueChange={(value) => setIntents(value ?? [])}
+            >
+              <SelectLabel className="sr-only">Qué puede hacer</SelectLabel>
+              <SelectTrigger
+                className={`!h-9 !bg-card !text-caption ${intents.length > 0 ? "!border-foreground" : ""}`}
+              >
+                <SelectValue placeholder="Qué puede hacer" maxLabels={1} />
+              </SelectTrigger>
+              <SelectContent>
+                {intentOptions.map((intent) => (
+                  <SelectItem key={intent} value={intent}>
                     {intentLabel(intent)}
-                  </Toggle>
-                );
-              })}
-            </fieldset>
+                    <SelectItemIndicator>
+                      <CheckIcon aria-hidden size={14} />
+                    </SelectItemIndicator>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           ) : null}
+
+          <Toggle
+            pressed={geo.state === "on" || geo.state === "locating"}
+            onPressedChange={locate}
+            className="inline-flex !h-9 items-center gap-1.5 !rounded-2xl !bg-card !px-3 text-caption data-pressed:!border-primary data-pressed:!bg-primary data-pressed:!text-primary-foreground"
+          >
+            <LocateFixedIcon aria-hidden size={15} />
+            {geo.state === "locating" ? "Ubicando…" : "Cerca de mí"}
+          </Toggle>
+
+          {origin ? (
+            <div className="inline-flex h-9 items-center gap-2.5 rounded-2xl bg-card px-3.5 shadow-card">
+              <span
+                id="radius-label"
+                className="text-caption text-subtle-foreground"
+              >
+                Radio
+              </span>
+              <Slider
+                min={1}
+                max={50}
+                value={radiusKm}
+                onValueChange={(value) => {
+                  setRadiusKm(Array.isArray(value) ? value[0] : value);
+                  setWithinRadius(true);
+                }}
+                className="w-30"
+              >
+                <SliderControl>
+                  <SliderTrack>
+                    <SliderIndicator />
+                    <SliderThumb aria-labelledby="radius-label" />
+                  </SliderTrack>
+                </SliderControl>
+              </Slider>
+              <span className="min-w-12 text-caption tabular-nums">
+                {withinRadius ? `${radiusKm} km` : "Sin límite"}
+              </span>
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 sm:ml-auto">
+            <label className="inline-flex min-h-9 items-center gap-2 text-caption text-subtle-foreground">
+              <Switch checked={verifiedOnly} onCheckedChange={setVerifiedOnly}>
+                <SwitchThumb />
+              </Switch>
+              Solo verificados
+            </label>
+            <label className="inline-flex min-h-9 items-center gap-2 text-caption text-subtle-foreground">
+              <Switch
+                checked={includeProspects}
+                onCheckedChange={setIncludeProspects}
+              >
+                <SwitchThumb />
+              </Switch>
+              Incluir sin reclamar
+            </label>
+          </div>
         </div>
 
-        {offerLocation && geo.state === "off" ? (
-          <div className="flex items-center gap-x-3 self-start rounded-2xl bg-muted py-1.5 pr-1.5 pl-3.5 text-caption max-sm:self-stretch">
-            <LocateFixed aria-hidden size={15} className="flex-none" />
-            <span className="min-w-0 flex-1">
-              <span className="sm:hidden">¿Ver lo cercano?</span>
-              <span className="max-sm:hidden">
-                Comparte tu ubicación y te mostramos primero lo que está cerca.
-              </span>
-            </span>
-            <div className="flex flex-none gap-1">
-              <Button
-                data-variant="solid"
-                data-size="sm"
-                onClick={() => startLocating(false)}
-              >
-                Usar mi ubicación
-              </Button>
-              <Button
-                data-variant="ghost"
-                data-size="sm"
-                aria-label="Ahora no"
-                onClick={() => {
-                  setOfferLocation(false);
-                  try {
-                    localStorage.setItem(INVITE_DISMISSED_KEY, "1");
-                  } catch {
-                    // The invite is dismissed for this visit without storage.
-                  }
-                }}
-                className="max-sm:!w-8 max-sm:!px-0"
-              >
-                <X aria-hidden size={14} className="sm:hidden" />
-                <span className="max-sm:hidden">Ahora no</span>
-              </Button>
-            </div>
-          </div>
-        ) : null}
+        {invite ? <div className="contents lg:hidden">{invite}</div> : null}
 
         {geo.state === "error" ? (
           <p role="alert" className="m-0 text-caption text-destructive-text">
@@ -547,22 +547,17 @@ export function DirectorySearch() {
 
         {active.length > 0 ? (
           <div className="flex flex-wrap items-center gap-1.5 text-caption">
-            <span className="mr-0.5 text-xs text-subtle-foreground">
-              Activos
-            </span>
+            <span className="sr-only">Filtros activos</span>
             {active.map((filter) => (
-              <span
-                key={filter.key}
-                className="inline-flex h-7 items-center gap-0.5 rounded-lg bg-muted pr-1 pl-2.5"
-              >
+              <span key={filter.key} className="tag !h-7 bg-card !pr-0">
                 {filter.label}
                 <Button
                   data-variant="ghost"
                   aria-label={`Quitar ${filter.label}`}
                   onClick={filter.remove}
-                  className="!size-6 !p-0 text-subtle-foreground"
+                  className="relative !size-7 !p-0 text-subtle-foreground after:absolute after:-inset-y-2 after:inset-x-0"
                 >
-                  <X aria-hidden size={12} strokeWidth={2} />
+                  <XIcon aria-hidden size={12} />
                 </Button>
               </span>
             ))}
@@ -580,9 +575,9 @@ export function DirectorySearch() {
 
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <main
-          className={`${view === "map" ? "hidden lg:flex" : "flex"} min-h-0 w-full flex-col border-border lg:w-110 lg:flex-none lg:border-r`}
+          className={`${view === "map" ? "hidden lg:flex" : "flex"} min-h-0 w-full flex-col border-border lg:w-140 lg:flex-none lg:border-r`}
         >
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3.5">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-2 sm:px-5">
             <p
               aria-live="polite"
               className="m-0 text-caption text-subtle-foreground"
@@ -591,7 +586,7 @@ export function DirectorySearch() {
                 "Buscando…"
               ) : (
                 <>
-                  <span className="font-mono text-xs font-bold tracking-wider text-foreground uppercase tabular-nums">
+                  <span className="label-caps text-foreground">
                     {pluralAgents(cards.length, result.truncated)}
                   </span>
                   {summary ? ` · ${summary}` : null}
@@ -622,35 +617,30 @@ export function DirectorySearch() {
             </Select>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-24 lg:pb-4">
+          <div className="min-h-0 flex-1 overflow-y-auto pb-24 lg:pb-0">
             {result === undefined || categories === undefined ? (
-              <div data-testid="loading" className="flex flex-col gap-3">
+              <div data-testid="loading">
                 <span className="sr-only">Cargando…</span>
-                {[0, 1, 2].map((i) => (
+                {[0, 1, 2, 3, 4, 5].map((i) => (
                   <div
                     key={i}
                     aria-hidden
-                    className="flex animate-pulse flex-col gap-3 rounded-3xl bg-card p-4 shadow-card"
+                    className="guide-row motion-safe:animate-pulse max-sm:px-4"
                   >
-                    <div className="flex items-start gap-3">
-                      <span className="size-10 flex-none rounded-2xl bg-muted" />
-                      <div className="flex flex-1 flex-col gap-2 pt-1">
-                        <span className="h-4 w-3/5 rounded-sm bg-muted" />
-                        <span className="h-3 w-2/5 rounded-sm bg-muted" />
-                      </div>
-                    </div>
-                    <span className="h-3 w-full rounded-sm bg-muted" />
-                    <div className="flex gap-2">
-                      <span className="h-9 flex-1 rounded-2xl bg-muted" />
-                      <span className="h-9 flex-1 rounded-2xl bg-muted" />
-                    </div>
+                    <span className="mt-0.5 size-4.5 rounded-sm bg-muted" />
+                    <span className="flex items-center gap-2 py-1">
+                      <span className="h-3.5 w-2/5 rounded-sm bg-muted" />
+                      <span className="leader !mt-0 self-center" />
+                      <span className="h-3 w-20 rounded-sm bg-muted" />
+                    </span>
+                    <span className="col-start-2 mt-1.5 mb-1 h-3 w-4/5 rounded-sm bg-muted" />
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col">
                 {cards.length === 0 ? (
-                  <div className="flex flex-col items-start gap-2 py-6">
+                  <div className="flex flex-col items-start gap-2 px-4 py-8 sm:px-5">
                     <p className="m-0 font-medium">
                       {active.length > 0
                         ? "No hay agentes con estos filtros."
@@ -667,7 +657,7 @@ export function DirectorySearch() {
                     cards={cards}
                     categories={categories}
                     distances={distances}
-                    selectedId={selectedId}
+                    selectedId={openId}
                     onSelect={setSelectedId}
                     onConverse={setConverse}
                   />
@@ -675,7 +665,7 @@ export function DirectorySearch() {
                 {result.nextOffset !== undefined ? (
                   <Button
                     data-testid="load-more"
-                    className="self-center"
+                    className="my-4 self-center"
                     aria-busy={loadingMore}
                     disabled={loadingMore}
                     onClick={() =>
@@ -689,7 +679,7 @@ export function DirectorySearch() {
                         Ver más agentes
                       </span>
                       {loadingMore ? (
-                        <LoaderCircle
+                        <LoaderCircleIcon
                           aria-label="Cargando"
                           size={16}
                           className="m-auto animate-spin [grid-area:1/1]"
@@ -699,7 +689,7 @@ export function DirectorySearch() {
                   </Button>
                 ) : null}
                 {radiusFilter && radiusFilter < 50 ? (
-                  <p className="m-0 text-center text-xs text-subtle-foreground">
+                  <p className="m-0 px-4 py-4 text-center text-xs text-subtle-foreground">
                     No hay más resultados en {radiusKm} km.{" "}
                     <Button
                       data-variant="ghost"
@@ -717,15 +707,23 @@ export function DirectorySearch() {
         </main>
 
         {view === "map" || isDesktop ? (
-          <MapView
-            cards={cards}
-            categories={categories ?? []}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            origin={origin}
-            radiusKm={radiusFilter}
-            className="flex-1"
-          />
+          <div className="relative flex min-h-0 flex-1">
+            <MapView
+              cards={cards}
+              categories={categories ?? []}
+              selectedId={openId}
+              popup={picked}
+              onSelect={setSelectedId}
+              origin={origin}
+              radiusKm={radiusFilter}
+              className="flex-1"
+            />
+            {invite ? (
+              <div className="absolute top-4 left-4 z-30 max-lg:hidden">
+                {invite}
+              </div>
+            ) : null}
+          </div>
         ) : null}
       </div>
 
@@ -738,7 +736,7 @@ export function DirectorySearch() {
         {view === "list" ? (
           <MapIcon aria-hidden size={18} />
         ) : (
-          <List aria-hidden size={18} />
+          <ListIcon aria-hidden size={18} />
         )}
         {view === "list" ? "Ver mapa" : "Ver lista"}
       </Button>
@@ -803,12 +801,12 @@ function TextSearch({
 
   return (
     <div className="flex flex-col gap-2">
-      <form onSubmit={submit} className="flex max-w-240 gap-2">
+      <form onSubmit={submit} className="flex max-w-220 gap-2">
         <label htmlFor="dir-q" className="sr-only">
           ¿Qué necesitas?
         </label>
         <div className="relative flex min-w-0 flex-1 items-center">
-          <Search
+          <SearchIcon
             aria-hidden
             size={18}
             className="pointer-events-none absolute left-4 hidden text-muted-foreground sm:block"
@@ -822,7 +820,7 @@ function TextSearch({
             maxLength={MAX_QUERY_LENGTH}
             onChange={(event) => setText(event.target.value)}
             placeholder="¿Qué necesitas? ej. hora con cardiólogo en Providencia"
-            className="!h-12 w-full !border-foreground !text-lead max-sm:!pr-11 sm:!pl-11"
+            className="!h-12 w-full !border-foreground !bg-card !text-lead max-sm:!pr-11 sm:!pl-11"
           />
           <Button
             type="submit"
@@ -834,15 +832,19 @@ function TextSearch({
             className="absolute right-1 !size-10 !p-0 sm:!hidden"
           >
             {busy ? (
-              <LoaderCircle aria-hidden size={18} className="animate-spin" />
+              <LoaderCircleIcon
+                aria-hidden
+                size={18}
+                className="animate-spin"
+              />
             ) : (
-              <Search aria-hidden size={18} />
+              <SearchIcon aria-hidden size={18} />
             )}
           </Button>
         </div>
         <Button
           type="submit"
-          data-variant="brand"
+          data-variant="solid"
           data-size="xl"
           className="max-sm:!hidden"
           aria-busy={busy}

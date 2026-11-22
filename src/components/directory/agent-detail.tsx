@@ -7,27 +7,20 @@ import {
   CollapsibleTrigger,
 } from "@ui-sdk/react/collapsible";
 import { useQuery } from "convex/react";
-import {
-  Ban,
-  ChevronDown,
-  ChevronLeft,
-  MapPin,
-  ShieldCheck,
-} from "lucide-react";
+import { ChevronDownIcon, ChevronLeftIcon, MapPinIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { api } from "@/convex/_generated/api";
 import type { DirectoryCard } from "@/convex/directory";
 import type { Category } from "@/shared/catalog";
 import { CONSUMER_AGENT_SLUG } from "@/shared/seed-data";
-import { dataFieldLabel, intentLabel } from "../room/room-format";
+import { Ledger, type LedgerRow, scopeRows } from "../ledger";
 import { SiteFooter } from "../site-footer";
 import { VerifiedBadge } from "../verified-badge";
 import { isProspect, ProspectBadge } from "./agent-badges";
 import {
   categoryIcon,
   categoryLabels,
-  dataFieldIcon,
   kindLabel,
   PROTOCOL_LABELS,
 } from "./directory-format";
@@ -41,25 +34,26 @@ export function AgentDetail({ slug }: { slug: string }) {
   return (
     <div className="flex min-h-dvh flex-col bg-background">
       <SiteHeader current="directory" />
-      <div className="mx-auto flex w-full max-w-280 flex-1 flex-col gap-7 px-4 pt-6 pb-16 sm:px-6">
+      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-7 px-4 pt-6 pb-18 sm:px-6">
         <nav aria-label="Ruta" className="text-caption">
           <Link
             href="/directory"
             className="inline-flex items-center gap-1 text-subtle-foreground no-underline hover:text-foreground"
           >
-            <ChevronLeft aria-hidden size={14} />
+            <ChevronLeftIcon aria-hidden size={14} />
             Directorio
           </Link>
         </nav>
         {card === undefined || categories === undefined ? (
-          <p className="m-0 text-subtle-foreground">Cargando…</p>
+          <DetailSkeleton />
         ) : card === null ? (
-          <div className="flex flex-col items-start gap-2">
-            <h1 className="m-0 text-2xl font-semibold tracking-tight">
+          <div className="flex flex-col items-start gap-3">
+            <h1 className="m-0 text-title font-semibold text-balance">
               No encontramos este agente
             </h1>
             <p className="m-0 text-subtle-foreground">
-              Puede que su ficha ya no esté publicada.
+              Su ficha ya no está publicada o la dirección cambió.{" "}
+              <Link href="/directory">Volver al directorio</Link>
             </p>
           </div>
         ) : (
@@ -69,6 +63,12 @@ export function AgentDetail({ slug }: { slug: string }) {
       <SiteFooter />
     </div>
   );
+}
+
+/** First sentence in the foreground, the rest quieter: the landing's two-tone headline. */
+function splitPurpose(purpose: string): [string, string | null] {
+  const match = purpose.match(/^(.+?[.!?])\s+(\S[\s\S]*)$/);
+  return match ? [match[1], match[2]] : [purpose, null];
 }
 
 function Detail({
@@ -81,231 +81,213 @@ function Detail({
   const [converse, setConverse] = useState<DirectoryCard | null>(null);
   const Icon = categoryIcon(card.categories, categories);
   const prospect = isProspect(card);
+  const own = card.slug === CONSUMER_AGENT_SLUG;
   const location = card.location;
   const address = location
     ? [location.address, location.comuna, location.region]
         .filter(Boolean)
         .join(", ")
     : null;
+  const [lead, rest] = splitPurpose(card.purpose);
+  const categoryText = categoryLabels(card.categories, categories);
+  const blocked = prospect
+    ? "Su dueño todavía no reclama este agente, así que aún no puede conversar."
+    : own
+      ? "Este es tu agente: habla por ti con los demás agentes del directorio."
+      : null;
+
+  const technical: LedgerRow[] = [
+    {
+      label: "Identificador",
+      value: <span className="font-mono text-xs">{card.slug}</span>,
+    },
+    { label: "Tipo", value: kindLabel(card) },
+    ...(card.allowedIntents.length
+      ? [
+          {
+            label: "Intenciones",
+            value: (
+              <span className="font-mono text-xs">
+                {card.allowedIntents.join(" · ")}
+              </span>
+            ),
+          },
+        ]
+      : []),
+    ...(card.endpoint
+      ? [
+          {
+            label: "Protocolo",
+            value: PROTOCOL_LABELS[card.endpoint.protocol],
+          },
+          {
+            label: "Endpoint",
+            value: (
+              <span className="font-mono text-xs break-all">
+                {card.endpoint.url}
+              </span>
+            ),
+          },
+        ]
+      : []),
+    ...(card.publicKey
+      ? [
+          {
+            label: "Clave pública",
+            value: (
+              <span className="font-mono text-xs break-all">
+                {card.publicKey}
+              </span>
+            ),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <>
-      <header className="flex flex-wrap items-start gap-5">
-        <span
-          aria-hidden
-          className="grid size-16 flex-none place-items-center rounded-3xl bg-muted"
+      <header className="flex flex-col gap-3">
+        <h1
+          className={`m-0 text-title font-semibold text-balance ${prospect ? "text-subtle-foreground" : ""}`}
         >
-          <Icon size={30} />
-        </span>
-        <div className="flex min-w-0 flex-[1_1_400px] flex-col gap-1.5">
-          <h1 className="m-0 flex items-center gap-1.5 text-title font-semibold">
-            {card.name}
-            {!prospect && card.verified ? <VerifiedBadge size={18} /> : null}
-          </h1>
-          {prospect ? (
-            <ProspectBadge />
-          ) : card.entityName && card.entityName !== card.name ? (
-            <span className="text-subtle-foreground">{card.entityName}</span>
+          {card.name}
+          {!prospect && card.verified ? (
+            <VerifiedBadge
+              size={22}
+              className="ml-1.5 !inline-grid !h-7 !w-7 place-items-center align-[0.02em] [&>svg]:!size-[22px]"
+            />
           ) : null}
-          <p className="m-0 text-caption text-subtle-foreground">
-            {[
-              categoryLabels(card.categories, categories),
-              location ? location.comuna : null,
-              kindLabel(card),
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
-        </div>
+        </h1>
+        <p className="m-0 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 font-mono text-xs font-medium text-subtle-foreground">
+          {prospect ? <ProspectBadge /> : null}
+          {!prospect && card.entityName && card.entityName !== card.name ? (
+            <span>{card.entityName}</span>
+          ) : null}
+          {categoryText ? (
+            <span className="inline-flex items-center gap-1.5">
+              <Icon aria-hidden size={14} />
+              {categoryText}
+            </span>
+          ) : null}
+          {location ? (
+            <span className="inline-flex items-center gap-1.5">
+              <MapPinIcon aria-hidden size={14} />
+              {location.comuna}
+            </span>
+          ) : null}
+          <span>{kindLabel(card)}</span>
+        </p>
+        <p
+          className={`m-0 mt-3 text-xl leading-[1.3] font-medium tracking-[-0.02em] text-pretty sm:text-2xl sm:leading-[1.3] ${prospect ? "text-subtle-foreground" : ""}`}
+        >
+          {lead}
+          {rest ? <span className="text-headline-muted"> {rest}</span> : null}
+        </p>
+
+        {blocked ? (
+          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-3 sm:mt-6">
+            <Button data-variant="brand" data-size="xl" disabled>
+              Conversar con este agente
+            </Button>
+            <p className="m-0 flex-[1_1_260px] text-caption text-pretty text-subtle-foreground">
+              {blocked}
+            </p>
+          </div>
+        ) : (
+          // On a phone the action stays within thumb reach.
+          <div className="mt-6 flex max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:z-20 max-sm:mt-0 max-sm:bg-background max-sm:px-4 max-sm:pt-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:shadow-[0_-1px_0_var(--ui-border)]">
+            <Button
+              data-variant="brand"
+              data-size="xl"
+              className="max-sm:flex-1"
+              onClick={() => setConverse(card)}
+            >
+              Conversar con este agente
+            </Button>
+          </div>
+        )}
       </header>
 
-      <div className="flex flex-wrap items-start gap-8">
-        <main className="flex min-w-0 flex-[999_1_480px] flex-col gap-8">
-          <section aria-labelledby="f-purpose" className="flex flex-col gap-2">
-            <h2 id="f-purpose" className="eyebrow text-subtle-foreground">
-              Propósito
-            </h2>
-            <p className="m-0 text-2xl leading-snug font-medium tracking-tight">
-              {card.purpose}
-            </p>
-          </section>
-
-          {card.allowedIntents.length > 0 ? (
-            <section aria-labelledby="f-can" className="flex flex-col gap-3">
-              <h2
-                id="f-can"
-                className="m-0 text-xl font-semibold tracking-tight"
-              >
-                Qué puede hacer
-              </h2>
-              <ul className="m-0 list-none rounded-3xl bg-card p-0 shadow-card">
-                {card.allowedIntents.map((intent) => (
-                  <li
-                    key={intent}
-                    className="flex flex-wrap justify-between gap-3 border-b border-border px-4 py-3 last:border-b-0"
-                  >
-                    <span className="font-medium">{intentLabel(intent)}</span>
-                    <code className="!bg-transparent !p-0 font-mono text-xs text-subtle-foreground">
-                      {intent}
-                    </code>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-4">
-            <section
-              aria-labelledby="f-requests"
-              className="flex flex-col gap-3 rounded-4xl bg-card p-5 shadow-card"
-            >
-              <h2 id="f-requests" className="m-0 text-base font-medium">
-                Qué datos te va a pedir
-              </h2>
-              <Chips
-                items={card.scope.dataItRequests}
-                empty="No pide datos."
-                render={(field) => {
-                  const FieldIcon = dataFieldIcon(field);
-                  return (
-                    <span className="inline-flex h-7 items-center gap-1.5 rounded-lg bg-muted px-3 text-caption">
-                      <FieldIcon aria-hidden size={14} />
-                      {dataFieldLabel(field)}
-                    </span>
-                  );
-                }}
-              />
-              <p className="m-0 text-caption text-subtle-foreground">
-                Solo puede pedir estos datos. El moderador bloquea cualquier
-                otro.
-              </p>
-            </section>
-            <section
-              aria-labelledby="f-shares"
-              className="flex flex-col gap-3 rounded-4xl bg-card p-5 shadow-card"
-            >
-              <h2 id="f-shares" className="m-0 text-base font-medium">
-                Qué datos comparte
-              </h2>
-              <Chips
-                items={card.scope.dataItShares}
-                empty="No comparte datos."
-                render={(field) => (
-                  <span className="inline-flex h-7 items-center rounded-lg border border-input px-3 text-caption">
-                    {dataFieldLabel(field)}
-                  </span>
-                )}
-              />
-            </section>
-          </div>
-
-          {card.scope.forbiddenTopics.length > 0 ? (
-            <section
-              aria-labelledby="f-forbidden"
-              className="flex flex-col gap-2.5"
-            >
-              <h2 id="f-forbidden" className="m-0 text-base font-medium">
-                Temas prohibidos
-              </h2>
-              <Chips
-                items={card.scope.forbiddenTopics}
-                empty=""
-                render={(topic) => (
-                  <span className="inline-flex h-7 items-center gap-1.5 rounded-lg bg-destructive-soft px-3 text-caption font-medium text-destructive-text">
-                    <Ban aria-hidden size={13} strokeWidth={2} />
-                    {topic}
-                  </span>
-                )}
-              />
-              <p className="m-0 text-caption text-subtle-foreground">
-                Si la conversación toca estos temas, el moderador interviene.
-              </p>
-            </section>
-          ) : null}
-
-          <section
-            aria-labelledby="f-description"
-            className="flex flex-col gap-2"
+      <div className="flex flex-col gap-10 border-t border-border pt-10">
+        <section aria-labelledby="f-contract" className="flex flex-col gap-3">
+          <h2
+            id="f-contract"
+            className="m-0 text-xl font-semibold tracking-tight"
           >
-            <h2 id="f-description" className="m-0 text-base font-medium">
-              Descripción
+            Contrato
+          </h2>
+          <p className="m-0 -mt-1.5 text-pretty text-subtle-foreground">
+            Lo que este agente puede hacer y pedir en una sala. Es lo mismo que
+            verás antes de abrir una.
+          </p>
+          <Ledger
+            rows={scopeRows({
+              intents: card.allowedIntents,
+              requests: card.scope.dataItRequests,
+              shares: card.scope.dataItShares,
+              forbidden: card.scope.forbiddenTopics,
+            })}
+          />
+        </section>
+
+        <section
+          aria-labelledby="f-description"
+          className="flex flex-col gap-3"
+        >
+          <h2
+            id="f-description"
+            className="m-0 text-xl font-semibold tracking-tight"
+          >
+            Descripción
+          </h2>
+          <p className="m-0 text-pretty text-subtle-foreground">
+            {card.description}
+          </p>
+        </section>
+
+        {location && address ? (
+          <section aria-labelledby="f-location" className="flex flex-col gap-3">
+            <h2
+              id="f-location"
+              className="m-0 text-xl font-semibold tracking-tight"
+            >
+              Ubicación
             </h2>
-            <p className="m-0 max-w-160 text-subtle-foreground">
-              {card.description}
-            </p>
+            <div
+              aria-hidden
+              className="relative h-50 overflow-hidden rounded-2xl bg-[var(--sm-map-land)] shadow-card [background-image:linear-gradient(var(--sm-map-grid)_1px,transparent_1px),linear-gradient(90deg,var(--sm-map-grid)_1px,transparent_1px)] [background-size:48px_48px]"
+            >
+              <span className="absolute top-1/2 left-1/2 grid size-8 -translate-1/2 place-items-center rounded-full bg-brand text-brand-ink shadow-selected">
+                <Icon size={16} />
+              </span>
+            </div>
+            <a
+              href={`https://www.openstreetmap.org/?mlat=${location.lat}&mlon=${location.lng}#map=17/${location.lat}/${location.lng}`}
+              target="_blank"
+              rel="noreferrer"
+              className="self-start text-caption"
+            >
+              {address}
+            </a>
           </section>
+        ) : null}
 
-          {location && address ? (
-            <section
-              aria-labelledby="f-location"
-              className="flex flex-col gap-2.5"
-            >
-              <h2 id="f-location" className="m-0 text-base font-medium">
-                Ubicación
-              </h2>
-              <div
-                aria-hidden
-                className="relative h-50 overflow-hidden rounded-2xl bg-[var(--sm-map-land)] shadow-card [background-image:linear-gradient(var(--sm-map-grid)_1px,transparent_1px),linear-gradient(90deg,var(--sm-map-grid)_1px,transparent_1px)] [background-size:48px_48px]"
-              >
-                <span className="absolute top-1/2 left-1/2 grid size-9 -translate-x-1/2 -translate-y-full place-items-center rounded-[50%_50%_50%_0] bg-primary text-primary-foreground [rotate:-45deg]">
-                  <MapPin size={16} className="rotate-45" />
-                </span>
-              </div>
-              <a
-                href={`https://www.openstreetmap.org/?mlat=${location.lat}&mlon=${location.lng}#map=17/${location.lat}/${location.lng}`}
-                target="_blank"
-                rel="noreferrer"
-                className="self-start text-caption"
-              >
-                {address}
-              </a>
-            </section>
-          ) : null}
-
-          <Collapsible className="border-t border-border pt-4">
-            <CollapsibleTrigger
-              data-variant="ghost"
-              className="group inline-flex items-center gap-1.5 !px-0 font-medium"
-            >
-              Detalles técnicos
-              <ChevronDown
-                aria-hidden
-                size={16}
-                className="transition-transform group-data-[open]:rotate-180 motion-reduce:transition-none"
-              />
-            </CollapsibleTrigger>
-            <CollapsiblePanel>
-              <dl className="m-0 mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-caption">
-                <dt className="text-subtle-foreground">Tipo</dt>
-                <dd className="m-0">{kindLabel(card)}</dd>
-                {card.endpoint ? (
-                  <>
-                    <dt className="text-subtle-foreground">Protocolo</dt>
-                    <dd className="m-0">
-                      {PROTOCOL_LABELS[card.endpoint.protocol]}
-                    </dd>
-                    <dt className="text-subtle-foreground">Endpoint</dt>
-                    <dd className="m-0 font-mono text-xs break-all">
-                      {card.endpoint.url}
-                    </dd>
-                  </>
-                ) : null}
-                {card.publicKey ? (
-                  <>
-                    <dt className="text-subtle-foreground">Clave pública</dt>
-                    <dd className="m-0 font-mono text-xs break-all">
-                      {card.publicKey}
-                    </dd>
-                  </>
-                ) : null}
-                <dt className="text-subtle-foreground">Slug</dt>
-                <dd className="m-0 font-mono text-xs">{card.slug}</dd>
-              </dl>
-            </CollapsiblePanel>
-          </Collapsible>
-        </main>
-
-        <ConverseAside card={card} onConverse={() => setConverse(card)} />
+        <Collapsible className="border-t border-border pt-4">
+          <CollapsibleTrigger
+            data-variant="ghost"
+            className="group inline-flex items-center gap-1.5 !px-0 font-medium"
+          >
+            Detalles técnicos
+            <ChevronDownIcon
+              aria-hidden
+              size={16}
+              className="transition-transform group-data-[open]:rotate-180 motion-reduce:transition-none"
+            />
+          </CollapsibleTrigger>
+          <CollapsiblePanel>
+            <Ledger rows={technical} className="mt-1 text-caption" />
+          </CollapsiblePanel>
+        </Collapsible>
       </div>
 
       <OpenSessionDialog card={converse} onClose={() => setConverse(null)} />
@@ -313,78 +295,33 @@ function Detail({
   );
 }
 
-function ConverseAside({
-  card,
-  onConverse,
-}: {
-  card: DirectoryCard;
-  onConverse: () => void;
-}) {
-  if (isProspect(card)) {
-    return (
-      <aside
-        aria-label="Conversar"
-        className="flex max-w-full flex-[0_0_320px] flex-col gap-3.5 rounded-4xl bg-muted p-5.5 [background-image:var(--sm-hatch)] lg:sticky lg:top-6"
-      >
-        <ProspectBadge />
-        <Button data-size="xl" disabled>
-          Conversar con este agente
-        </Button>
-        <p className="m-0 text-caption text-subtle-foreground">
-          Este agente fue pre-armado y aún no lo reclama su dueño.
-        </p>
-      </aside>
-    );
-  }
+const bar = "rounded-lg bg-muted motion-safe:animate-pulse";
 
-  const own = card.slug === CONSUMER_AGENT_SLUG;
+/** The page's shape while the card loads: title, meta, purpose, action, four ledger rows. */
+function DetailSkeleton() {
   return (
-    <aside
-      aria-label="Conversar"
-      className="flex max-w-full flex-[0_0_320px] flex-col gap-3.5 rounded-4xl bg-card p-5.5 shadow-card lg:sticky lg:top-6"
-    >
-      <Button
-        data-variant="brand"
-        data-size="xl"
-        disabled={own}
-        onClick={onConverse}
+    <div aria-busy className="flex flex-col gap-3">
+      <span className="sr-only">Cargando agente…</span>
+      <span aria-hidden className={`h-9 w-4/5 ${bar}`} />
+      <span aria-hidden className={`h-4 w-3/5 ${bar}`} />
+      <span aria-hidden className={`mt-3 h-7 w-full ${bar}`} />
+      <span aria-hidden className={`h-7 w-2/3 ${bar}`} />
+      <span aria-hidden className={`mt-6 h-12 w-64 max-w-full ${bar}`} />
+      <div
+        aria-hidden
+        className="mt-7 flex flex-col border-t border-border pt-10"
       >
-        Conversar con este agente
-      </Button>
-      <p className="m-0 flex gap-2 text-caption text-subtle-foreground">
-        <ShieldCheck aria-hidden size={16} className="mt-0.5 flex-none" />
-        {own
-          ? "Este es tu agente: habla por ti con los demás agentes del directorio."
-          : "Las conversaciones son moderadas: tu agente y este solo pueden hablar dentro del propósito declarado."}
-      </p>
-      {own ? null : (
-        <div className="flex flex-col gap-1.5 border-t border-border pt-3.5 text-caption">
-          <span className="font-medium">Antes de abrir verás el contrato</span>
-          <span className="text-subtle-foreground">
-            Intención, datos que pedirá, datos que comparte y temas prohibidos.
+        <span className={`mb-4 h-6 w-28 ${bar}`} />
+        {["w-full", "w-11/12", "w-full", "w-4/5"].map((width, index) => (
+          <span
+            // biome-ignore lint/suspicious/noArrayIndexKey: static placeholder rows
+            key={index}
+            className="flex h-10 items-center border-b border-border last:border-b-0"
+          >
+            <span className={`h-3.5 ${width} ${bar}`} />
           </span>
-        </div>
-      )}
-    </aside>
-  );
-}
-
-function Chips({
-  items,
-  empty,
-  render,
-}: {
-  items: string[];
-  empty: string;
-  render: (item: string) => React.ReactNode;
-}) {
-  if (items.length === 0)
-    return <p className="m-0 text-caption text-subtle-foreground">{empty}</p>;
-  return (
-    <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
-      {items.map((item) => (
-        <li key={item}>{render(item)}</li>
-      ))}
-    </ul>
+        ))}
+      </div>
+    </div>
   );
 }

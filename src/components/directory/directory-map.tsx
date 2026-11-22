@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@ui-sdk/react/button";
-import { Minus, Plus } from "lucide-react";
+import { MinusIcon, PlusIcon } from "lucide-react";
 import {
   type PointerEvent as ReactPointerEvent,
   useEffect,
@@ -87,6 +87,7 @@ export function DirectoryMap({
   cards,
   categories,
   selectedId,
+  popup = true,
   onSelect,
   origin,
   radiusKm,
@@ -205,7 +206,7 @@ export function DirectoryMap({
                 <span
                   key={label.comuna}
                   aria-hidden
-                  className="pointer-events-none absolute -translate-x-1/2 translate-y-6 text-caption tracking-[0.06em] whitespace-nowrap text-muted-foreground uppercase"
+                  className="pointer-events-none absolute -translate-x-1/2 translate-y-6 font-mono text-micro font-medium tracking-[0.1em] whitespace-nowrap text-muted-foreground uppercase"
                   style={{ left: at.x, top: at.y }}
                 >
                   {label.comuna}
@@ -240,7 +241,7 @@ export function DirectoryMap({
         )}
       </div>
 
-      {selectedPin && selected && selectedAt ? (
+      {popup && selectedPin && selected && selectedAt ? (
         <SelectedCard
           key={selected.agentId}
           pin={selectedPin}
@@ -266,7 +267,7 @@ export function DirectoryMap({
           onClick={() => zoomBy(1.5)}
           className="!size-10 !rounded-none !p-0"
         >
-          <Plus aria-hidden size={16} />
+          <PlusIcon aria-hidden size={16} />
         </Button>
         <Button
           data-variant="ghost"
@@ -275,7 +276,7 @@ export function DirectoryMap({
           onClick={() => zoomBy(1 / 1.5)}
           className="!size-10 !rounded-none border-t border-border !p-0"
         >
-          <Minus aria-hidden size={16} />
+          <MinusIcon aria-hidden size={16} />
         </Button>
       </div>
 

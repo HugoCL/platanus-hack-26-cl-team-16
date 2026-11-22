@@ -56,10 +56,10 @@ export function SiteHeader({
                 key={item.key}
                 href={item.href}
                 aria-current={item.key === current ? "page" : undefined}
-                className={`inline-flex h-9 items-center rounded-2xl px-3.5 text-foreground no-underline ${
+                className={`inline-flex h-7 items-center rounded-[3px] px-2.5 no-underline ${
                   item.key === current
-                    ? "bg-muted font-medium"
-                    : "text-subtle-foreground hover:bg-muted"
+                    ? "highlight font-medium"
+                    : "text-subtle-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
                 {item.label}

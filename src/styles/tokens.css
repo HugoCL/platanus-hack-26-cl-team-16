@@ -50,6 +50,9 @@
   --ui-shadow:
     0 1px 2px light-dark(oklch(0.13 0.004 49 / 0.05), transparent),
     0 0 0 1px light-dark(oklch(0.13 0.004 49 / 0.1), oklch(1 0 0 / 0.08));
+  /* The selected map pin: an ink edge so yellow holds on any map, and a lift. */
+  --sm-shadow-selected:
+    0 0 0 1.5px var(--brand-ink), 0 6px 14px -4px oklch(0 0 0 / 0.35);
   /* Floating controls over content (the mobile map toggle). */
   --sm-shadow-float: 0 8px 24px -6px oklch(0 0 0 / 0.35);
   --ui-overlay: light-dark(oklch(0.13 0.004 49 / 0.25), oklch(0 0 0 / 0.6));

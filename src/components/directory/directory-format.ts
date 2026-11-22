@@ -1,45 +1,45 @@
 import {
-  BedDouble,
-  Bot,
-  Coffee,
-  Croissant,
-  Dumbbell,
-  FileText,
-  Hammer,
-  HeartPulse,
-  IdCard,
+  BedDoubleIcon,
+  BotIcon,
+  CoffeeIcon,
+  CroissantIcon,
+  DumbbellIcon,
+  FileTextIcon,
+  HammerIcon,
+  HeartPulseIcon,
+  IdCardIcon,
   type LucideIcon,
-  PawPrint,
-  Pill,
-  Scale,
-  Scissors,
-  Smartphone,
-  Smile,
-  Stethoscope,
-  Store,
-  User,
-  Wrench,
+  PawPrintIcon,
+  PillIcon,
+  ScaleIcon,
+  ScissorsIcon,
+  SmartphoneIcon,
+  SmileIcon,
+  StethoscopeIcon,
+  StoreIcon,
+  UserIcon,
+  WrenchIcon,
 } from "lucide-react";
 import type { DirectoryCard } from "@/convex/directory";
 import type { Category } from "@/shared/catalog";
 import { distanceKm, type LatLng } from "@/shared/geo";
 
 const CATEGORY_ICONS: Record<string, LucideIcon> = {
-  salud: HeartPulse,
-  cardiologia: HeartPulse,
-  medicina_general: Stethoscope,
-  odontologia: Smile,
-  hoteleria: BedDouble,
-  cafeteria: Coffee,
-  panaderia: Croissant,
-  ferreteria: Hammer,
-  veterinaria: PawPrint,
-  peluqueria: Scissors,
-  abogados: Scale,
-  gasfiteria: Wrench,
-  gimnasio: Dumbbell,
-  farmacia: Pill,
-  asistente_personal: Bot,
+  salud: HeartPulseIcon,
+  cardiologia: HeartPulseIcon,
+  medicina_general: StethoscopeIcon,
+  odontologia: SmileIcon,
+  hoteleria: BedDoubleIcon,
+  cafeteria: CoffeeIcon,
+  panaderia: CroissantIcon,
+  ferreteria: HammerIcon,
+  veterinaria: PawPrintIcon,
+  peluqueria: ScissorsIcon,
+  abogados: ScaleIcon,
+  gasfiteria: WrenchIcon,
+  gimnasio: DumbbellIcon,
+  farmacia: PillIcon,
+  asistente_personal: BotIcon,
 };
 
 export function categoryIcon(
@@ -54,18 +54,18 @@ export function categoryIcon(
       current = categories.find((c) => c.slug === current)?.parent;
     }
   }
-  return Store;
+  return StoreIcon;
 }
 
 const DATA_FIELD_ICONS: Record<string, LucideIcon> = {
-  nombre: User,
-  nombre_paciente: User,
-  rut: IdCard,
-  telefono: Smartphone,
+  nombre: UserIcon,
+  nombre_paciente: UserIcon,
+  rut: IdCardIcon,
+  telefono: SmartphoneIcon,
 };
 
 export function dataFieldIcon(field: string): LucideIcon {
-  return DATA_FIELD_ICONS[field] ?? FileText;
+  return DATA_FIELD_ICONS[field] ?? FileTextIcon;
 }
 
 export const KIND_LABELS: Record<DirectoryCard["kind"], string> = {

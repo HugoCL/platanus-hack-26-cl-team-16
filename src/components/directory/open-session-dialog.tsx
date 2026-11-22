@@ -13,15 +13,21 @@ import {
 import { Radio, RadioGroup, RadioIndicator } from "@ui-sdk/react/radio";
 import { Textarea } from "@ui-sdk/react/textarea";
 import { useAction, useConvexAuth, useQuery } from "convex/react";
-import { Check, LoaderCircle, ShieldCheck, X } from "lucide-react";
+import {
+  CheckIcon,
+  LoaderCircleIcon,
+  ShieldCheckIcon,
+  XIcon,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import type { DirectoryCard } from "@/convex/directory";
 import { CONSUMER_AGENT_SLUG } from "@/shared/seed-data";
 import { SessionIntent } from "@/shared/session";
+import { Ledger, scopeRows } from "../ledger";
 import { openRoomError } from "../room/live-room";
-import { dataFieldLabel, intentLabel } from "../room/room-format";
+import { intentLabel } from "../room/room-format";
 
 const MAX_DESCRIPTION = 500;
 const MAX_VIOLATIONS = 3;
@@ -102,7 +108,7 @@ export function OpenSessionDialog({
                 data-variant="ghost"
                 className="!size-8 !p-0 text-subtle-foreground"
               >
-                <X aria-hidden size={16} />
+                <XIcon aria-hidden size={16} />
               </DialogClose>
             </div>
 
@@ -138,9 +144,6 @@ export function OpenSessionDialog({
                             <RadioIndicator />
                           </Radio>
                           <span className="flex-1">{intentLabel(name)}</span>
-                          <code className="!bg-transparent !p-0 font-mono text-xs text-subtle-foreground">
-                            {name}
-                          </code>
                         </label>
                       ))}
                     </RadioGroup>
@@ -198,42 +201,31 @@ export function OpenSessionDialog({
                     este contrato.
                   </DialogDescription>
                 </div>
-                <dl className="m-0 flex flex-col gap-3.5 text-caption">
-                  <div className="flex flex-col gap-1">
-                    <dt className="text-subtle-foreground">Intención</dt>
-                    <dd className="m-0 break-words">
-                      <span className="font-medium">
-                        {intent ? intentLabel(intent) : ""}
-                      </span>{" "}
-                      · {description.trim()}
-                    </dd>
-                  </div>
-                  <ChipRow
-                    term="Te pedirá"
-                    items={card.scope.dataItRequests.map(dataFieldLabel)}
-                    className="bg-muted"
-                  />
-                  <ChipRow
-                    term="Comparte"
-                    items={card.scope.dataItShares.map(dataFieldLabel)}
-                    className="border border-input"
-                  />
-                  <ChipRow
-                    term="Temas prohibidos"
-                    items={card.scope.forbiddenTopics}
-                    className="bg-destructive-soft font-medium text-destructive-text"
-                  />
-                  <div className="flex justify-between gap-3 border-t border-border pt-3">
-                    <dt className="text-subtle-foreground">
-                      Máximo de bloqueos
-                    </dt>
-                    <dd className="m-0 font-medium tabular-nums">
-                      {MAX_VIOLATIONS}
-                    </dd>
-                  </div>
-                </dl>
+                {description.trim() ? (
+                  <p className="m-0 text-pretty break-words">
+                    <span className="text-subtle-foreground">
+                      {selfName} va a pedir:
+                    </span>{" "}
+                    “{description.trim()}”
+                  </p>
+                ) : null}
+                <Ledger
+                  className="text-caption"
+                  rows={[
+                    {
+                      label: "Intención",
+                      value: intent ? intentLabel(intent) : "",
+                    },
+                    ...scopeRows({
+                      requests: card.scope.dataItRequests,
+                      shares: card.scope.dataItShares,
+                      forbidden: card.scope.forbiddenTopics,
+                    }),
+                    { label: "Máximo de bloqueos", value: MAX_VIOLATIONS },
+                  ]}
+                />
                 {error ? (
-                  <p role="alert" className="m-0 text-sm text-destructive">
+                  <p role="alert" className="m-0 text-sm text-destructive-text">
                     {error}
                   </p>
                 ) : null}
@@ -255,13 +247,13 @@ export function OpenSessionDialog({
                       className="inline-flex items-center gap-2"
                     >
                       {pending ? (
-                        <LoaderCircle
+                        <LoaderCircleIcon
                           aria-hidden
                           size={16}
                           className="animate-spin motion-reduce:animate-none"
                         />
                       ) : (
-                        <ShieldCheck aria-hidden size={16} />
+                        <ShieldCheckIcon aria-hidden size={16} />
                       )}
                       {pending ? "Negociando contrato…" : "Abrir sala moderada"}
                     </Button>
@@ -295,7 +287,7 @@ function Steps({ step }: { step: Step }) {
   return (
     <ol
       aria-label="Pasos"
-      className="m-0 flex list-none items-center gap-1.5 p-0 text-xs tabular-nums"
+      className="m-0 flex list-none items-center gap-1.5 p-0 text-xs whitespace-nowrap tabular-nums"
     >
       {items.map((item, index) => {
         const current = item.key === step;
@@ -306,7 +298,7 @@ function Steps({ step }: { step: Step }) {
             className={`inline-flex items-center gap-1.5 ${current ? "font-medium" : "text-subtle-foreground"}`}
           >
             {index > 0 ? (
-              <span aria-hidden className="h-px w-4 bg-input" />
+              <span aria-hidden className="h-px w-2 bg-input sm:w-4" />
             ) : null}
             <span
               className={`grid size-5.5 place-items-center rounded-full ${
@@ -317,11 +309,7 @@ function Steps({ step }: { step: Step }) {
                     : "border border-ring"
               }`}
             >
-              {item.done ? (
-                <Check aria-hidden size={12} strokeWidth={2} />
-              ) : (
-                index + 1
-              )}
+              {item.done ? <CheckIcon aria-hidden size={12} /> : index + 1}
             </span>
             {item.label}
             {item.done ? <span className="sr-only"> (listo)</span> : null}
@@ -329,35 +317,5 @@ function Steps({ step }: { step: Step }) {
         );
       })}
     </ol>
-  );
-}
-
-function ChipRow({
-  term,
-  items,
-  className,
-}: {
-  term: string;
-  items: string[];
-  className: string;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <dt className="text-subtle-foreground">{term}</dt>
-      <dd className="m-0 flex flex-wrap gap-1.5">
-        {items.length === 0 ? (
-          <span className="text-subtle-foreground">Nada</span>
-        ) : (
-          items.map((item) => (
-            <span
-              key={item}
-              className={`inline-flex h-6.5 items-center rounded-lg px-2.5 ${className}`}
-            >
-              {item}
-            </span>
-          ))
-        )}
-      </dd>
-    </div>
   );
 }
