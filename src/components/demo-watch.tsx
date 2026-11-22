@@ -62,6 +62,7 @@ export function DemoWatch() {
       messages={room.history}
       answers={liveAnswers(room.history)}
       answersReadOnly
+      showRooms={false}
       onSendText={() => {}}
       onRespond={() => {}}
     />

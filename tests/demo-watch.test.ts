@@ -33,6 +33,7 @@ it("shows the watcher the demo room with nothing to write or press", async () =>
   expect(html).toContain("Confirma tu pedido");
   expect(html).toContain("Estás observando esta sala");
   expect(html).toMatch(/<button[^>]*type="submit"[^>]*disabled/);
+  expect(html).not.toContain("Tus salas");
   expect(html).not.toContain("Tomar control");
   expect(html).not.toContain("Cerrar sala");
   expect(html).not.toContain("Invitar agente");
