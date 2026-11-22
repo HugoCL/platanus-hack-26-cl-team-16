@@ -34,6 +34,7 @@ import {
   BotIcon,
   CheckIcon,
   PanelRightIcon,
+  RotateCcwIcon,
   SendHorizontalIcon,
   ShieldAlertIcon,
   ShieldCheckIcon,
@@ -112,8 +113,8 @@ export function DemoRoom({
       onSendText={room.sendText}
       onRestart={room.reset}
       onReview={room.review}
-      toolbar={
-        <DemoToolbar role={role} onRole={setRole} onReset={room.reset} />
+      demoControls={
+        <DemoControls role={role} onRole={setRole} onReset={room.reset} />
       }
     />
   );
@@ -133,7 +134,7 @@ export function RoomView({
   onCloseRoom,
   onRestart,
   onReview,
-  toolbar,
+  demoControls,
   error,
   sessions,
   sending = false,
@@ -153,7 +154,7 @@ export function RoomView({
   onCloseRoom?: () => void;
   onRestart?: () => void;
   onReview?: (messageId: string, approve: boolean) => void;
-  toolbar?: ReactNode;
+  demoControls?: ReactNode;
   error?: string;
   sending?: boolean;
   answersReadOnly?: boolean;
@@ -207,7 +208,11 @@ export function RoomView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-background">
-      {toolbar}
+      {demoControls ? (
+        <div className="border-b border-border px-4 py-2 xl:hidden">
+          {demoControls}
+        </div>
+      ) : null}
       <div className="flex min-h-0 flex-1">
         <SessionList
           self={self}
@@ -216,6 +221,7 @@ export function RoomView({
           lastAt={messages.at(-1)?.sentAt}
           status={status}
           sessions={sessions}
+          footer={demoControls}
         />
         <main className="flex min-w-0 flex-1 flex-col border-x border-border">
           {contract ? (
@@ -353,7 +359,7 @@ export function RoomView({
   );
 }
 
-function DemoToolbar({
+function DemoControls({
   role,
   onRole,
   onReset,
@@ -363,35 +369,27 @@ function DemoToolbar({
   onReset: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 bg-primary px-4 py-1.5 text-xs text-primary-foreground">
-      <span className="font-semibold">Demo</span>
-      <span className="hidden opacity-80 sm:inline">
-        Sin backend: datos del seed y una conversación guionada
-      </span>
-      <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-        <Select
-          value={role}
-          onValueChange={(value) => {
-            if (value) onRole(value as Viewer["role"]);
-          }}
-        >
-          <SelectLabel className="sr-only">Ver como</SelectLabel>
-          <SelectTrigger className="!h-7 !border-transparent !text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="owner">Ver como dueño</SelectItem>
-            <SelectItem value="observer">Ver como observador</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button
-          data-size="sm"
-          className="!h-7 !border-transparent"
-          onClick={onReset}
-        >
-          Reiniciar demo
-        </Button>
-      </div>
+    <div className="flex flex-wrap items-center gap-2 xl:flex-col xl:items-stretch">
+      <p className="m-0 text-xs text-muted-foreground">Demo</p>
+      <Select
+        value={role}
+        onValueChange={(value) => {
+          if (value) onRole(value as Viewer["role"]);
+        }}
+      >
+        <SelectLabel className="sr-only">Ver como</SelectLabel>
+        <SelectTrigger className="h-8 w-auto min-w-0 gap-2 text-xs xl:w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="owner">Ver como dueño</SelectItem>
+          <SelectItem value="observer">Ver como observador</SelectItem>
+        </SelectContent>
+      </Select>
+      <Button data-size="sm" onClick={onReset}>
+        <RotateCcwIcon size={14} />
+        Reiniciar demo
+      </Button>
     </div>
   );
 }
@@ -430,6 +428,7 @@ function SessionList({
   lastAt,
   status,
   sessions,
+  footer,
 }: {
   self?: RoomParticipant;
   other?: RoomParticipant;
@@ -437,6 +436,7 @@ function SessionList({
   lastAt?: number;
   status: SessionStatus;
   sessions?: { sessionId: string; name: string; intent: string }[];
+  footer?: ReactNode;
 }) {
   return (
     <nav
@@ -480,6 +480,7 @@ function SessionList({
       <p className="m-0 mt-2 px-6 text-xs text-pretty text-subtle-foreground">
         Las salas que abra tu agente aparecen aquí.
       </p>
+      {footer ? <div className="mt-auto px-6 pt-4">{footer}</div> : null}
     </nav>
   );
 }
