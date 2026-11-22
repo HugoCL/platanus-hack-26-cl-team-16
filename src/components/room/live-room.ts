@@ -116,6 +116,14 @@ export function inviteError(error: unknown) {
   }
 }
 
+// The agent's owner answering an invitation: the same failures, read from their side.
+export function respondError(error: unknown) {
+  const kind = (error as { data?: { kind?: string } } | null)?.data?.kind;
+  return kind === "NotFriend"
+    ? "Ya no eres amigo de quien te invitó, así que no puedes aprobar esta invitación."
+    : inviteError(error);
+}
+
 export function openRoomError(error: unknown) {
   const data = (error as { data?: { kind?: string; message?: unknown } } | null)
     ?.data;

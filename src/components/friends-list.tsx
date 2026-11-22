@@ -19,6 +19,7 @@ import type { FunctionReturnType } from "convex/server";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useState } from "react";
+import { respondError } from "@/components/room/live-room";
 import { api } from "@/convex/_generated/api";
 
 const FAILED = "No pudimos guardar el cambio. Inténtalo de nuevo.";
@@ -85,10 +86,8 @@ function RoomInvitations() {
     try {
       await respond({ invitationId, approve });
       if (approve) router.push(`/room/${sessionId}`);
-    } catch {
-      setError(
-        "No pudimos responder la invitación. Puede que la sala ya esté cerrada.",
-      );
+    } catch (error) {
+      setError(respondError(error));
     } finally {
       setPending(false);
     }

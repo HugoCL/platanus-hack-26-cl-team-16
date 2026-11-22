@@ -6,6 +6,7 @@ import {
   liveAnswers,
   mapLiveRoom,
   openRoomError,
+  respondError,
   sendError,
 } from "../src/components/room/live-room";
 import {
@@ -225,6 +226,15 @@ describe("live room mapping", () => {
       "No se pudo completar la acción. Inténtalo de nuevo.",
     );
     expect(sendError(null)).toBe(sendError({}));
+  });
+
+  it("tells the agent's owner why an invitation cannot be approved", () => {
+    expect(respondError({ data: { kind: "NotFriend" } })).toMatch(
+      /Ya no eres amigo/,
+    );
+    expect(respondError({ data: { kind: "RoomNotActive" } })).toBe(
+      "La sala está cerrada.",
+    );
   });
 
   it.each([
