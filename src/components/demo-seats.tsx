@@ -6,10 +6,15 @@ import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { useState } from "react";
 import { api } from "@/convex/_generated/api";
-import type { DemoSeat } from "@/shared/demo-pcb";
+import { DEMO_KNOWLEDGE, type DemoSeat } from "@/shared/demo-pcb";
 
-const BOT_PROMPT =
-  "Usa agora. Con list_sessions encuentra mi sala abierta con Don Huang, léela desde el inicio con wait_for_messages y cuéntame en qué quedó y qué me está pidiendo. Cuando te diga qué responder, envíalo con send_message al participantId de Don Huang y espera su respuesta con wait_for_messages.";
+// What each seat's holder pastes into their assistant. The manufacturer's own agent replaces
+// the hosted one, so its message carries the price list the hosted agent quotes from.
+const BOT_PROMPTS: Record<DemoSeat, string> = {
+  buyer:
+    "Usa agora. Con list_sessions encuentra mi sala abierta con el fabricante de PCB, léela desde el inicio con wait_for_messages y cuéntame en qué quedó y qué me está pidiendo. Cuando te diga qué responder, envíalo con send_message al participantId del agente del fabricante y espera su respuesta con wait_for_messages.",
+  merchant: `Usa agora. Eres el agente de ventas de Don Huang, fabricante de PCB en Shenzhen. Con list_sessions encuentra la sala que abrió el comprador y léela desde el inicio con wait_for_messages. Cuando te lo pida, responde al comprador con send_message a toda la sala (recipient "all"), en español y en seis líneas como máximo, y espera su respuesta con wait_for_messages. Cotiza solo con esta lista: da el precio por unidad, el subtotal, el envío, el total en USD y el plazo. Si te doy una oferta distinta de la lista, aplícala y di que la ofrece Don Huang.\n\n${DEMO_KNOWLEDGE.text}`,
+};
 
 const SEATS: { seat: DemoSeat; title: string; detail: string }[] = [
   {
@@ -30,7 +35,7 @@ function seatError(error: unknown) {
   if (kind === "Forbidden")
     return "Toma un asiento para poder reiniciar la sala.";
   if (kind === "NotYourAgent")
-    return "Solo puedes traer un agente tuyo, y solo como comprador.";
+    return "Solo puedes traer un agente vinculado a tu cuenta.";
   if (kind === "NotFound") return "La sala de la demo no está preparada.";
   return "No pudimos hacer el cambio. Inténtalo de nuevo.";
 }
@@ -77,9 +82,9 @@ function Seats() {
     }
   }
 
-  async function copyPrompt() {
+  async function copyPrompt(seat: DemoSeat) {
     try {
-      await navigator.clipboard.writeText(BOT_PROMPT);
+      await navigator.clipboard.writeText(BOT_PROMPTS[seat]);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -103,6 +108,7 @@ function Seats() {
         {SEATS.map(({ seat, title, detail }) => {
           const holder = demo.seats.find((s) => s.seat === seat);
           const mine = demo.mySeat === seat;
+          const brought = demo.agents[seat];
           return (
             <li
               key={seat}
@@ -137,21 +143,22 @@ function Seats() {
                   Entrar como {title.toLowerCase()}
                 </Button>
               )}
-              {seat === "buyer" && (mine || !holder?.taken) ? (
+              {mine || !holder?.taken ? (
                 <div className="flex flex-col items-start gap-2 border-t border-border pt-3">
-                  {demo.buyerAgent && mine ? (
+                  {brought && mine ? (
                     <>
                       <p className="m-0 text-sm">
-                        Hablas desde tu agente{" "}
-                        <strong>{demo.buyerAgent.name}</strong>: la sala muestra
-                        lo que conversó con el fabricante. Pega este mensaje en
-                        tu asistente para seguir desde ahí.
+                        Hablas desde tu agente <strong>{brought.name}</strong>
+                        {seat === "buyer"
+                          ? ": la sala muestra lo que conversó con el fabricante."
+                          : ": reemplaza al agente de Don Huang, así que cotiza él con la lista de precios del mensaje."}{" "}
+                        Pega este mensaje en tu asistente para seguir desde ahí.
                       </p>
-                      <p className="m-0 rounded-md bg-muted p-3 text-sm">
-                        {BOT_PROMPT}
+                      <p className="m-0 max-h-48 w-full overflow-y-auto whitespace-pre-line rounded-md bg-muted p-3 text-sm">
+                        {BOT_PROMPTS[seat]}
                       </p>
                       <div className="flex flex-wrap gap-2">
-                        <Button data-size="sm" onClick={copyPrompt}>
+                        <Button data-size="sm" onClick={() => copyPrompt(seat)}>
                           {copied ? "Mensaje copiado" : "Copiar el mensaje"}
                         </Button>
                         <Button

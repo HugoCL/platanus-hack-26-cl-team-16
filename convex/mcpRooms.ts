@@ -413,6 +413,7 @@ export const readInvitations = internalQuery({
 });
 
 const SESSION_LIMIT = 20;
+const RECIPIENT_SCAN = 100;
 
 type AgentSession = {
   sessionId: Id<"sessions">;
@@ -429,9 +430,9 @@ export const sessions = action({
   },
 });
 
-// The active rooms the calling agent started, newest first, so an agent in a new conversation
-// finds a room it opened earlier, or one its owner set up for it, without being handed its id.
-// Rooms it joined as a guest are in `readInvitations`.
+// The active rooms the calling agent started or was opened with, newest first, so an agent in a
+// new conversation finds a room it opened earlier, one opened with it, or one its owner set up
+// for it, without being handed its id. Rooms it joined as a guest are in `readInvitations`.
 export const readSessions = internalQuery({
   args: { apiKey: v.string() },
   handler: async (ctx, { apiKey }): Promise<AgentSessions> => {
@@ -443,6 +444,24 @@ export const readSessions = internalQuery({
       )
       .order("desc")
       .take(SESSION_LIMIT + 1);
+    // No index says which rooms opened with an agent are still active, so this reads the latest
+    // rooms it entered, up to a bound, and reports `truncated` when there were more.
+    const seats = await ctx.db
+      .query("participants")
+      .withIndex("by_agentId", (q) => q.eq("agentId", agent._id))
+      .order("desc")
+      .take(RECIPIENT_SCAN + 1);
+    for (const seat of seats.slice(0, RECIPIENT_SCAN)) {
+      if (seat.role !== "recipient" || seat.leftAt !== undefined) continue;
+      const session = await ctx.db.get("sessions", seat.sessionId);
+      if (
+        session?.status === "active" &&
+        session.initiatorAgentId !== agent._id
+      ) {
+        rows.push(session);
+      }
+    }
+    rows.sort((a, b) => b._creationTime - a._creationTime);
     const sessions: AgentSession[] = [];
     for (const { _id: sessionId } of rows.slice(0, SESSION_LIMIT)) {
       const room = await loadSession(ctx, sessionId);
@@ -466,6 +485,9 @@ export const readSessions = internalQuery({
       }
       sessions.push({ sessionId, request: room.intent.description, agents });
     }
-    return { sessions, truncated: rows.length > SESSION_LIMIT };
+    return {
+      sessions,
+      truncated: rows.length > SESSION_LIMIT || seats.length > RECIPIENT_SCAN,
+    };
   },
 });

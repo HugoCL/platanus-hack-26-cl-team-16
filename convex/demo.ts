@@ -35,10 +35,15 @@ import { loadSession, requireRoomIdentity, toParticipant } from "./roomState";
 // `npx convex run --prod demo:reset`). Until then the public functions below find nothing. After
 // that, two signed-in people take the seats on /demo and either of them can restart the room.
 //
-// The demo room is the room the demo provider is in. That agent is an unlisted draft, so nobody
-// opens another room with it from the directory.
+// The manufacturer's hosted agent is an unlisted draft, so nobody opens another room with it from
+// the directory. Either seat can bring an external agent of its holder's instead of the hosted
+// one: the room then starts over with that agent as the one that has been talking.
 
 const seat = v.union(v.literal("buyer"), v.literal("merchant"));
+const broughtAgent = v.union(
+  v.null(),
+  v.object({ agentId: v.id("agents"), name: v.string() }),
+);
 const SEATS = Object.keys(DEMO_SEATS) as DemoSeat[];
 const MAX_DEMO_ROOMS = 20;
 const MAX_ROOM_ROWS = 500;
@@ -72,8 +77,8 @@ function agentBySlug(ctx: QueryCtx, slug: string) {
     .unique();
 }
 
-// Unless the buyer brings their own agent, theirs is the platform's consumer agent. A deployment
-// that was never seeded gets it here.
+// The buyer's hosted agent is the platform's consumer agent. A deployment that was never seeded
+// gets it here.
 async function ensureBuyerAgent(ctx: MutationCtx) {
   const existing = await agentBySlug(ctx, CONSUMER_AGENT_SLUG);
   if (existing) return existing._id;
@@ -155,12 +160,32 @@ async function deleteProviderData(ctx: MutationCtx, agentId: Id<"agents">) {
   for (const row of rows) await ctx.db.delete(row._id);
 }
 
-function demoRooms(ctx: QueryCtx, providerId: Id<"agents">) {
-  return ctx.db
-    .query("participants")
-    .withIndex("by_agentId_and_sessionId", (q) => q.eq("agentId", providerId))
+// The demo rooms, newest first: the marked ones, and the ones the manufacturer's hosted agent is
+// in, which is how a room was told apart before the mark existed.
+async function demoRooms(ctx: QueryCtx) {
+  const ids = new Set<Id<"sessions">>();
+  const marked = await ctx.db
+    .query("sessions")
+    .withIndex("by_demo", (q) => q.eq("demo", true))
     .order("desc")
     .take(MAX_DEMO_ROOMS);
+  for (const session of marked) ids.add(session._id);
+  const provider = await agentBySlug(ctx, DEMO_PROVIDER_SLUG);
+  if (provider) {
+    const rows = await ctx.db
+      .query("participants")
+      .withIndex("by_agentId_and_sessionId", (q) =>
+        q.eq("agentId", provider._id),
+      )
+      .take(MAX_DEMO_ROOMS);
+    for (const row of rows) ids.add(row.sessionId);
+  }
+  const sessions: Doc<"sessions">[] = [];
+  for (const id of ids) {
+    const session = await ctx.db.get("sessions", id);
+    if (session) sessions.push(session);
+  }
+  return sessions.sort((a, b) => b._creationTime - a._creationTime);
 }
 
 function members(ctx: QueryCtx, sessionId: Id<"sessions">) {
@@ -171,6 +196,19 @@ function members(ctx: QueryCtx, sessionId: Id<"sessions">) {
 }
 
 type SeatAgents = Record<DemoSeat, Id<"agents">>;
+
+// The agent on each side of a room: the one that opened it and the one it was opened with.
+function seatAgents(
+  session: Doc<"sessions">,
+  rows: Doc<"participants">[],
+): SeatAgents | null {
+  const recipient = rows.find(
+    (row) => row.kind === "agent" && row.role === "recipient",
+  );
+  return recipient?.kind === "agent"
+    ? { buyer: session.initiatorAgentId, merchant: recipient.agentId }
+    : null;
+}
 
 // The seat a human holds is the agent they are in the room for. Someone who came in with an
 // invited agent holds neither seat.
@@ -206,7 +244,7 @@ async function deleteRoom(ctx: MutationCtx, sessionId: Id<"sessions">) {
   await ctx.db.delete(sessionId);
 }
 
-// The external agent a person may bring to the buyer's seat: one of their own.
+// The external agent a person may bring to a seat: one of their own.
 async function ownAgent(
   ctx: QueryCtx,
   agentId: Id<"agents">,
@@ -219,33 +257,34 @@ async function ownAgent(
     : null;
 }
 
-// Deletes the demo rooms and opens a fresh one, keeping whoever holds each seat. The buyer's
-// agent is `buyerAgentId`, or the one the last room had while the buyer's seat is still held by
-// its owner, or the consumer agent.
+// Deletes the demo rooms and opens a fresh one, keeping whoever holds each seat. A seat's agent
+// is the one in `agents` (null for the hosted one), or the one the last room had; an external
+// agent stays only while its owner holds the seat.
 async function rebuild(
   ctx: MutationCtx,
   {
     clearSeats = false,
-    buyerAgentId: chosen,
-  }: { clearSeats?: boolean; buyerAgentId?: Id<"agents"> | null } = {},
+    agents: chosen = {},
+  }: {
+    clearSeats?: boolean;
+    agents?: Partial<Record<DemoSeat, Id<"agents"> | null>>;
+  } = {},
 ) {
-  const consumerAgentId = await ensureBuyerAgent(ctx);
-  const providerId = await ensureProvider(ctx);
-  const provider = await ctx.db.get("agents", providerId);
+  const hosted: SeatAgents = {
+    buyer: await ensureBuyerAgent(ctx),
+    merchant: await ensureProvider(ctx),
+  };
+  const provider = await ctx.db.get("agents", hosted.merchant);
   if (!provider) throw new Error("demo: the provider vanished");
 
   const seats = emptySeats();
-  let kept: Id<"agents"> | null = null;
-  const rooms = await demoRooms(ctx, providerId);
+  let kept = hosted;
   // Oldest first, so the newest room's seats win.
-  for (const room of rooms.reverse()) {
-    const session = await ctx.db.get("sessions", room.sessionId);
-    kept = session?.initiatorAgentId ?? null;
-    for (const member of await members(ctx, room.sessionId)) {
-      const held = seatOf(member, {
-        buyer: kept ?? consumerAgentId,
-        merchant: providerId,
-      });
+  for (const session of (await demoRooms(ctx)).reverse()) {
+    const rows = await members(ctx, session._id);
+    kept = seatAgents(session, rows) ?? hosted;
+    for (const member of rows) {
+      const held = seatOf(member, kept);
       if (held && member.kind === "human" && !clearSeats) {
         seats[held] = {
           tokenIdentifier: member.tokenIdentifier,
@@ -253,12 +292,15 @@ async function rebuild(
         };
       }
     }
-    await deleteRoom(ctx, room.sessionId);
+    await deleteRoom(ctx, session._id);
   }
-  const wanted = chosen === undefined ? kept : chosen;
-  const own =
-    wanted && (await ownAgent(ctx, wanted, seats.buyer.tokenIdentifier));
-  const buyerAgentId = own ? own._id : consumerAgentId;
+  const agents = { ...hosted };
+  for (const seat of SEATS) {
+    const wanted = chosen[seat] === undefined ? kept[seat] : chosen[seat];
+    const own =
+      wanted && (await ownAgent(ctx, wanted, seats[seat].tokenIdentifier));
+    if (own) agents[seat] = own._id;
+  }
 
   const contract: SessionContract = {
     intent: DEMO_INTENT,
@@ -272,25 +314,26 @@ async function rebuild(
     maxViolations: 3,
   };
   const sessionId = await ctx.db.insert("sessions", {
-    initiatorAgentId: buyerAgentId,
+    initiatorAgentId: agents.buyer,
     intent: DEMO_INTENT,
     contract,
     mode: "moderated",
     status: "active",
     turnCount: 0,
     violationCount: 0,
+    demo: true,
   });
   const speakers = {
     buyerAgent: await ctx.db.insert("participants", {
       sessionId,
       kind: "agent",
-      agentId: buyerAgentId,
+      agentId: agents.buyer,
       role: "initiator",
     }),
     providerAgent: await ctx.db.insert("participants", {
       sessionId,
       kind: "agent",
-      agentId: providerId,
+      agentId: agents.merchant,
       role: "recipient",
     }),
     buyer: await ctx.db.insert("participants", {
@@ -298,7 +341,7 @@ async function rebuild(
       kind: "human",
       ...seats.buyer,
       role: "owner",
-      onBehalfOfAgentId: buyerAgentId,
+      onBehalfOfAgentId: agents.buyer,
     }),
     // An operator, so the room keeps a single owner: the person a provider sends its cards to.
     merchant: await ctx.db.insert("participants", {
@@ -306,7 +349,7 @@ async function rebuild(
       kind: "human",
       ...seats.merchant,
       role: "operator",
-      onBehalfOfAgentId: providerId,
+      onBehalfOfAgentId: agents.merchant,
     }),
   };
   const allowed = (reason: string) => ({
@@ -324,7 +367,9 @@ async function rebuild(
     },
     moderation: allowed("Aviso de la plataforma."),
   });
-  for (const line of own ? DEMO_AGENT_SCRIPT : DEMO_SCRIPT) {
+  const script =
+    agents.buyer === hosted.buyer ? DEMO_SCRIPT : DEMO_AGENT_SCRIPT;
+  for (const line of script) {
     await insertMessage(ctx, {
       sessionId,
       senderParticipantId: speakers[line.from],
@@ -336,21 +381,29 @@ async function rebuild(
   return sessionId;
 }
 
-// The current demo room and the caller's seat in it, or null while the demo is off.
+// The current demo room and the caller's seat in it, or null while the demo is off. `brought` is
+// the external agent each seat talks through, if its holder brought one.
 async function current(ctx: QueryCtx, tokenIdentifier: string) {
-  const provider = await agentBySlug(ctx, DEMO_PROVIDER_SLUG);
-  if (!provider) return null;
-  const [room] = await demoRooms(ctx, provider._id);
-  const session = room && (await ctx.db.get("sessions", room.sessionId));
+  const [session] = await demoRooms(ctx);
   if (!session) return null;
-  const agents = { buyer: session.initiatorAgentId, merchant: provider._id };
-  const humans = (await members(ctx, room.sessionId)).flatMap((member) => {
+  const rows = await members(ctx, session._id);
+  const agents = seatAgents(session, rows);
+  if (!agents) return null;
+  const humans = rows.flatMap((member) => {
     const held = seatOf(member, agents);
     return held && member.kind === "human" ? [{ seat: held, member }] : [];
   });
+  const brought: Record<DemoSeat, Doc<"agents"> | null> = {
+    buyer: null,
+    merchant: null,
+  };
+  for (const seat of SEATS) {
+    const agent = await ctx.db.get("agents", agents[seat]);
+    if (agent?.kind === "external") brought[seat] = agent;
+  }
   return {
-    sessionId: room.sessionId,
-    buyerAgentId: agents.buyer,
+    sessionId: session._id,
+    brought,
     humans,
     mine: humans.find((h) => h.member.tokenIdentifier === tokenIdentifier),
   };
@@ -375,12 +428,9 @@ export const remove = internalMutation({
   args: {},
   returns: v.null(),
   handler: async (ctx) => {
+    for (const room of await demoRooms(ctx)) await deleteRoom(ctx, room._id);
     const provider = await agentBySlug(ctx, DEMO_PROVIDER_SLUG);
-    if (!provider) return null;
-    for (const room of await demoRooms(ctx, provider._id)) {
-      await deleteRoom(ctx, room.sessionId);
-    }
-    await deleteProviderData(ctx, provider._id);
+    if (provider) await deleteProviderData(ctx, provider._id);
     return null;
   },
 });
@@ -392,11 +442,8 @@ export const state = query({
     v.object({
       sessionId: v.id("sessions"),
       mySeat: v.union(seat, v.null()),
-      // Set while the buyer talks through their own agent instead of the room's page.
-      buyerAgent: v.union(
-        v.null(),
-        v.object({ agentId: v.id("agents"), name: v.string() }),
-      ),
+      // Set for a seat whose holder talks through their own agent instead of the room's page.
+      agents: v.object({ buyer: broughtAgent, merchant: broughtAgent }),
       seats: v.array(
         v.object({ seat, taken: v.boolean(), displayName: v.string() }),
       ),
@@ -406,14 +453,14 @@ export const state = query({
     const { tokenIdentifier } = await requireRoomIdentity(ctx);
     const demo = await current(ctx, tokenIdentifier);
     if (!demo) return null;
-    const buyerAgent = await ctx.db.get("agents", demo.buyerAgentId);
+    const brought = (seat: DemoSeat) => {
+      const agent = demo.brought[seat];
+      return agent ? { agentId: agent._id, name: agent.name } : null;
+    };
     return {
       sessionId: demo.sessionId,
       mySeat: demo.mine?.seat ?? null,
-      buyerAgent:
-        buyerAgent?.kind === "external"
-          ? { agentId: buyerAgent._id, name: buyerAgent.name }
-          : null,
+      agents: { buyer: brought("buyer"), merchant: brought("merchant") },
       seats: demo.humans.map(({ seat, member }) => ({
         seat,
         taken: !isPlaceholder(member.tokenIdentifier),
@@ -469,9 +516,10 @@ export const watch = query({
 // Takes a free seat. Someone who already holds the other seat moves, so one person can rehearse
 // both sides. The name is what the room shows the other side; it is not verified.
 //
-// The buyer may bring one of their own external agents with `agentId`: the room then starts
-// over with that agent as the one that has been talking to the manufacturer, so the buyer goes
-// on from their assistant, over MCP. Taking the seat without one goes back to the room's page.
+// `agentId` brings one of the caller's own external agents to the seat: the room then starts over
+// with that agent as the one that has been talking, so its owner goes on from their assistant,
+// over MCP. The manufacturer's own agent replaces the hosted one, so it has to quote by itself.
+// Taking the seat without one goes back to the hosted agent and the room's page.
 export const join = mutation({
   args: {
     seat,
@@ -487,13 +535,9 @@ export const join = mutation({
     if (!target) fail("NotFound", "the demo room has no such seat");
     if (
       args.agentId &&
-      (args.seat !== "buyer" ||
-        !(await ownAgent(ctx, args.agentId, identity.tokenIdentifier)))
+      !(await ownAgent(ctx, args.agentId, identity.tokenIdentifier))
     ) {
-      fail(
-        "NotYourAgent",
-        "only the buyer can bring an agent, and only their own",
-      );
+      fail("NotYourAgent", "you can only bring an agent of your own");
     }
     const mine = demo.mine?.seat === args.seat;
     if (!mine && !isPlaceholder(target.member.tokenIdentifier)) {
@@ -515,22 +559,19 @@ export const join = mutation({
         ).slice(0, 120),
       });
     }
-    const consumerAgentId = await ensureBuyerAgent(ctx);
-    const buyerAgentId =
-      args.seat === "buyer" ? (args.agentId ?? consumerAgentId) : null;
-    // Whoever leaves the buyer's seat for the other one takes their agent with them.
-    const leftBuyerSeat = !mine && demo.mine?.seat === "buyer";
-    if (
-      (buyerAgentId && buyerAgentId !== demo.buyerAgentId) ||
-      (leftBuyerSeat && demo.buyerAgentId !== consumerAgentId)
-    ) {
-      return { sessionId: await rebuild(ctx, { buyerAgentId }) };
+    const now = (s: DemoSeat) => demo.brought[s]?._id ?? null;
+    const agents = { buyer: now("buyer"), merchant: now("merchant") };
+    agents[args.seat] = args.agentId ?? null;
+    // Whoever leaves a seat for the other one takes their agent with them.
+    if (!mine && demo.mine) agents[demo.mine.seat] = null;
+    if (SEATS.some((s) => agents[s] !== now(s))) {
+      return { sessionId: await rebuild(ctx, { agents }) };
     }
     return { sessionId: demo.sessionId };
   },
 });
 
-// Leaving the buyer's seat takes the buyer's own agent out with them: the room starts over.
+// Leaving a seat takes the agent its holder brought out with them: the room starts over.
 export const leave = mutation({
   args: {},
   returns: v.null(),
@@ -542,12 +583,7 @@ export const leave = mutation({
       tokenIdentifier: DEMO_SEATS[demo.mine.seat].placeholder,
       displayName: DEMO_SEATS[demo.mine.seat].displayName,
     });
-    if (
-      demo.mine.seat === "buyer" &&
-      demo.buyerAgentId !== (await ensureBuyerAgent(ctx))
-    ) {
-      await rebuild(ctx);
-    }
+    if (demo.brought[demo.mine.seat]) await rebuild(ctx);
     return null;
   },
 });

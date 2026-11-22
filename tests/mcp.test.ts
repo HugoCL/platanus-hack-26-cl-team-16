@@ -935,6 +935,59 @@ describe("MCP room tools", () => {
     });
   });
 
+  it("list_sessions also lists the active rooms another agent opened with the key's agent", async () => {
+    // Rooms the directory would not open: the key's agent is on the receiving side.
+    const withMe = (status: "active" | "closed") =>
+      t.run(async (ctx) => {
+        const model = await ctx.db.query("sessions").first();
+        if (!model) throw new Error("the seed has no session");
+        const { _id, _creationTime, ...fields } = model;
+        const sessionId = await ctx.db.insert("sessions", {
+          ...fields,
+          initiatorAgentId: agents.consumer,
+          status,
+        });
+        const initiator = await ctx.db.insert("participants", {
+          sessionId,
+          kind: "agent",
+          agentId: agents.consumer,
+          role: "initiator",
+        });
+        await ctx.db.insert("participants", {
+          sessionId,
+          kind: "agent",
+          agentId: agents.external,
+          role: "recipient",
+        });
+        return { sessionId, initiator, request: fields.intent.description };
+      });
+    await withMe("closed");
+    const opened = await withMe("active");
+    const mine = await openRoom();
+    expect(await use("list_sessions", {})).toEqual({
+      sessions: [
+        {
+          sessionId: mine.sessionId,
+          request: REQUEST,
+          agents: [expect.anything()],
+        },
+        {
+          sessionId: opened.sessionId,
+          request: opened.request,
+          agents: [
+            { participantId: opened.initiator, name: expect.any(String) },
+          ],
+        },
+      ],
+      truncated: false,
+    });
+
+    await use("close_session", { sessionId: opened.sessionId });
+    expect(await use("list_sessions", {})).toMatchObject({
+      sessions: [{ sessionId: mine.sessionId }],
+    });
+  });
+
   it("close_session closes the room, later sends are refused and a wait returns at once", async () => {
     const { sessionId, provider } = await openRoom();
 
