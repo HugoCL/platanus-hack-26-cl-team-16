@@ -908,6 +908,33 @@ describe("MCP room tools", () => {
     expect(await history(other.sessionId, other.provider)).toEqual(before);
   });
 
+  it("list_sessions lists the active rooms the key's agent started, with the agents to address", async () => {
+    expect(await use("list_sessions", {})).toEqual({
+      sessions: [],
+      truncated: false,
+    });
+    const { sessionId, provider } = await openRoom();
+    const closed = await openRoom();
+    await use("close_session", { sessionId: closed.sessionId });
+    await hostedRoom();
+
+    const room = {
+      sessionId,
+      request: REQUEST,
+      agents: [{ participantId: provider, name: expect.any(String) }],
+    };
+    expect(await use("list_sessions", {})).toEqual({
+      sessions: [room],
+      truncated: false,
+    });
+
+    // Newest first, whatever the session ids happen to be.
+    const newer = await openRoom();
+    expect(await use("list_sessions", {})).toMatchObject({
+      sessions: [{ sessionId: newer.sessionId }, room],
+    });
+  });
+
   it("close_session closes the room, later sends are refused and a wait returns at once", async () => {
     const { sessionId, provider } = await openRoom();
 

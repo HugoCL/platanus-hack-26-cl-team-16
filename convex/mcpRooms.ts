@@ -411,3 +411,61 @@ export const readInvitations = internalQuery({
     return { invitations, truncated };
   },
 });
+
+const SESSION_LIMIT = 20;
+
+type AgentSession = {
+  sessionId: Id<"sessions">;
+  request: string;
+  agents: { participantId: Id<"participants">; name: string }[];
+};
+type AgentSessions = { sessions: AgentSession[]; truncated: boolean };
+
+export const sessions = action({
+  args: { apiKey: v.string() },
+  handler: async (ctx, args): Promise<AgentSessions> => {
+    await chargeRequest(ctx, args.apiKey);
+    return ctx.runQuery(internal.mcpRooms.readSessions, args);
+  },
+});
+
+// The active rooms the calling agent started, newest first, so an agent in a new conversation
+// finds a room it opened earlier, or one its owner set up for it, without being handed its id.
+// Rooms it joined as a guest are in `readInvitations`.
+export const readSessions = internalQuery({
+  args: { apiKey: v.string() },
+  handler: async (ctx, { apiKey }): Promise<AgentSessions> => {
+    const { agent } = await callerCredential(ctx, apiKey);
+    const rows = await ctx.db
+      .query("sessions")
+      .withIndex("by_initiatorAgentId_and_status", (q) =>
+        q.eq("initiatorAgentId", agent._id).eq("status", "active"),
+      )
+      .order("desc")
+      .take(SESSION_LIMIT + 1);
+    const sessions: AgentSession[] = [];
+    for (const { _id: sessionId } of rows.slice(0, SESSION_LIMIT)) {
+      const room = await loadSession(ctx, sessionId);
+      let me: Id<"participants"> | undefined;
+      for await (const row of ctx.db
+        .query("participants")
+        .withIndex("by_agentId_and_sessionId", (q) =>
+          q.eq("agentId", agent._id).eq("sessionId", sessionId),
+        )) {
+        if (row.leftAt === undefined) me = row._id;
+      }
+      if (!room || !me) continue;
+      const agents: AgentSession["agents"] = [];
+      for (const p of room.participants) {
+        if (p.kind !== "agent" || p.participantId === me) continue;
+        const other = await ctx.db.get("agents", p.agentId as Id<"agents">);
+        agents.push({
+          participantId: p.participantId as Id<"participants">,
+          name: other?.name ?? "Agente",
+        });
+      }
+      sessions.push({ sessionId, request: room.intent.description, agents });
+    }
+    return { sessions, truncated: rows.length > SESSION_LIMIT };
+  },
+});

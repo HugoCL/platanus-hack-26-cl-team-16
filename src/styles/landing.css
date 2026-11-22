@@ -739,6 +739,20 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .landing-prompt,
+  .landing-prompt > * {
+    transition: none;
+  }
+
+  .landing-prompt:active {
+    transform: none;
+  }
+
+  .landing-prompt:active > * {
+    filter: none;
+    opacity: 1;
+  }
+
   .landing-replay-room {
     height: auto;
   }

@@ -2,7 +2,7 @@
 
 import { Button } from "@ui-sdk/react/button";
 import { CheckIcon, CopyIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ClaudeLogo,
   GeminiLogo,
@@ -23,14 +23,32 @@ function agentPrompt(origin: string) {
 
 export function CopyAgentPrompt(props: React.HTMLAttributes<HTMLDivElement>) {
   const [copied, setCopied] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  const mounted = useRef(false);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      clearTimeout(resetTimer.current);
+    };
+  }, []);
 
   async function copy() {
+    clearTimeout(resetTimer.current);
+    setFailed(false);
     try {
       await navigator.clipboard.writeText(agentPrompt(window.location.origin));
+      if (!mounted.current) return;
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      resetTimer.current = setTimeout(() => setCopied(false), 2000);
     } catch {
+      if (!mounted.current) return;
       setCopied(false);
+      setFailed(true);
     }
   }
 
@@ -50,6 +68,9 @@ export function CopyAgentPrompt(props: React.HTMLAttributes<HTMLDivElement>) {
       <span role="status" className="sr-only">
         {copied ? "Prompt copiado" : ""}
       </span>
+      {failed && (
+        <p role="alert">No se pudo copiar el prompt. Inténtalo de nuevo.</p>
+      )}
     </div>
   );
 }

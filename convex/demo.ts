@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { effectiveAllowedIntents } from "../shared/agent";
 import {
+  DEMO_AGENT_SCRIPT,
   DEMO_CATEGORY,
   DEMO_INTENT,
   DEMO_KNOWLEDGE,
@@ -71,8 +72,8 @@ function agentBySlug(ctx: QueryCtx, slug: string) {
     .unique();
 }
 
-// The buyer's agent is the platform's consumer agent, the only one that plays the consumer.
-// A deployment that was never seeded gets it here.
+// Unless the buyer brings their own agent, theirs is the platform's consumer agent. A deployment
+// that was never seeded gets it here.
 async function ensureBuyerAgent(ctx: MutationCtx) {
   const existing = await agentBySlug(ctx, CONSUMER_AGENT_SLUG);
   if (existing) return existing._id;
@@ -205,20 +206,44 @@ async function deleteRoom(ctx: MutationCtx, sessionId: Id<"sessions">) {
   await ctx.db.delete(sessionId);
 }
 
-// Deletes the demo rooms and opens a fresh one, keeping whoever holds each seat.
-async function rebuild(ctx: MutationCtx, clearSeats: boolean) {
-  const buyerAgentId = await ensureBuyerAgent(ctx);
+// The external agent a person may bring to the buyer's seat: one of their own.
+async function ownAgent(
+  ctx: QueryCtx,
+  agentId: Id<"agents">,
+  tokenIdentifier: string,
+) {
+  const agent = await ctx.db.get("agents", agentId);
+  return agent?.kind === "external" &&
+    agent.ownerTokenIdentifier === tokenIdentifier
+    ? agent
+    : null;
+}
+
+// Deletes the demo rooms and opens a fresh one, keeping whoever holds each seat. The buyer's
+// agent is `buyerAgentId`, or the one the last room had while the buyer's seat is still held by
+// its owner, or the consumer agent.
+async function rebuild(
+  ctx: MutationCtx,
+  {
+    clearSeats = false,
+    buyerAgentId: chosen,
+  }: { clearSeats?: boolean; buyerAgentId?: Id<"agents"> | null } = {},
+) {
+  const consumerAgentId = await ensureBuyerAgent(ctx);
   const providerId = await ensureProvider(ctx);
   const provider = await ctx.db.get("agents", providerId);
   if (!provider) throw new Error("demo: the provider vanished");
 
   const seats = emptySeats();
+  let kept: Id<"agents"> | null = null;
   const rooms = await demoRooms(ctx, providerId);
   // Oldest first, so the newest room's seats win.
   for (const room of rooms.reverse()) {
+    const session = await ctx.db.get("sessions", room.sessionId);
+    kept = session?.initiatorAgentId ?? null;
     for (const member of await members(ctx, room.sessionId)) {
       const held = seatOf(member, {
-        buyer: buyerAgentId,
+        buyer: kept ?? consumerAgentId,
         merchant: providerId,
       });
       if (held && member.kind === "human" && !clearSeats) {
@@ -230,6 +255,10 @@ async function rebuild(ctx: MutationCtx, clearSeats: boolean) {
     }
     await deleteRoom(ctx, room.sessionId);
   }
+  const wanted = chosen === undefined ? kept : chosen;
+  const own =
+    wanted && (await ownAgent(ctx, wanted, seats.buyer.tokenIdentifier));
+  const buyerAgentId = own ? own._id : consumerAgentId;
 
   const contract: SessionContract = {
     intent: DEMO_INTENT,
@@ -295,7 +324,7 @@ async function rebuild(ctx: MutationCtx, clearSeats: boolean) {
     },
     moderation: allowed("Aviso de la plataforma."),
   });
-  for (const line of DEMO_SCRIPT) {
+  for (const line of own ? DEMO_AGENT_SCRIPT : DEMO_SCRIPT) {
     await insertMessage(ctx, {
       sessionId,
       senderParticipantId: speakers[line.from],
@@ -311,16 +340,17 @@ async function rebuild(ctx: MutationCtx, clearSeats: boolean) {
 async function current(ctx: QueryCtx, tokenIdentifier: string) {
   const provider = await agentBySlug(ctx, DEMO_PROVIDER_SLUG);
   if (!provider) return null;
-  const buyerAgent = await agentBySlug(ctx, CONSUMER_AGENT_SLUG);
   const [room] = await demoRooms(ctx, provider._id);
-  if (!room || !buyerAgent) return null;
-  const agents = { buyer: buyerAgent._id, merchant: provider._id };
+  const session = room && (await ctx.db.get("sessions", room.sessionId));
+  if (!session) return null;
+  const agents = { buyer: session.initiatorAgentId, merchant: provider._id };
   const humans = (await members(ctx, room.sessionId)).flatMap((member) => {
     const held = seatOf(member, agents);
     return held && member.kind === "human" ? [{ seat: held, member }] : [];
   });
   return {
     sessionId: room.sessionId,
+    buyerAgentId: agents.buyer,
     humans,
     mine: humans.find((h) => h.member.tokenIdentifier === tokenIdentifier),
   };
@@ -333,7 +363,7 @@ export const reset = internalMutation({
   args: { clearSeats: v.optional(v.boolean()) },
   returns: v.object({ sessionId: v.id("sessions") }),
   handler: async (ctx, { clearSeats }) => {
-    const sessionId = await rebuild(ctx, clearSeats === true);
+    const sessionId = await rebuild(ctx, { clearSeats });
     console.log(`demo: room ${sessionId} is ready, open /demo to take a seat`);
     return { sessionId };
   },
@@ -362,6 +392,11 @@ export const state = query({
     v.object({
       sessionId: v.id("sessions"),
       mySeat: v.union(seat, v.null()),
+      // Set while the buyer talks through their own agent instead of the room's page.
+      buyerAgent: v.union(
+        v.null(),
+        v.object({ agentId: v.id("agents"), name: v.string() }),
+      ),
       seats: v.array(
         v.object({ seat, taken: v.boolean(), displayName: v.string() }),
       ),
@@ -371,9 +406,14 @@ export const state = query({
     const { tokenIdentifier } = await requireRoomIdentity(ctx);
     const demo = await current(ctx, tokenIdentifier);
     if (!demo) return null;
+    const buyerAgent = await ctx.db.get("agents", demo.buyerAgentId);
     return {
       sessionId: demo.sessionId,
       mySeat: demo.mine?.seat ?? null,
+      buyerAgent:
+        buyerAgent?.kind === "external"
+          ? { agentId: buyerAgent._id, name: buyerAgent.name }
+          : null,
       seats: demo.humans.map(({ seat, member }) => ({
         seat,
         taken: !isPlaceholder(member.tokenIdentifier),
@@ -428,8 +468,16 @@ export const watch = query({
 
 // Takes a free seat. Someone who already holds the other seat moves, so one person can rehearse
 // both sides. The name is what the room shows the other side; it is not verified.
+//
+// The buyer may bring one of their own external agents with `agentId`: the room then starts
+// over with that agent as the one that has been talking to the manufacturer, so the buyer goes
+// on from their assistant, over MCP. Taking the seat without one goes back to the room's page.
 export const join = mutation({
-  args: { seat, name: v.optional(v.string()) },
+  args: {
+    seat,
+    name: v.optional(v.string()),
+    agentId: v.optional(v.id("agents")),
+  },
   returns: v.object({ sessionId: v.id("sessions") }),
   handler: async (ctx, args) => {
     const identity = await requireRoomIdentity(ctx);
@@ -437,28 +485,52 @@ export const join = mutation({
     if (!demo) fail("NotFound", "the demo room is not set up");
     const target = demo.humans.find((h) => h.seat === args.seat);
     if (!target) fail("NotFound", "the demo room has no such seat");
-    if (demo.mine?.seat === args.seat) return { sessionId: demo.sessionId };
-    if (!isPlaceholder(target.member.tokenIdentifier)) {
+    if (
+      args.agentId &&
+      (args.seat !== "buyer" ||
+        !(await ownAgent(ctx, args.agentId, identity.tokenIdentifier)))
+    ) {
+      fail(
+        "NotYourAgent",
+        "only the buyer can bring an agent, and only their own",
+      );
+    }
+    const mine = demo.mine?.seat === args.seat;
+    if (!mine && !isPlaceholder(target.member.tokenIdentifier)) {
       fail("SeatTaken", "someone else holds that seat");
     }
-    if (demo.mine) {
-      await ctx.db.patch("participants", demo.mine.member._id, {
-        tokenIdentifier: DEMO_SEATS[demo.mine.seat].placeholder,
-        displayName: DEMO_SEATS[demo.mine.seat].displayName,
+    if (!mine) {
+      if (demo.mine) {
+        await ctx.db.patch("participants", demo.mine.member._id, {
+          tokenIdentifier: DEMO_SEATS[demo.mine.seat].placeholder,
+          displayName: DEMO_SEATS[demo.mine.seat].displayName,
+        });
+      }
+      await ctx.db.patch("participants", target.member._id, {
+        tokenIdentifier: identity.tokenIdentifier,
+        displayName: (
+          args.name?.trim() ||
+          identity.name?.trim() ||
+          DEMO_SEATS[args.seat].displayName
+        ).slice(0, 120),
       });
     }
-    await ctx.db.patch("participants", target.member._id, {
-      tokenIdentifier: identity.tokenIdentifier,
-      displayName: (
-        args.name?.trim() ||
-        identity.name?.trim() ||
-        DEMO_SEATS[args.seat].displayName
-      ).slice(0, 120),
-    });
+    const consumerAgentId = await ensureBuyerAgent(ctx);
+    const buyerAgentId =
+      args.seat === "buyer" ? (args.agentId ?? consumerAgentId) : null;
+    // Whoever leaves the buyer's seat for the other one takes their agent with them.
+    const leftBuyerSeat = !mine && demo.mine?.seat === "buyer";
+    if (
+      (buyerAgentId && buyerAgentId !== demo.buyerAgentId) ||
+      (leftBuyerSeat && demo.buyerAgentId !== consumerAgentId)
+    ) {
+      return { sessionId: await rebuild(ctx, { buyerAgentId }) };
+    }
     return { sessionId: demo.sessionId };
   },
 });
 
+// Leaving the buyer's seat takes the buyer's own agent out with them: the room starts over.
 export const leave = mutation({
   args: {},
   returns: v.null(),
@@ -470,6 +542,12 @@ export const leave = mutation({
       tokenIdentifier: DEMO_SEATS[demo.mine.seat].placeholder,
       displayName: DEMO_SEATS[demo.mine.seat].displayName,
     });
+    if (
+      demo.mine.seat === "buyer" &&
+      demo.buyerAgentId !== (await ensureBuyerAgent(ctx))
+    ) {
+      await rebuild(ctx);
+    }
     return null;
   },
 });
@@ -483,6 +561,6 @@ export const restart = mutation({
     const demo = await current(ctx, tokenIdentifier);
     if (!demo) fail("NotFound", "the demo room is not set up");
     if (!demo.mine) fail("Forbidden", "take a seat to restart the demo room");
-    return { sessionId: await rebuild(ctx, false) };
+    return { sessionId: await rebuild(ctx) };
   },
 });
