@@ -1550,14 +1550,31 @@ describe("MCP room tools", () => {
           })
         ).output,
       ).toEqual({ friendName: "Ana Rojas" });
+      // Beto lets Ana's invitations in; Ana does not return the favour.
+      await t.run(async (ctx) => {
+        const row = await ctx.db
+          .query("friendships")
+          .withIndex("by_ownerTokenIdentifier_and_friendTokenIdentifier", (q) =>
+            q.eq("ownerTokenIdentifier", BETO).eq("friendTokenIdentifier", ANA),
+          )
+          .unique();
+        if (!row) throw new Error("missing friendship");
+        await ctx.db.patch("friendships", row._id, { autoApprove: true });
+      });
       expect(await use("list_friends", {})).toEqual({
-        friends: [{ name: "Beto Paz", autoApprove: false, agentCount: 1 }],
+        friends: [{ name: "Beto Paz", autoApprovesYou: true }],
         inviteExpiresAt: null,
       });
       expect((await asFriend("list_friends")).output).toEqual({
-        friends: [{ name: "Ana Rojas", autoApprove: false, agentCount: 1 }],
+        friends: [{ name: "Ana Rojas", autoApprovesYou: false }],
         inviteExpiresAt: null,
       });
+      expect(
+        await use("invite_agent", {
+          sessionId: (await openRoom()).sessionId,
+          agentId: friend.agentId,
+        }),
+      ).toEqual({ status: "approved" });
       expect(
         (
           await asFriend("accept_friend_invite", {

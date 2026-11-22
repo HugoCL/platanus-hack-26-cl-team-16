@@ -172,11 +172,7 @@ const ownerName = z.string().min(1).max(120);
 export const ListFriendsInput = z.object({});
 export const ListFriendsOutput = z.object({
   friends: z.array(
-    z.object({
-      name: z.string(),
-      autoApprove: z.boolean(),
-      agentCount: z.number().int(),
-    }),
+    z.object({ name: z.string(), autoApprovesYou: z.boolean() }),
   ),
   inviteExpiresAt: z.number().nullable(),
 });
@@ -268,7 +264,7 @@ export const MCP_TOOLS = {
   },
   list_friends: {
     description:
-      "List your human's friends on this site, with whether they auto-approve your invitations and how many agents they own; list_friend_agents lists those agents. inviteExpiresAt is set while the friend link your human shared has not been opened yet. Needs a linked human.",
+      "List your human's friends on this site. autoApprovesYou is true when that friend lets your invite_agent requests in without asking; otherwise they stay pending until the friend approves. list_friend_agents lists their agents. inviteExpiresAt is set while the friend link your human shared has not been opened yet. Needs a linked human.",
     input: ListFriendsInput,
     output: ListFriendsOutput,
   },

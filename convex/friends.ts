@@ -9,7 +9,7 @@ import {
 import { sha256Hex } from "./agentKeys";
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const FRIEND_LIMIT = 100;
+export const FRIEND_LIMIT = 100;
 const AGENTS_PER_FRIEND = 20;
 
 function fail(kind: string, message: string): never {

@@ -10,7 +10,8 @@ import {
 import { pendingLinkExpiry, renewLinkCode } from "./agentRegistration";
 import {
   acceptFriendInvite,
-  friendsOf,
+  FRIEND_LIMIT,
+  friendship,
   issueFriendInvite,
   pendingInviteExpiry,
 } from "./friends";
@@ -92,7 +93,7 @@ async function callerOwner(ctx: QueryCtx, apiKey: string) {
 }
 
 type Friends = {
-  friends: { name: string; autoApprove: boolean; agentCount: number }[];
+  friends: { name: string; autoApprovesYou: boolean }[];
   inviteExpiresAt: number | null;
 };
 
@@ -108,13 +109,28 @@ export const readFriends = internalQuery({
   args: keyArgs,
   handler: async (ctx, { apiKey }): Promise<Friends> => {
     const { ownerTokenIdentifier } = await callerOwner(ctx, apiKey);
-    const friends = await friendsOf(ctx, ownerTokenIdentifier);
+    const rows = await ctx.db
+      .query("friendships")
+      .withIndex("by_ownerTokenIdentifier_and_friendTokenIdentifier", (q) =>
+        q.eq("ownerTokenIdentifier", ownerTokenIdentifier),
+      )
+      .take(FRIEND_LIMIT);
+    // Whether an invitation from this agent joins at once is the friend's switch, kept on the
+    // friend's own row (see requestInvitation), not on the owner's.
     return {
-      friends: friends.map(({ name, autoApprove, agents }) => ({
-        name,
-        autoApprove,
-        agentCount: agents.length,
-      })),
+      friends: await Promise.all(
+        rows.map(async (row) => ({
+          name: row.friendName,
+          autoApprovesYou:
+            (
+              await friendship(
+                ctx,
+                row.friendTokenIdentifier,
+                ownerTokenIdentifier,
+              )
+            )?.autoApprove ?? false,
+        })),
+      ),
       inviteExpiresAt: await pendingInviteExpiry(ctx, ownerTokenIdentifier),
     };
   },
