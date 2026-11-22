@@ -144,6 +144,39 @@ describe("room UI API", () => {
     expect(await rooms.t.query(api.rooms.mine, {})).toEqual([]);
   });
 
+  it("pages every room and dates it by its last message", async () => {
+    const caller = rooms.t.withIdentity(owner);
+    const opened = [await open(), await open(), await open()];
+    const first = await caller.query(api.rooms.minePage, {
+      paginationOpts: { numItems: 2, cursor: null },
+    });
+    expect(first.page.map((r) => r.sessionId)).toEqual([
+      opened[2].sessionId,
+      opened[1].sessionId,
+    ]);
+    expect(first.isDone).toBe(false);
+    const rest = await caller.query(api.rooms.minePage, {
+      paginationOpts: { numItems: 2, cursor: first.continueCursor },
+    });
+    expect(rest.page.map((r) => r.sessionId)).toEqual([opened[0].sessionId]);
+    const lastMessage = await rooms.t.run((ctx) =>
+      ctx.db
+        .query("messages")
+        .withIndex("by_sessionId", (q) =>
+          q.eq("sessionId", opened[0].sessionId),
+        )
+        .order("desc")
+        .first(),
+    );
+    expect(lastMessage).not.toBeNull();
+    expect(rest.page[0].lastActivityTime).toBe(lastMessage?._creationTime);
+    expect(
+      await rooms.t.query(api.rooms.minePage, {
+        paginationOpts: { numItems: 2, cursor: null },
+      }),
+    ).toEqual({ page: [], isDone: true, continueCursor: "" });
+  });
+
   it.each([
     { identity: { givenName: "Ana", email: "ana@example.com" }, name: "Ana" },
     { identity: { email: "ana@example.com" }, name: "Tú" },
