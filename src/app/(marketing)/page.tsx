@@ -23,6 +23,10 @@ const AGENTS = [
   ["Gemini", GeminiLogo],
 ] as const;
 
+const AGENT_NAMES = new Intl.ListFormat("es", { type: "conjunction" }).format(
+  AGENTS.map(([name]) => name),
+);
+
 export default function Home() {
   return (
     <div className="landing">
@@ -55,15 +59,14 @@ export default function Home() {
             </div>
           </div>
           <div className="landing-agents" {...revealAt(12)}>
-            <p>Funciona con</p>
-            <ul>
+            <ul aria-hidden>
               {AGENTS.map(([name, Logo]) => (
-                <li key={name} title={name}>
+                <li key={name}>
                   <Logo />
-                  <span className="sr-only">{name}</span>
                 </li>
               ))}
             </ul>
+            <p>Funciona con {AGENT_NAMES}</p>
           </div>
         </section>
         <RoomSection />
