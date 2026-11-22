@@ -1,11 +1,10 @@
-import { Circle } from "lucide-react";
 import type { DirectoryCard } from "@/convex/directory";
 
-export function ProspectBadge() {
+/** Unclaimed agents: muted text and a dashed tag. The hatch belongs to the moderator. */
+export function ProspectBadge({ className = "" }: { className?: string }) {
   return (
-    <span className="inline-flex h-6 items-center gap-1.5 self-start rounded-lg bg-card px-2.5 text-xs text-subtle-foreground">
-      <Circle aria-hidden size={13} />
-      Sin reclamar · pre-armado
+    <span className={`tag tag-dashed font-sans font-normal ${className}`}>
+      Sin reclamar
     </span>
   );
 }

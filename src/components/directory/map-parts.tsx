@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowRightIcon } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 import type { DirectoryCard } from "@/convex/directory";
@@ -14,6 +15,8 @@ export type DirectoryMapProps = {
   cards: DirectoryCard[];
   categories: Category[];
   selectedId: string | null;
+  /** False while the selection is the list's default, not a pick: no card, no pan. */
+  popup?: boolean;
   onSelect: (agentId: string) => void;
   origin: LatLng | null;
   radiusKm: number | null;
@@ -91,7 +94,7 @@ export function PinMark({
       aria-hidden
       className={`relative grid size-9 origin-bottom-left translate-x-1/2 place-items-center rounded-[50%_50%_50%_0] transition-[scale] duration-200 ease-[var(--ease-out)] [rotate:-45deg] motion-reduce:transition-none ${
         isSelected
-          ? "z-20 scale-[1.2] bg-brand text-brand-ink shadow-[0_0_0_1.5px_var(--brand-ink),0_0_0_4px_color-mix(in_oklch,var(--brand-yellow)_35%,transparent)]"
+          ? "z-20 scale-[1.2] bg-brand text-brand-ink shadow-selected"
           : prospect
             ? "z-10 border-2 border-foreground bg-card text-foreground"
             : "z-10 bg-card text-foreground shadow-card"
@@ -186,9 +189,11 @@ export function SelectedCard({
       ) : null}
       <Link
         href={`/directory/${selected.slug}`}
-        className="press inline-flex h-8 items-center self-start rounded-2xl border border-input px-3 text-caption font-medium text-foreground no-underline hover:bg-muted"
+        className="ficha-link -mb-1.5 self-start"
       >
         Ver ficha
+        <span className="sr-only"> de {selected.name}</span>
+        <ArrowRightIcon aria-hidden size={14} />
       </Link>
     </div>
   );
@@ -196,10 +201,14 @@ export function SelectedCard({
 
 export function MapLegend({ origin }: { origin: LatLng | null }) {
   return (
-    <div className="absolute top-3 left-3 flex gap-3.5 lg:top-auto lg:bottom-4 lg:left-4 rounded-2xl bg-card px-3 py-2 text-xs text-subtle-foreground shadow-card">
+    <div className="absolute top-3 left-3 flex gap-3.5 rounded-2xl bg-card px-3 py-2 text-xs text-subtle-foreground shadow-card lg:top-auto lg:bottom-4 lg:left-4">
       <span className="inline-flex items-center gap-1.5">
         <span className="size-2.5 rounded-full bg-foreground" />
         Activo
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <span className="size-2.5 rounded-full bg-brand shadow-[0_0_0_1px_var(--brand-ink)]" />
+        Seleccionado
       </span>
       <span className="inline-flex items-center gap-1.5">
         <span className="size-2.5 rounded-full border-2 border-foreground" />

@@ -175,76 +175,8 @@
     text-align: start;
   }
 
-  /* Slot picker tiles: the time is the control; the chosen one turns yellow, as on the landing. */
-  .room-slot {
-    background: var(--ui-muted);
-    transition: background-color 150ms ease-out;
-
-    &:hover:not(:has([data-disabled], [data-checked])) {
-      background: color-mix(
-        in oklch,
-        var(--ui-foreground) 10%,
-        var(--ui-muted)
-      );
-    }
-
-    &:has([data-checked]) {
-      background: var(--brand-yellow);
-      box-shadow: inset 0 0 0 1px light-dark(var(--brand-ink), transparent);
-      color: var(--brand-ink);
-    }
-
-    &:has(:focus-visible) {
-      outline: 4px solid var(--ui-ring);
-    }
-  }
-
-  /* Composer: "Tomar control" shrinks into the send button and the input takes the freed width. */
-  [data-slot="button"].room-composer-action {
-    position: relative;
-    flex-shrink: 0;
-    overflow: hidden;
-    width: auto;
-    interpolate-size: allow-keywords;
-    transition:
-      width 260ms cubic-bezier(0.23, 1, 0.32, 1),
-      padding-inline 260ms cubic-bezier(0.23, 1, 0.32, 1),
-      transform 150ms ease-out,
-      background-color 150ms ease-out;
-
-    &[data-control] {
-      width: calc(var(--ui-spacing) * 12);
-      padding-inline: 0;
-    }
-  }
-
-  .room-composer-label {
-    white-space: nowrap;
-    transition: opacity 120ms ease-out;
-
-    [data-control] > & {
-      opacity: 0;
-    }
-  }
-
-  .room-composer-icon {
-    position: absolute;
-    inset: 0;
-    margin: auto;
-    opacity: 0;
-    transform: scale(0.8);
-    transition:
-      opacity 180ms ease-out 80ms,
-      transform 180ms cubic-bezier(0.23, 1, 0.32, 1) 80ms;
-
-    [data-control] > & {
-      opacity: 1;
-      transform: none;
-    }
-  }
-
   [data-slot="textarea"].room-composer-input {
-    min-height: calc(var(--ui-spacing) * 12);
+    min-height: calc(var(--ui-spacing) * 11);
     max-height: 10rem;
     resize: none;
 
@@ -281,87 +213,735 @@
 
 @keyframes room-flash {
   from {
-    box-shadow: 0 0 0 3px var(--ui-ring);
+    outline-color: var(--ui-ring);
   }
   to {
-    box-shadow: 0 0 0 3px transparent;
+    outline-color: transparent;
   }
 }
 
-.room-bubble {
-  transition:
-    opacity 180ms ease-out,
-    border-color 180ms ease-out;
-}
-
-.room-pending {
-  opacity: 0.6;
-}
-
-.room-stage {
-  animation: room-scan 1.2s ease-in-out infinite;
-}
-
-.room-highlight > .room-bubble {
-  border-radius: var(--sm-radius-3xl);
-  animation: room-flash 1.6s ease-out;
-}
-
-/* Desktop contract panel: the column opens from the right edge and the content follows it in. */
-.room-panel {
-  width: 0;
-  transition: width 260ms var(--ease-out);
-
-  &[data-open] {
-    width: 340px;
-  }
-}
-
-.room-panel-inner {
-  opacity: 0;
-  transform: translateX(12px);
-  transition:
-    opacity 200ms var(--ease-out),
-    transform 260ms var(--ease-out);
-
-  [data-open] > & {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-/* The audit dialog fades in from just below full size; it is centered, so it scales from center. */
-.room-dialog {
-  transition:
-    opacity 200ms var(--ease-out),
-    scale 200ms var(--ease-out);
-
-  &:is([data-starting-style], [data-ending-style]) {
+@keyframes room-rise {
+  from {
     opacity: 0;
-    scale: 0.96;
+    translate: 0 6px;
   }
 }
 
-.room-dialog-backdrop {
-  transition: opacity 200ms var(--ease-out);
+/*
+ * The room. Layered with the rest of the components so a Tailwind utility on the same element
+ * still wins.
+ */
+@layer components {
+  /* One reading column: the head, the thread and the composer share a measure. */
+  .room-col {
+    width: 100%;
+    max-width: 880px;
+    margin-inline: auto;
+    padding-inline: 1.5rem;
 
-  &:is([data-starting-style], [data-ending-style]) {
-    opacity: 0;
+    @media (max-width: 40rem) {
+      padding-inline: 1rem;
+    }
+  }
+
+  .room-dot {
+    display: inline-block;
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+
+  /* "Tus salas": the open room carries the highlighter. */
+  .room-list {
+    display: none;
+    flex: none;
+    flex-direction: column;
+    width: 248px;
+    border-right: 1px solid var(--ui-border);
+
+    @media (min-width: 64rem) {
+      display: flex;
+    }
+  }
+
+  .room-list-item {
+    display: block;
+    padding: 0.625rem 1.25rem;
+    border-top: 1px solid var(--ui-border);
+    color: inherit;
+    text-decoration: none;
+    transition: background-color 150ms ease-out;
+
+    &[aria-current] {
+      background: var(--sm-card);
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      &:not([aria-current]):hover {
+        background: color-mix(in oklch, var(--ui-muted) 60%, transparent);
+      }
+    }
+  }
+
+  .room-list li:last-child > .room-list-item {
+    border-bottom: 1px solid var(--ui-border);
+  }
+
+  .room-list-line {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+
+    & time {
+      color: var(--sm-subtle-foreground);
+    }
+
+    /* The open room: the shared highlighter (guide.css), let out to the row's text edge. */
+    &.highlight {
+      margin: -2px -6px;
+      padding: 2px 6px;
+
+      & time {
+        color: inherit;
+      }
+    }
+  }
+
+  /* Head: the name, a mono strip with the turn and the faults meter, and three controls. */
+  .room-head {
+    display: flex;
+    flex: none;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.625rem 0.75rem;
+    padding-block: 0.875rem;
+  }
+
+  .room-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 1.125rem;
+    margin: 0.125rem 0 0;
+    color: var(--sm-subtle-foreground);
+    font: 500 0.75rem / 1.5 var(--ui-font-mono);
+    font-variant-numeric: tabular-nums;
+
+    & b {
+      color: var(--ui-foreground);
+      font-weight: 600;
+    }
+  }
+
+  .room-faults {
+    display: inline-flex;
+    gap: 3px;
+    margin-left: 6px;
+    vertical-align: 1px;
+
+    & i {
+      width: 16px;
+      height: 6px;
+      background: var(--ui-border);
+    }
+
+    /* Yellow alone is 1.5:1 on paper, so a bar that is on also takes an ink edge in light. */
+    & i[data-on] {
+      background: var(--brand-yellow);
+      box-shadow: inset 0 0 0 1px light-dark(var(--brand-ink), transparent);
+    }
+  }
+
+  .room-head-btn {
+    flex: none;
+    border-radius: var(--sm-radius-2xl);
+    background: var(--sm-card);
+    font-size: 0.8125rem;
+    transition:
+      scale 160ms var(--ease-out),
+      background-color 150ms ease-out;
+
+    &:active {
+      scale: 0.97;
+    }
+
+    &[data-open] {
+      background: var(--ui-muted);
+    }
+
+    & > svg {
+      color: var(--sm-subtle-foreground);
+    }
+  }
+
+  .room-head-icon {
+    width: calc(var(--ui-spacing) * 8);
+    padding-inline: 0;
+    border-color: transparent;
+    background: transparent;
+  }
+
+  /* Head panels, the moderator panel and the menu: one floating surface. */
+  :is(.room-hpop, .room-pop, .room-menu) {
+    border: 0;
+    border-radius: var(--sm-radius-4xl);
+    background: var(--sm-card);
+    box-shadow:
+      var(--ui-shadow),
+      0 12px 32px -12px oklch(0 0 0 / 0.3);
+    transition:
+      opacity 150ms var(--ease-out),
+      translate 150ms var(--ease-out);
+
+    &:is([data-starting-style], [data-ending-style]) {
+      opacity: 0;
+      translate: 0 -4px;
+    }
+  }
+
+  .room-hpop {
+    gap: 0.75rem;
+    max-width: calc(100vw - 2rem);
+    padding: 1rem;
+  }
+
+  .room-menu {
+    min-width: 232px;
+    padding: 6px;
+
+    /* Items share one left edge; the check of a checkbox item sits at the right. */
+    & :is([data-slot="menu-item"], [data-slot="menu-checkbox-item"]) {
+      min-height: 36px;
+      padding-inline: 0.625rem;
+      border-radius: var(--ui-radius);
+      cursor: pointer;
+    }
+
+    & [data-slot="menu-item-indicator"] {
+      position: static;
+      order: 1;
+      margin-left: auto;
+    }
+
+    & [data-destructive] {
+      color: var(--sm-destructive-text);
+    }
+  }
+
+  /* Thread: a time gutter and the conversation. */
+  .room-thread {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    width: 100%;
+    max-width: 880px;
+    margin-inline: auto;
+  }
+
+  .room-notice {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0.75rem 1.5rem;
+    border-bottom: 1px solid var(--ui-border);
+    color: var(--sm-subtle-foreground);
+    font: 500 0.6875rem / 1.4 var(--ui-font-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    overflow-wrap: anywhere;
+
+    & > svg {
+      flex: none;
+    }
+
+    &[data-code="session_closed"] {
+      color: var(--ui-foreground);
+    }
+
+    &[data-code="message_blocked"] {
+      color: var(--sm-destructive-text);
+    }
+
+    &[data-code="session_terminated"] {
+      background: var(--sm-destructive-soft);
+      color: var(--sm-destructive-text);
+    }
+  }
+
+  .room-filter {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0.5rem 1.5rem;
+    border-bottom: 1px solid var(--ui-border);
+    background: var(--ui-muted);
+    font-size: 0.8125rem;
+  }
+
+  .room-entry {
+    display: grid;
+    grid-template-columns: 84px minmax(0, 1fr);
+    scroll-margin-top: 6rem;
+  }
+
+  .room-time {
+    padding: 18px 0 0 1.5rem;
+    color: var(--sm-subtle-foreground);
+    font: 500 0.75rem / 1.5 var(--ui-font-mono);
+    font-variant-numeric: tabular-nums;
+
+    [data-continued] > & {
+      padding-top: 9px;
+    }
+  }
+
+  .room-msg {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    min-width: 0;
+    padding: 14px 1.5rem 14px 0;
+
+    [data-mine] > & {
+      align-items: flex-end;
+    }
+
+    [data-continued] > & {
+      padding-top: 0;
+    }
+  }
+
+  .room-who {
+    overflow: hidden;
+    max-width: 100%;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The bubble and its shield. Your own messages put the shield on the other side. */
+  .room-brow {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    max-width: 100%;
+
+    [data-mine] & {
+      flex-direction: row-reverse;
+    }
+  }
+
+  .room-bubble {
+    min-width: 0;
+    max-width: min(520px, 100%);
+    padding: 9px 14px;
+    border-radius: var(--sm-radius-3xl);
+    background: var(--sm-card);
+    box-shadow: var(--ui-shadow);
+    text-wrap: pretty;
+    transition: opacity 180ms ease-out;
+
+    [data-mine] & {
+      background: var(--ui-primary);
+      box-shadow: none;
+      color: var(--ui-primary-foreground);
+    }
+  }
+
+  .room-pending {
+    opacity: 0.6;
+  }
+
+  /* What the moderator held back: the hatch. */
+  .room-held {
+    min-width: 0;
+    max-width: min(520px, 100%);
+    padding: 9px 14px;
+    border-radius: var(--sm-radius-3xl);
+    background: var(--sm-hatch), var(--ui-muted);
+    color: var(--sm-subtle-foreground);
+    text-wrap: pretty;
+  }
+
+  .room-redact {
+    display: inline-block;
+    height: 1.05em;
+    border-radius: 2px;
+    background: var(--sm-hatch), var(--sm-destructive-soft);
+    vertical-align: -0.2em;
+
+    [data-mine] & {
+      background: color-mix(in oklch, currentColor 28%, transparent);
+    }
+  }
+
+  .room-shield {
+    position: relative;
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    margin-top: 1px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--sm-radius-2xl);
+    background: transparent;
+    color: var(--ui-muted-foreground);
+    transition:
+      background-color 150ms ease-out,
+      color 150ms ease-out;
+
+    &:is(:hover, [data-open]) {
+      background: var(--ui-muted);
+      color: var(--ui-foreground);
+    }
+
+    &:is(
+        [data-status="redacted"],
+        [data-status="blocked"],
+        [data-status="escalated"]
+      ) {
+      color: var(--ui-foreground);
+    }
+  }
+
+  .room-shield-dot {
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px var(--ui-background);
+  }
+
+  .room-pop {
+    gap: 0.625rem;
+    width: min(288px, calc(100vw - 1.5rem));
+    padding: 0.875rem;
+    font-size: 0.8125rem;
+  }
+
+  .room-pop-verdict {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin: 0;
+    font-weight: 600;
+
+    & > span:not(.room-dot) {
+      margin-left: auto;
+      color: var(--sm-subtle-foreground);
+      font: 400 0.75rem / 1 var(--ui-font-mono);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  .room-pop-reason {
+    margin: 0;
+    color: var(--sm-subtle-foreground);
+    overflow-wrap: anywhere;
+    text-wrap: pretty;
+  }
+
+  .room-pop-stages {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin: 0;
+    padding: 0;
+    color: var(--sm-subtle-foreground);
+    font-size: 0.75rem;
+    list-style: none;
+
+    & li {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+  }
+
+  .room-pop-acts {
+    display: flex;
+    flex-direction: column;
+    margin: 2px -6px -6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--ui-border);
+  }
+
+  .room-pop-act {
+    justify-content: flex-start;
+    gap: 0.5rem;
+    width: 100%;
+    height: 36px;
+    padding-inline: 6px;
+    border: 0;
+    border-radius: var(--ui-radius);
+    background: transparent;
+    font-size: inherit;
+    font-weight: 400;
+
+    & > svg {
+      color: var(--sm-subtle-foreground);
+    }
+  }
+
+  /* A ruling that changed the message is never hover-only: it is also written under the bubble. */
+  .room-ruling {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    max-width: min(520px, 100%);
+    margin: 0;
+    color: var(--sm-subtle-foreground);
+    font-size: 0.75rem;
+    overflow-wrap: anywhere;
+    text-wrap: pretty;
+
+    & > .room-dot {
+      translate: 0 -1px;
+    }
+
+    & b {
+      color: var(--ui-foreground);
+      font-weight: 500;
+    }
+  }
+
+  .room-stage {
+    animation: room-scan 1.2s ease-in-out infinite;
+  }
+
+  .room-highlight :is(.room-bubble, .room-held, [data-genui]) {
+    outline: 3px solid transparent;
+    outline-offset: 2px;
+    animation: room-flash 1.6s ease-out;
+  }
+
+  .room-typing-line {
+    min-height: 1.25rem;
+    margin-block: 0;
+    padding: 0 1.5rem 0 84px;
+    color: var(--sm-subtle-foreground);
+    font-size: 0.75rem;
+
+    &[data-mine] {
+      text-align: right;
+    }
+  }
+
+  .room-typing {
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: var(--sm-radius-full);
+    background: currentColor;
+    animation: room-scan 1s ease-in-out infinite;
+  }
+
+  /* Slot picker tiles: day and time in mono; the chosen one turns yellow, as on the landing. */
+  .room-slot {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1px;
+    min-height: 44px;
+    max-width: min(100%, 15rem);
+    padding: 8px 12px;
+    border: 1px solid var(--ui-input);
+    border-radius: var(--sm-radius-2xl);
+    background: var(--sm-card);
+    cursor: pointer;
+    transition:
+      background-color 150ms ease-out,
+      border-color 150ms ease-out;
+
+    & b {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font: 600 0.8125rem / 1.4 var(--ui-font-mono);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* The check marks the chosen slot, so the choice does not rest on yellow alone. */
+    & b > svg {
+      display: none;
+      flex: none;
+    }
+
+    & small {
+      color: var(--sm-subtle-foreground);
+      font-size: 0.75rem;
+      overflow-wrap: anywhere;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      &:hover:not(:has([data-disabled], [data-checked])) {
+        background: var(--ui-muted);
+      }
+    }
+
+    &:has([data-checked]) {
+      border-color: transparent;
+      background: var(--brand-yellow);
+      box-shadow: inset 0 0 0 1px light-dark(var(--brand-ink), transparent);
+      color: var(--brand-ink);
+
+      & small {
+        color: var(--brand-ink);
+      }
+
+      & b > svg {
+        display: block;
+      }
+    }
+
+    &:has([data-disabled]) {
+      cursor: default;
+    }
+
+    /* A slot that can no longer be picked: a dashed edge and quiet text. */
+    &:has([data-disabled]):not(:has([data-checked])) {
+      border-style: dashed;
+      background: transparent;
+      color: var(--sm-subtle-foreground);
+    }
+
+    &:has(:focus-visible) {
+      outline: 4px solid var(--ui-ring);
+    }
+  }
+
+  /* Composer: one sentence and "Tomar control", or the band and the field. */
+  .room-composer {
+    flex: none;
+    border-top: 1px solid var(--ui-border);
+  }
+
+  .room-composer-idle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-block: 0.75rem;
+
+    @media (max-width: 40rem) {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.5rem;
+      padding-block: 0.625rem 0.75rem;
+
+      & p {
+        font-size: 0.8125rem;
+        text-align: center;
+      }
+    }
+  }
+
+  .room-composer-live {
+    animation: room-rise 220ms var(--ease-out);
+  }
+
+  [data-slot="button"].room-return {
+    flex: none;
+    margin-right: -0.375rem;
+    padding-inline: 0.375rem;
+    color: var(--brand-ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+
+    &:hover {
+      background: color-mix(in oklch, var(--brand-ink) 10%, transparent);
+    }
+
+    &:focus-visible {
+      outline-color: var(--brand-ink);
+    }
+  }
+
+  /* Room audit: one row per intervention; pressing it scrolls to the message. */
+  [data-slot="button"].room-audit-row {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 2px;
+    width: calc(100% + 1rem);
+    height: auto;
+    margin-inline: -0.5rem;
+    padding: 0.5625rem 0.5rem;
+    border: 0;
+    border-radius: var(--ui-radius);
+    background: transparent;
+    font-size: 0.8125rem;
+    font-weight: 400;
+    text-align: left;
+    white-space: normal;
+
+    &:hover {
+      background: var(--ui-muted);
+    }
+  }
+
+  /* The audit dialog fades in from just below full size; it is centered, so it scales from center. */
+  .room-dialog {
+    transition:
+      opacity 200ms var(--ease-out),
+      scale 200ms var(--ease-out);
+
+    &:is([data-starting-style], [data-ending-style]) {
+      opacity: 0;
+      scale: 0.96;
+    }
+  }
+
+  .room-dialog-backdrop {
+    transition: opacity 200ms var(--ease-out);
+
+    &:is([data-starting-style], [data-ending-style]) {
+      opacity: 0;
+    }
   }
 }
 
-.room-typing {
-  display: inline-block;
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: var(--sm-radius-full);
-  background: currentColor;
-  animation: room-scan 1s ease-in-out infinite;
+@media (max-width: 40rem) {
+  @layer components {
+    .room-notice,
+    .room-filter {
+      padding-inline: 1rem;
+    }
+
+    .room-entry {
+      grid-template-columns: 60px minmax(0, 1fr);
+    }
+
+    .room-time {
+      padding-left: 1rem;
+    }
+
+    .room-msg {
+      padding-right: 1rem;
+    }
+
+    .room-typing-line {
+      padding: 0 1rem 0 60px;
+    }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .room-bubble,
   .room-slot,
+  .room-shield,
+  .room-head-btn,
+  .room-list-item,
   :is(
     [data-slot="button"],
     [data-slot="dialog-trigger"],
@@ -372,20 +952,16 @@
     transition: none;
   }
 
-  [data-slot="button"].room-composer-action,
-  .room-composer-label,
-  .room-composer-icon,
   [data-slot="textarea"].room-composer-input {
     transition: none;
   }
 
-  .room-panel {
-    transition: none;
-  }
+  :is(.room-hpop, .room-pop, .room-menu) {
+    transition: opacity 150ms ease-out;
 
-  .room-panel-inner {
-    transform: none;
-    transition: opacity 200ms ease-out;
+    &:is([data-starting-style], [data-ending-style]) {
+      translate: none;
+    }
   }
 
   .room-dialog {
@@ -398,8 +974,13 @@
 
   .room-stage,
   .room-typing,
-  .room-highlight > .room-bubble {
+  .room-composer-live,
+  .room-highlight :is(.room-bubble, .room-held, [data-genui]) {
     animation: none;
+  }
+
+  .room-head-btn:active {
+    scale: none;
   }
 
   :is(

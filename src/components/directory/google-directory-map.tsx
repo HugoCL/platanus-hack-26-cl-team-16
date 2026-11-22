@@ -33,6 +33,7 @@ export default function GoogleDirectoryMap({
   cards,
   categories,
   selectedId,
+  popup = true,
   onSelect,
   origin,
   radiusKm,
@@ -70,7 +71,7 @@ export default function GoogleDirectoryMap({
             origin={origin}
             radiusKm={radiusKm}
           />
-          <PanToSelected at={selected?.location ?? null} />
+          <PanToSelected at={popup ? (selected?.location ?? null) : null} />
 
           {origin ? (
             <>
@@ -118,7 +119,7 @@ export default function GoogleDirectoryMap({
             );
           })}
 
-          {selectedPin && selected ? (
+          {popup && selectedPin && selected ? (
             <AdvancedMarker
               position={selected.location}
               zIndex={30}

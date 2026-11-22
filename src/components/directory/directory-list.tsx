@@ -1,4 +1,5 @@
 import { Button } from "@ui-sdk/react/button";
+import { ArrowRightIcon } from "lucide-react";
 import Link from "next/link";
 import type { DirectoryCard } from "@/convex/directory";
 import type { Category } from "@/shared/catalog";
@@ -7,8 +8,6 @@ import { intentLabel } from "../room/room-format";
 import { VerifiedBadge } from "../verified-badge";
 import { isProspect, ProspectBadge } from "./agent-badges";
 import { categoryIcon, formatKm, KIND_LABELS } from "./directory-format";
-
-const VISIBLE_INTENTS = 3;
 
 export type DirectoryListProps = {
   cards: DirectoryCard[];
@@ -31,10 +30,7 @@ export default function DirectoryList({
   for (const card of cards)
     nameCounts.set(card.name, (nameCounts.get(card.name) ?? 0) + 1);
   return (
-    <ul
-      className="m-0 flex list-none flex-col gap-3 p-0"
-      data-testid="directory"
-    >
+    <ul className="m-0 list-none p-0" data-testid="directory">
       {cards.map((card) => (
         <AgentResult
           key={card.agentId}
@@ -70,105 +66,108 @@ function AgentResult({
 }) {
   const prospect = isProspect(card);
   const Icon = categoryIcon(card.categories, categories);
-  const intents = card.allowedIntents;
-  const href = `/directory/${card.slug}`;
-  const meta = [
-    sharesName ? (card.location?.address ?? card.entityName) : undefined,
+  const where = [
     card.comuna,
     distance === undefined ? undefined : formatKm(distance),
-    KIND_LABELS[card.kind],
-  ].filter(Boolean);
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  // Two agents with one name are told apart by their address.
+  const address = sharesName
+    ? (card.location?.address ?? card.entityName)
+    : undefined;
+  const detailsId = `agent-${card.agentId}-details`;
 
   return (
-    // The title is the card's select button; its ::before stretches over the card so a click
-    // anywhere selects it. Links, buttons and the badge sit above it (relative z-10).
+    // A guide row: the name is the row's select button and its ::before stretches over the row,
+    // so a click anywhere selects it. The badge and the open row's actions sit above it.
     <li
       id={`agent-${card.agentId}`}
       data-testid="agent-card"
       data-slug={card.slug}
       data-status={card.status}
-      className={`relative flex scroll-m-4 flex-col gap-2.5 rounded-3xl p-4 transition-[opacity,box-shadow] duration-200 ease-[var(--ease-out)] starting:opacity-0 motion-reduce:transition-none has-[[data-select]:focus-visible]:outline-2 has-[[data-select]:focus-visible]:outline-offset-2 has-[[data-select]:focus-visible]:outline-ring ${
-        prospect ? "bg-muted [background-image:var(--sm-hatch)]" : "bg-card"
-      } ${selected ? "shadow-[0_0_0_2px_var(--ui-foreground)]" : prospect ? "" : "shadow-card"}`}
+      data-selected={selected ? "" : undefined}
+      className="guide-row scroll-m-4 max-sm:px-4"
     >
-      <div className="flex items-start gap-3">
-        <span
-          aria-hidden
-          className={`grid size-10 flex-none place-items-center rounded-2xl ${prospect ? "bg-card" : "bg-muted"}`}
+      <Icon
+        aria-hidden
+        size={18}
+        className={`mt-0.5 ${prospect ? "text-muted-foreground" : "text-subtle-foreground"}`}
+      />
+      <div className="guide-line">
+        <h2
+          className={`m-0 flex min-w-0 items-center gap-1 text-lead leading-[1.4] tracking-[-0.01em] ${prospect ? "font-normal" : "font-medium"} ${prospect && !selected ? "text-subtle-foreground" : ""}`}
         >
-          <Icon size={20} />
-        </span>
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <h2 className="m-0 flex min-w-0 items-start gap-1 text-base leading-snug font-medium tracking-tight">
-            <button
-              type="button"
-              data-select
-              aria-pressed={selected}
-              title={card.name}
-              onClick={() => onSelect?.(card.agentId)}
-              className="line-clamp-2 min-w-0 cursor-pointer border-0 bg-transparent p-0 text-left font-[inherit] text-inherit outline-none before:absolute before:inset-0 before:rounded-3xl"
-            >
-              {card.name}
-            </button>
-            {!prospect && card.verified ? (
-              <VerifiedBadge className="relative z-10 mt-0.5 flex-none" />
-            ) : null}
-          </h2>
-          {meta.length > 0 ? (
-            <p className="m-0 text-caption text-subtle-foreground tabular-nums">
-              {meta.join(" · ")}
-            </p>
+          <button
+            type="button"
+            data-select
+            aria-expanded={selected}
+            aria-controls={selected ? detailsId : undefined}
+            title={card.name}
+            onClick={() => onSelect?.(card.agentId)}
+            className="min-w-0 cursor-pointer truncate border-0 bg-transparent p-0 text-left font-[inherit] tracking-[inherit] text-inherit outline-none before:absolute before:inset-0"
+          >
+            {card.name}
+          </button>
+          {!prospect && card.verified ? (
+            <VerifiedBadge className="relative z-10 -my-1 flex-none" />
           ) : null}
-          {prospect ? <ProspectBadge /> : null}
-        </div>
+          {prospect ? <ProspectBadge className="ml-1 flex-none" /> : null}
+        </h2>
+        <span aria-hidden className="leader" />
+        {where ? <span className="guide-where">{where}</span> : null}
       </div>
 
       <p
-        className={`m-0 line-clamp-2 text-sm leading-normal ${prospect ? "text-subtle-foreground" : ""}`}
+        className={`col-start-2 m-0 ${
+          selected
+            ? "mt-2.5 text-sm text-pretty"
+            : "mt-px truncate text-caption text-subtle-foreground"
+        }`}
       >
+        {address ? (
+          <span className={selected ? "font-medium" : "text-foreground"}>
+            {address}
+            {" · "}
+          </span>
+        ) : null}
         {card.purpose}
       </p>
 
-      {!prospect && intents.length > 0 ? (
-        <ul
-          aria-label="Qué puede hacer"
-          className="m-0 flex list-none flex-wrap gap-1.5 p-0"
+      {selected ? (
+        <div
+          id={detailsId}
+          className="relative z-10 col-start-2 flex flex-col gap-3 pt-2.5 pb-1"
         >
-          {intents.slice(0, VISIBLE_INTENTS).map((intent) => (
-            <li
-              key={intent}
-              title={intentLabel(intent)}
-              className="h-6 max-w-full truncate rounded-lg border border-input px-2.5 text-xs leading-[22px]"
+          {!prospect && card.allowedIntents.length > 0 ? (
+            <ul
+              aria-label="Qué puede hacer"
+              className="m-0 flex list-none flex-wrap gap-1.5 p-0"
             >
-              {intentLabel(intent)}
-            </li>
-          ))}
-          {intents.length > VISIBLE_INTENTS ? (
-            <li className="inline-flex h-6 items-center px-2 text-xs text-subtle-foreground">
-              +{intents.length - VISIBLE_INTENTS}
-            </li>
+              {card.allowedIntents.map((intent) => (
+                <li key={intent} className="tag">
+                  <span className="truncate">{intentLabel(intent)}</span>
+                </li>
+              ))}
+            </ul>
           ) : null}
-        </ul>
+          <div className="flex items-center gap-4">
+            {prospect || card.slug === CONSUMER_AGENT_SLUG ? null : (
+              <Button data-variant="solid" onClick={() => onConverse?.(card)}>
+                Conversar
+              </Button>
+            )}
+            <Link href={`/directory/${card.slug}`} className="ficha-link">
+              Ver ficha
+              <span className="sr-only"> de {card.name}</span>
+              <ArrowRightIcon aria-hidden size={14} />
+            </Link>
+            <span className="ml-auto text-xs text-subtle-foreground">
+              {KIND_LABELS[card.kind]}
+            </span>
+          </div>
+        </div>
       ) : null}
-
-      <div className="relative z-10 flex gap-2">
-        {prospect || card.slug === CONSUMER_AGENT_SLUG ? null : (
-          <Button
-            data-variant="solid"
-            className="flex-1"
-            onClick={() => onConverse?.(card)}
-          >
-            Conversar
-          </Button>
-        )}
-        <Link
-          href={href}
-          className="press inline-flex h-9 flex-1 items-center justify-center rounded-2xl border border-input bg-card text-sm font-medium text-foreground no-underline hover:bg-muted"
-        >
-          Ver ficha
-          <span className="sr-only"> de {card.name}</span>
-        </Link>
-      </div>
     </li>
   );
 }

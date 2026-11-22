@@ -54,8 +54,10 @@ export function MobileMenu({
               href={item.href}
               onClick={close}
               aria-current={item.key === current ? "page" : undefined}
-              className={`press flex h-11 items-center rounded-2xl px-3 text-lead text-foreground no-underline ${
-                item.key === current ? "bg-muted font-medium" : "hover:bg-muted"
+              className={`press flex h-11 items-center px-3 text-lead no-underline ${
+                item.key === current
+                  ? "highlight font-medium"
+                  : "rounded-2xl text-foreground hover:bg-muted"
               }`}
             >
               {item.label}

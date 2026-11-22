@@ -1,0 +1,191 @@
+/*
+ * Imported into `components`, so a Tailwind utility on the same element still wins.
+ *
+ * The guide vocabulary: what the app views take from the landing's phone book.
+ * A ledger of key and value joined by dot leaders, one tag, and the yellow highlighter,
+ * which marks the selected thing and nothing else.
+ */
+
+/*
+ * Dot leader: fills the gap between a name and its value. Draws in --leader-ink, the text colour
+ * unless a parent sets it. In a ledger the label draws it (a dl takes no other children).
+ */
+.leader,
+.ledger dt::after {
+  flex: 1;
+  align-self: flex-start;
+  min-width: 1.5rem;
+  height: 2px;
+  margin-top: 0.95em;
+  background-image: radial-gradient(
+    circle,
+    color-mix(in oklch, var(--leader-ink, currentColor) 35%, transparent) 0.75px,
+    transparent 1px
+  );
+  background-size: 6px 2px;
+  background-repeat: repeat-x;
+}
+
+.ledger {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+
+  & > div {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding-block: 0.5625rem;
+    border-bottom: 1px solid var(--ui-border);
+  }
+
+  & > div:last-child {
+    border-bottom: 0;
+  }
+
+  & dt {
+    --leader-ink: var(--ui-foreground);
+    display: flex;
+    flex: 1 1 auto;
+    align-items: baseline;
+    gap: 0.5rem;
+    color: var(--sm-subtle-foreground);
+    white-space: nowrap;
+  }
+
+  & dt::after {
+    content: "";
+  }
+
+  /* A wrapped value starts where the dots end, so the leader never stops short of it. */
+  & dd {
+    max-width: 66%;
+    margin: 0;
+    font-weight: 500;
+    text-wrap: balance;
+    overflow-wrap: anywhere;
+  }
+
+  /* In a narrow column a long value takes its own line under the label. After the base rules. */
+  @container (max-width: 30rem) {
+    & > div {
+      flex-wrap: wrap;
+    }
+
+    & dd {
+      max-width: 100%;
+    }
+  }
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  max-width: 100%;
+  height: 1.5rem;
+  padding-inline: 0.5rem;
+  border: 1px solid var(--ui-input);
+  border-radius: var(--ui-radius);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+/* Unclaimed: a dashed edge instead of the moderator's hatch. */
+.tag-dashed {
+  border-style: dashed;
+  color: var(--sm-subtle-foreground);
+}
+
+.highlight {
+  border-radius: 3px;
+  background: var(--brand-yellow);
+  color: var(--brand-ink);
+}
+
+/* A dashed tag that sits on the highlighter keeps its edge readable. */
+.highlight .tag-dashed,
+[data-selected] > .guide-line .tag-dashed {
+  border-color: color-mix(in oklch, var(--brand-ink) 55%, transparent);
+  color: var(--brand-ink);
+}
+
+/* "Ver ficha": one text link, the same in a row and on the map. */
+.ficha-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 2.25rem;
+  color: var(--ui-foreground);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-underline-offset: 3px;
+}
+
+/* Mono caps for counts and small notices: the one uppercase label. */
+.label-caps {
+  font: 700 0.75rem / 1 var(--ui-font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Directory results as guide rows. */
+.guide-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  column-gap: 0.75rem;
+  padding: 0.6875rem 1.25rem;
+  border-bottom: 1px solid var(--ui-border);
+  transition: background-color 150ms ease-out;
+
+  @media (hover: hover) and (pointer: fine) {
+    &:not([data-selected]):hover {
+      background: color-mix(in oklch, var(--ui-muted) 60%, transparent);
+    }
+  }
+
+  &[data-selected] {
+    background: var(--sm-card);
+  }
+
+  &:has([data-select]:focus-visible) {
+    outline: 2px solid var(--ui-ring);
+    outline-offset: -2px;
+  }
+}
+
+.guide-line {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+
+  [data-selected] > & {
+    margin: -0.1875rem -0.5rem;
+    padding: 0.1875rem 0.5rem;
+    border-radius: 3px;
+    background: var(--brand-yellow);
+    color: var(--brand-ink);
+  }
+}
+
+.guide-where {
+  flex: none;
+  color: var(--sm-subtle-foreground);
+  font: 500 0.75rem / 1.4 var(--ui-font-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+
+  [data-selected] > .guide-line > & {
+    color: var(--brand-ink);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide-row {
+    transition: none;
+  }
+}

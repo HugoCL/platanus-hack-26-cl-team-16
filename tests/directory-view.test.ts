@@ -74,7 +74,34 @@ it("5. the web view shows every seed card", async () => {
     );
   }
   expect(html).toContain('aria-label="Verificada"');
-  expect(html).toContain("Providencia · Hospedado");
-  expect(html).toContain("Sin reclamar · pre-armado");
-  expect(html).toContain('href="/directory/cafe-los-dominicos"');
+  expect(html).toContain('<span class="guide-where">Providencia</span>');
+  expect(html).toContain("Sin reclamar");
+  // A closed row shows the name, the place and the purpose; the rest waits for a selection.
+  expect(html).not.toContain("Hospedado");
+  expect(html).not.toContain('href="/directory/cafe-los-dominicos"');
+
+  const open = cards.find((card) => card.slug === "cafe-los-dominicos");
+  const unclaimed = renderToStaticMarkup(
+    createElement(DirectoryList, {
+      cards,
+      categories,
+      selectedId: open?.agentId,
+    }),
+  );
+  expect(unclaimed.match(/data-selected/g)).toHaveLength(1);
+  expect(unclaimed).toContain('href="/directory/cafe-los-dominicos"');
+  expect(unclaimed).not.toContain("Conversar");
+
+  const claimed = cards.find((card) => card.status !== "prospect");
+  const selected = renderToStaticMarkup(
+    createElement(DirectoryList, {
+      cards,
+      categories,
+      selectedId: claimed?.agentId,
+    }),
+  );
+  expect(selected).toContain("Hospedado");
+  expect(selected).toContain("Conversar");
+  // No intent codes in the row: people read the Spanish label.
+  expect(selected).not.toContain("check_availability");
 });

@@ -69,7 +69,7 @@ export const REASON_LABELS: Record<ModerationReasonCode, string> = {
   url: "Enlace externo",
   pii: "Dato personal (PII)",
   malformed_payload: "Formato inválido",
-  prompt_injection: "Prompt injection",
+  prompt_injection: "Inyección de instrucciones",
   off_purpose: "Fuera del propósito",
   forbidden_topic: "Tema prohibido",
   data_leak: "Fuga de datos",
@@ -82,6 +82,27 @@ export const STAGE_LABELS: Record<ModerationStage, string> = {
   injection: "Inyección",
   purpose: "Propósito",
 };
+
+// What the moderator ruled, as a word. The shield, its panel and the room audit share it.
+export const STATUS_LABELS: Record<ModerationStatus, string> = {
+  pending: "Revisando…",
+  allowed: "Aprobado",
+  redacted: "Editado",
+  blocked: "Bloqueado",
+  escalated: "Requiere aprobación",
+};
+
+// The rule a moderator alert cites, in words. The code stays in the message audit.
+const RULE_LABELS: Record<string, string> = {
+  purpose: "Fuera del propósito",
+  scope: "Fuera del contrato",
+  injection: "Inyección de instrucciones",
+  sensitive_data: "Datos sensibles",
+};
+
+export function ruleLabel(rule: string) {
+  return RULE_LABELS[rule] ?? intentLabel(rule);
+}
 
 export const SESSION_STATUS_LABELS: Record<SessionStatus, string> = {
   requested: "Esperando aceptación",
@@ -137,6 +158,18 @@ export function groupSlotsByDay(slots: Slot[]) {
   return days;
 }
 
+// "Mié 25 · 09:00": a slot named by its day and time, as the landing writes it.
+export function formatSlot(at: number | string) {
+  return `${formatDay(at)} · ${formatTime(at)}`;
+}
+
+// A room in a list: the time when it was active today, else the day.
+export function formatLastActivity(at: number, now = Date.now()) {
+  return formatLongDay(at) === formatLongDay(now)
+    ? formatTime(at)
+    : formatDay(at);
+}
+
 export function violationTone(count: number, max: number) {
   if (count >= max) return "danger";
   if (count / max > 0.5) return "warning";
@@ -173,12 +206,51 @@ export function canAnswerUi(viewer: Viewer) {
 }
 
 export function countViolations(messages: RoomMessage[]) {
+  return messages.filter(isViolation).length;
+}
+
+function isViolation(message: RoomMessage) {
+  return (
+    message.status === "blocked" &&
+    message.senderParticipantId !== null &&
+    !message.reasons?.some((reason) => reason.code === "moderator_error")
+  );
+}
+
+// Which fault each blocked message was: the first is 1. The header shows the total; this is the
+// ordinal written under the message.
+export function violationOrdinals(messages: RoomMessage[]) {
+  const ordinals = new Map<string, number>();
+  for (const message of messages)
+    if (isViolation(message))
+      ordinals.set(message.messageId, ordinals.size + 1);
+  return ordinals;
+}
+
+// The gate counts one turn per message an agent sends (convex/gate.ts), whatever its verdict.
+export function countAgentTurns(
+  messages: RoomMessage[],
+  participants: RoomParticipant[],
+) {
+  const agents = new Set(
+    participants.filter((p) => p.kind === "agent").map((p) => p.participantId),
+  );
   return messages.filter(
-    (message) =>
-      message.status === "blocked" &&
-      message.senderParticipantId !== null &&
-      !message.reasons?.some((reason) => reason.code === "moderator_error"),
+    (m) => m.senderParticipantId !== null && agents.has(m.senderParticipantId),
   ).length;
+}
+
+export function isIntervention(message: RoomMessage) {
+  return (
+    message.senderParticipantId !== null &&
+    message.status !== "allowed" &&
+    message.status !== "pending"
+  );
+}
+
+// The opening notice in words. The stored text carries the intent code, so the room writes its own.
+export function openingNotice(sentAt: number, intentName: string) {
+  return `${formatLongDay(sentAt)} · sala abierta · contrato: ${intentLabel(intentName).toLowerCase()}`;
 }
 
 export function uiInteractionState(

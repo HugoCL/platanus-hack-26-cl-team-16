@@ -19,7 +19,6 @@ import {
 } from "@ui-sdk/react/select";
 import { Textarea } from "@ui-sdk/react/textarea";
 import {
-  CalendarIcon,
   CheckIcon,
   FileTextIcon,
   ListIcon,
@@ -37,13 +36,23 @@ import {
   type ListSpec,
   type MapPinSpec,
   type ModeratorAlertSpec,
-  type SlotPickerSpec,
+  SlotPickerSpec,
   type UiResponse,
   UiSpec,
 } from "@/shared/genui";
-import { formatTime, groupSlotsByDay, uiInteractionState } from "./room-format";
+import {
+  formatSlot,
+  groupSlotsByDay,
+  ruleLabel,
+  uiInteractionState,
+} from "./room-format";
 
 export type GenUiAnswer = { response: UiResponse; at: number };
+
+// The room draws a slot picker as a sentence with tiles under it, so it asks before choosing a frame.
+export function isSlotPicker(spec: unknown) {
+  return SlotPickerSpec.safeParse(spec).success;
+}
 
 type BlockProps<S> = {
   spec: S;
@@ -52,10 +61,12 @@ type BlockProps<S> = {
   onRespond: (response: UiResponse) => void;
 };
 
-const TYPE_META: Record<UiSpec["type"], { label: string; icon: ReactNode }> = {
+const TYPE_META: Record<
+  Exclude<UiSpec["type"], "slot_picker">,
+  { label: string; icon: ReactNode }
+> = {
   card: { label: "Tarjeta", icon: <PanelTopIcon size={16} /> },
   form: { label: "Formulario", icon: <FileTextIcon size={16} /> },
-  slot_picker: { label: "Horarios", icon: <CalendarIcon size={16} /> },
   confirmation: { label: "Confirmación", icon: <CheckIcon size={16} /> },
   list: { label: "Lista", icon: <ListIcon size={16} /> },
   map_pin: { label: "Ubicación", icon: <MapPinIcon size={16} /> },
@@ -88,7 +99,6 @@ export function GenUiBlock({
   }
 
   const spec = parsed.data;
-  const meta = TYPE_META[spec.type];
   const { disabled, showOwnerOnly } = uiInteractionState(
     canInteract,
     readOnly,
@@ -97,6 +107,26 @@ export function GenUiBlock({
   const props = { answer, disabled, onRespond };
   const title = "title" in spec ? spec.title : undefined;
 
+  // The slot picker has no card: its tiles hang under the sentence that introduces them.
+  if (spec.type === "slot_picker") {
+    return (
+      <section
+        aria-label={spec.title}
+        data-genui={spec.type}
+        data-answered={answer ? "" : undefined}
+        className="flex w-full max-w-[520px] flex-col gap-1.5"
+      >
+        {showOwnerOnly ? (
+          <p className="m-0 text-xs text-subtle-foreground">
+            Solo el dueño puede responder
+          </p>
+        ) : null}
+        <SlotPickerBlock spec={spec} {...props} />
+      </section>
+    );
+  }
+
+  const meta = TYPE_META[spec.type];
   return (
     <section
       aria-label={title ?? meta.label}
@@ -120,9 +150,6 @@ export function GenUiBlock({
       <div className="px-5 pb-5">
         {spec.type === "card" ? <CardBlock spec={spec} {...props} /> : null}
         {spec.type === "form" ? <FormBlock spec={spec} {...props} /> : null}
-        {spec.type === "slot_picker" ? (
-          <SlotPickerBlock spec={spec} {...props} />
-        ) : null}
         {spec.type === "confirmation" ? (
           <ConfirmationBlock spec={spec} {...props} />
         ) : null}
@@ -357,50 +384,39 @@ function SlotPickerBlock({
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <p className="m-0 text-xs text-subtle-foreground">Hora de Santiago</p>
+    <>
       <RadioGroup
         aria-label={spec.title}
         value={slotId}
         onValueChange={setSlotId}
         disabled={disabled}
-        className="flex flex-col gap-3"
+        className="flex flex-row flex-wrap gap-1.5"
       >
-        {shownDays.map(({ day, slots }) => (
-          <div key={day} className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium">{day}</span>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2">
-              {slots.map((slot) => (
-                <label
-                  key={slot.id}
-                  data-slot="label"
-                  className="room-slot flex cursor-pointer flex-col gap-0.5 rounded-2xl px-3.5 py-2.5 text-sm leading-tight has-[[data-disabled]]:cursor-default"
-                >
-                  <Radio
-                    value={slot.id}
-                    className="sr-only"
-                    onClick={() => confirmSlot(slot.id)}
-                    onKeyDownCapture={(event) => {
-                      if (event.key !== " " || disabled) return;
-                      event.preventDefault();
-                      event.stopPropagation();
-                      if (event.repeat) return;
-                      confirmSlot(slot.id);
-                    }}
-                  >
-                    <RadioIndicator />
-                  </Radio>
-                  <span className="text-base font-semibold tabular-nums">
-                    {slot.label ?? formatTime(slot.start)}
-                  </span>
-                  {slot.detail ? (
-                    <span className="text-xs opacity-80">{slot.detail}</span>
-                  ) : null}
-                </label>
-              ))}
-            </div>
-          </div>
-        ))}
+        {shownDays.flatMap(({ slots }) =>
+          slots.map((slot) => (
+            <label key={slot.id} data-slot="label" className="room-slot">
+              <Radio
+                value={slot.id}
+                className="sr-only"
+                onClick={() => confirmSlot(slot.id)}
+                onKeyDownCapture={(event) => {
+                  if (event.key !== " " || disabled) return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if (event.repeat) return;
+                  confirmSlot(slot.id);
+                }}
+              >
+                <RadioIndicator />
+              </Radio>
+              <b>
+                {slot.label ?? formatSlot(slot.start)}
+                <CheckIcon size={13} aria-hidden="true" />
+              </b>
+              {slot.detail ? <small>{slot.detail}</small> : null}
+            </label>
+          )),
+        )}
       </RadioGroup>
       {hiddenDays > 0 ? (
         <Button
@@ -412,7 +428,7 @@ function SlotPickerBlock({
           Ver {hiddenDays} {hiddenDays === 1 ? "día más" : "días más"}
         </Button>
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -624,7 +640,7 @@ function ModeratorAlertBlock({
     <div className="flex items-start gap-2 rounded-2xl bg-destructive-soft p-3 text-sm text-destructive-text">
       <TriangleAlertIcon size={16} className="mt-0.5 shrink-0" />
       <div className="flex flex-col gap-0.5">
-        <code className="font-mono text-xs">{spec.rule}</code>
+        <span className="font-medium">{ruleLabel(spec.rule)}</span>
         <span>{spec.reason}</span>
       </div>
     </div>
