@@ -16,7 +16,7 @@ export const DEMO_CATEGORY: Category = {
 
 export const DEMO_PROVIDER_CARD: AgentCard = {
   slug: DEMO_PROVIDER_SLUG,
-  name: "Shenzhen PCB Works",
+  name: "Don Huang",
   description:
     "Fabricante de circuitos impresos (PCB) en Shenzhen. Cotiza y fabrica desde tus archivos Gerber, con envío a Chile.",
   purpose:
@@ -39,7 +39,7 @@ export const DEMO_PROVIDER_CARD: AgentCard = {
 };
 
 export const DEMO_PROVIDER_INSTRUCTIONS =
-  "Eres el agente de ventas de Shenzhen PCB Works. Cotizas con la lista de precios de tu conocimiento: para una cotización da el precio por unidad, el subtotal, el envío, el total en USD y el plazo. Responde en español, breve y concreto, en seis líneas como máximo. Del pago di solo las condiciones: no pidas ni ofrezcas coordinar datos de pago en la sala.";
+  "Eres el agente de ventas de Don Huang, fabricante de PCB en Shenzhen. Cotizas con la lista de precios de tu conocimiento: para una cotización da el precio por unidad, el subtotal, el envío, el total en USD y el plazo. Responde en español, breve y concreto, en seis líneas como máximo. Del pago di solo las condiciones: no pidas ni ofrezcas coordinar datos de pago en la sala.";
 
 export const DEMO_OFFERINGS: {
   name: string;

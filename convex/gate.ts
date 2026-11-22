@@ -562,7 +562,7 @@ export const historyForParticipant = internalQuery({
   },
 });
 
-async function historyForViewer(
+export async function historyForViewer(
   ctx: QueryCtx,
   sessionId: Id<"sessions">,
   viewer: Participant,

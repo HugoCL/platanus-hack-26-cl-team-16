@@ -89,7 +89,7 @@ describe("demo room", () => {
     const view = await li().query(api.rooms.view, { sessionId });
     expect(view?.session.status).toBe("active");
     expect(view?.participantNames.map((p) => p.name)).toEqual(
-      expect.arrayContaining(["Shenzhen PCB Works", "Ana Rojas", "Li Wei"]),
+      expect.arrayContaining(["Don Huang", "Ana Rojas", "Li Wei"]),
     );
   });
 
@@ -226,6 +226,27 @@ describe("demo room", () => {
     });
     await settle();
     expect((await texts(ana(), sessionId)).at(-1)).toBe(QUOTE);
+  });
+
+  it("lets a signed-in person watch the room, read-only, as the buyer sees it", async () => {
+    await expect(t.query(api.demo.watch, {})).rejects.toThrow();
+    expect(await caro().query(api.demo.watch, {})).toBeNull();
+    const { sessionId } = await reset();
+    await ana().mutation(api.demo.join, { seat: "buyer" });
+    const watched = await caro().query(api.demo.watch, {});
+    expect(watched?.session.sessionId).toBe(sessionId);
+    expect(watched?.history).toEqual(await history(ana(), sessionId));
+    expect(watched?.participantNames.map((p) => p.name)).toContain("Don Huang");
+    // Watching gives no way in: the watcher is still not in the room.
+    await expect(history(caro(), sessionId)).rejects.toThrow();
+    await expect(
+      caro().action(api.gate.send, {
+        sessionId,
+        recipient: "all",
+        content: { kind: "text", text: "hola" },
+      }),
+    ).rejects.toThrow();
+    expect((await caro().query(api.demo.state, {}))?.mySeat).toBeNull();
   });
 
   it("keeps the manufacturer out of the directory", async () => {

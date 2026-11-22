@@ -23,8 +23,9 @@ import {
   type QueryCtx,
   query,
 } from "./_generated/server";
+import { historyForViewer } from "./gate";
 import { insertMessage } from "./roomMessages";
-import { requireRoomIdentity } from "./roomState";
+import { loadSession, requireRoomIdentity, toParticipant } from "./roomState";
 
 // The resettable live demo room (docs/demo.md): a buyer and a PCB manufacturer in Shenzhen, in
 // a room that opens mid-conversation with the manufacturer's order form still unanswered.
@@ -378,6 +379,49 @@ export const state = query({
         taken: !isPlaceholder(member.tokenIdentifier),
         displayName: member.displayName,
       })),
+    };
+  },
+});
+
+// The demo room for someone watching: what the buyer's seat sees, read-only, so the room can be
+// put on a shared screen without taking a seat. It takes no room id, so it only ever shows the
+// demo room. Any signed-in user can watch, like any signed-in user can take a free seat.
+export const watch = query({
+  args: {},
+  handler: async (ctx) => {
+    const { tokenIdentifier } = await requireRoomIdentity(ctx);
+    const demo = await current(ctx, tokenIdentifier);
+    const buyer = demo?.humans.find((h) => h.seat === "buyer")?.member;
+    if (!demo || !buyer) return null;
+    const session = await loadSession(ctx, demo.sessionId);
+    if (!session) return null;
+    const participantNames = await Promise.all(
+      session.participants.map(async (participant) => {
+        if (participant.kind === "human") {
+          return {
+            participantId: participant.participantId,
+            name: participant.displayName,
+          };
+        }
+        const agent = await ctx.db.get(participant.agentId as Id<"agents">);
+        return {
+          participantId: participant.participantId,
+          name: agent?.name ?? "Agente",
+          verified: !!agent?.verified && !agent.selfRegistered,
+        };
+      }),
+    );
+    const stored = await ctx.db.get(demo.sessionId);
+    return {
+      session,
+      violationCount: stored?.violationCount ?? 0,
+      participantNames,
+      seenAsParticipantId: buyer._id,
+      history: await historyForViewer(
+        ctx,
+        demo.sessionId,
+        toParticipant(buyer),
+      ),
     };
   },
 });

@@ -17,7 +17,7 @@ const SEATS: { seat: DemoSeat; title: string; detail: string }[] = [
   {
     seat: "merchant",
     title: "Fabricante",
-    detail: "Atiende junto al agente de Shenzhen PCB Works.",
+    detail: "Don Huang, que atiende junto a su agente.",
   },
 ];
 
@@ -151,6 +151,16 @@ function Seats() {
           Toma un asiento para abrir la sala o reiniciarla.
         </p>
       )}
+      <p className="m-0">
+        <Link href="/room/demo/watch" className="font-medium underline">
+          Ver como observador
+        </Link>
+        <span className="text-subtle-foreground">
+          {" "}
+          — la sala en vivo y en solo lectura, sin ocupar un asiento, para
+          compartir pantalla.
+        </span>
+      </p>
       {error ? (
         <p role="alert" className="m-0 text-sm text-destructive">
           {error}
