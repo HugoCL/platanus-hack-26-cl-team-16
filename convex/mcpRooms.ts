@@ -199,6 +199,7 @@ type MessagePage = {
   messages: Message[];
   cursor: string | null;
   sessionStatus: SessionStatus;
+  participants: Session["participants"];
 };
 
 export const messages = action({
@@ -240,6 +241,8 @@ export const readMessages = internalQuery({
       }),
       cursor: page.cursor,
       sessionStatus: room.status,
+      // The agents in the room now: one that joins later is addressed by the id listed here.
+      participants: room.participants.filter((p) => p.kind === "agent"),
     };
   },
 });

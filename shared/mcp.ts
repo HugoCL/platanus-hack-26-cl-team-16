@@ -91,6 +91,7 @@ export const WaitForMessagesOutput = z.object({
   messages: z.array(Message),
   cursor: z.string().nullable(),
   sessionStatus: SessionStatus,
+  participants: z.array(Participant),
 });
 
 export const CloseSessionInput = z.object({
@@ -159,7 +160,7 @@ export const MCP_TOOLS = {
   },
   wait_for_messages: {
     description:
-      "Long-poll for messages delivered to you in a session after a cursor. Pass the returned cursor as after on the next call.",
+      "Long-poll for messages delivered to you in a session after a cursor. Pass the returned cursor as after on the next call. participants lists the agents in the session now, including one that joined after it opened.",
     input: WaitForMessagesInput,
     output: WaitForMessagesOutput,
   },
@@ -176,7 +177,7 @@ export const MCP_TOOLS = {
   },
   invite_agent: {
     description:
-      'Ask a friend\'s agent into a session you opened. "pending": its owner has to approve on this site, and the agent joins when they do. "approved": the owner auto-approves your owner, so the agent and its owner are already in. Either way, a join shows up in wait_for_messages as an agent_joined notice.',
+      'Ask a friend\'s agent into a session you opened. "pending": its owner has to approve on this site, and the agent joins when they do. "approved": the owner auto-approves your owner, so the agent and its owner are already in. Either way, a join shows up in wait_for_messages as an agent_joined notice, and its participants then list the guest: address it by that participantId.',
     input: InviteAgentInput,
     output: InviteAgentOutput,
   },

@@ -934,7 +934,12 @@ describe("MCP room tools", () => {
         after: read.cursor,
         timeoutMs: 20000,
       }),
-    ).toEqual({ messages: [], cursor: read.cursor, sessionStatus: "closed" });
+    ).toEqual({
+      messages: [],
+      cursor: read.cursor,
+      sessionStatus: "closed",
+      participants: read.participants,
+    });
     expect(Date.now() - started).toBeLessThan(2000);
   });
 
@@ -949,7 +954,12 @@ describe("MCP room tools", () => {
         after: read.cursor,
         timeoutMs: 700,
       }),
-    ).toEqual({ messages: [], cursor: read.cursor, sessionStatus: "active" });
+    ).toEqual({
+      messages: [],
+      cursor: read.cursor,
+      sessionStatus: "active",
+      participants: read.participants,
+    });
     expect(Date.now() - started).toBeGreaterThanOrEqual(700);
   });
 
@@ -978,6 +988,7 @@ describe("MCP room tools", () => {
       messages: [],
       cursor: read.cursor,
       sessionStatus: "active",
+      participants: read.participants,
     });
     expect(reads).toBeGreaterThan(1);
     expect(elapsed).toBeGreaterThanOrEqual(1490);
@@ -1328,10 +1339,18 @@ describe("MCP room tools", () => {
       expect(seen.output?.messages.map((m) => m.content)).toMatchObject([
         { kind: "system", code: "agent_joined" },
       ]);
-      const [guest] = await guests(sessionId);
+      const room = await use("wait_for_messages", { sessionId, timeoutMs: 0 });
+      const guest = room.participants.find((p) => p.role === "guest");
+      expect(guest).toMatchObject({ kind: "agent", agentId: friend.agentId });
+      expect(room.participants.map((p) => p.kind)).toEqual([
+        "agent",
+        "agent",
+        "agent",
+      ]);
+      expect(seen.output?.participants).toEqual(room.participants);
       await use("send_message", {
         sessionId,
-        recipient: guest._id,
+        recipient: guest?.participantId,
         content: text("¿Puede Beto el martes?"),
       });
       const next = await asFriend("wait_for_messages", {
