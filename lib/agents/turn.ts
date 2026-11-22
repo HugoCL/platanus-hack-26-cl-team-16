@@ -51,7 +51,18 @@ function label(turn: AgentTurn, id: string | null): string {
   if (id === turn.self) return "tú";
   const participant = turn.participants.find((p) => p.participantId === id);
   if (!participant) return "desconocido";
-  if (participant.kind === "human") return `humano ${participant.displayName}`;
+  if (participant.kind === "human") {
+    // A provider is told which humans speak for its own business: what they offer is the
+    // business's word, while a customer's human is someone it serves.
+    const me = turn.participants.find((p) => p.participantId === turn.self);
+    const mine =
+      me?.kind === "agent" &&
+      me.role === "recipient" &&
+      participant.onBehalfOfAgentId === me.agentId;
+    // The name is whatever the person typed, so it goes in quotes: no name can read as the
+    // words outside them, which say whose side the human is on.
+    return `${mine ? "humano de tu equipo" : "humano"} ${data(participant.displayName)}`;
+  }
   if (participant.role === "guest") return "agente invitado";
   return participant.role === "initiator"
     ? "agente consumidor"

@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "demo:agent": "node scripts/demo-agent.mjs",
+    "demo:reset": "convex run demo:reset",
     "dev:cloud": "convex dev --start 'next dev'",
     "seed": "convex run seed:ensure",
     "seed:reset": "convex run seed:reset",

@@ -83,7 +83,7 @@ function judgePrompt(
     if (id === null) return "plataforma";
     if (id === "all") return "todos";
     const participant = participants.find((p) => p.participantId === id);
-    return participant ? label(participant) : id;
+    return participant ? label(participant, participants) : id;
   };
   const recent = history.map((m) => {
     const body = DELIVERABLE_STATUSES.includes(m.status)
@@ -99,7 +99,7 @@ function judgePrompt(
     "",
     "Participantes:",
     "<participantes>",
-    data(participants.map(label)),
+    data(participants.map((p) => label(p, participants))),
     "</participantes>",
     ...(participants.some((p) => p.kind === "agent" && p.role === "guest")
       ? [
@@ -116,16 +116,21 @@ function judgePrompt(
         ]
       : []),
     "",
-    `Mensaje a revisar, de ${data(label(sender))} para ${data(who(recipient))}:`,
+    `Mensaje a revisar, de ${data(label(sender, participants))} para ${data(who(recipient))}:`,
     "<mensaje>",
     data(content),
     "</mensaje>",
   ].join("\n");
 }
 
-function label(participant: Participant): string {
+function label(participant: Participant, participants: Participant[]): string {
   if (participant.kind === "human") {
-    return `${participant.participantId} (humano, ${participant.role})`;
+    // Whose side a human is on, so that speaking for that side does not read as impersonation.
+    const agent = participants.find(
+      (p) => p.kind === "agent" && p.agentId === participant.onBehalfOfAgentId,
+    );
+    const side = agent ? `, habla por ${agent.participantId}` : "";
+    return `${participant.participantId} (humano, ${participant.role}${side})`;
   }
   if (participant.role === "guest") {
     return `${participant.participantId} (agente invitado)`;

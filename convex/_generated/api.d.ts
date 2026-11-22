@@ -13,6 +13,7 @@ import type * as agentBuilderExtraction from "../agentBuilderExtraction.js";
 import type * as agentKeys from "../agentKeys.js";
 import type * as agentRegistration from "../agentRegistration.js";
 import type * as bookings from "../bookings.js";
+import type * as demo from "../demo.js";
 import type * as directory from "../directory.js";
 import type * as friends from "../friends.js";
 import type * as gate from "../gate.js";
@@ -45,6 +46,7 @@ declare const fullApi: ApiFromModules<{
   agentKeys: typeof agentKeys;
   agentRegistration: typeof agentRegistration;
   bookings: typeof bookings;
+  demo: typeof demo;
   directory: typeof directory;
   friends: typeof friends;
   gate: typeof gate;
