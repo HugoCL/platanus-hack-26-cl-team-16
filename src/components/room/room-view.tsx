@@ -162,6 +162,7 @@ export function RoomView({
   sessions,
   sending = false,
   answersReadOnly = false,
+  showRooms = true,
 }: {
   sessionId?: string;
   participants: RoomParticipant[];
@@ -185,6 +186,8 @@ export function RoomView({
   error?: string;
   sending?: boolean;
   answersReadOnly?: boolean;
+  // False for someone who is not in the room: they have no rooms of their own to list.
+  showRooms?: boolean;
 }) {
   const role = viewer.role;
   const [shields] = useState(createShieldController);
@@ -270,11 +273,13 @@ export function RoomView({
         </div>
       ) : null}
       <div className="flex min-h-0 flex-1">
-        <RoomSidebar
-          rooms={rooms}
-          currentId={currentId}
-          footer={demoControls}
-        />
+        {showRooms ? (
+          <RoomSidebar
+            rooms={rooms}
+            currentId={currentId}
+            footer={demoControls}
+          />
+        ) : null}
         <main className="flex min-w-0 flex-1 flex-col">
           <RoomHeader
             self={self}

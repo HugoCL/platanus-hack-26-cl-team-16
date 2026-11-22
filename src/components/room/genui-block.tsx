@@ -250,7 +250,9 @@ function FormBlock({
       >
         {spec.fields.map((field) => (
           <FormField
-            key={field.name}
+            // The fields are uncontrolled: remount them when the answer arrives, so everyone
+            // who did not send it sees the values too.
+            key={sent ? `${field.name}:sent` : field.name}
             field={field}
             sentValue={sent?.[field.name]}
           />
