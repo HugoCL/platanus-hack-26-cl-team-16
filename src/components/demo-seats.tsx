@@ -8,6 +8,10 @@ import { useState } from "react";
 import { api } from "@/convex/_generated/api";
 import type { DemoSeat } from "@/shared/demo-pcb";
 
+const BOT_PROMPT =
+  "Usa agora. Con list_sessions encuentra mi sala abierta con Don Huang, léela desde el inicio con wait_for_messages y cuéntame en qué quedó y qué me está pidiendo. Cuando te diga qué responder, envíalo con send_message al participantId de Don Huang y espera su respuesta con wait_for_messages.";
+const MAX_OWN_AGENTS = 3;
+
 const SEATS: { seat: DemoSeat; title: string; detail: string }[] = [
   {
     seat: "buyer",
@@ -26,6 +30,8 @@ function seatError(error: unknown) {
   if (kind === "SeatTaken") return "Otra persona ya tomó ese asiento.";
   if (kind === "Forbidden")
     return "Toma un asiento para poder reiniciar la sala.";
+  if (kind === "NotYourAgent")
+    return "Solo puedes traer un agente tuyo, y solo como comprador.";
   if (kind === "NotFound") return "La sala de la demo no está preparada.";
   return "No pudimos hacer el cambio. Inténtalo de nuevo.";
 }
@@ -52,6 +58,8 @@ export function DemoSeats() {
 function Seats() {
   const { user } = useUser();
   const demo = useQuery(api.demo.state, {});
+  const ownAgents = useQuery(api.agentRegistration.mine, {});
+  const [copied, setCopied] = useState(false);
   const join = useMutation(api.demo.join);
   const leave = useMutation(api.demo.leave);
   const restart = useMutation(api.demo.restart);
@@ -69,6 +77,17 @@ function Seats() {
       setBusy(false);
     }
   }
+
+  async function copyPrompt() {
+    try {
+      await navigator.clipboard.writeText(BOT_PROMPT);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  }
+  const name = user?.fullName || user?.username || undefined;
 
   if (demo === undefined) return <p role="status">Cargando la demo…</p>;
   if (demo === null)
@@ -114,18 +133,65 @@ function Seats() {
                   data-size="sm"
                   className="self-start"
                   disabled={busy || holder?.taken}
-                  onClick={() =>
-                    run(() =>
-                      join({
-                        seat,
-                        name: user?.fullName || user?.username || undefined,
-                      }),
-                    )
-                  }
+                  onClick={() => run(() => join({ seat, name }))}
                 >
                   Entrar como {title.toLowerCase()}
                 </Button>
               )}
+              {seat === "buyer" && (mine || !holder?.taken) ? (
+                <div className="flex flex-col items-start gap-2 border-t border-border pt-3">
+                  {demo.buyerAgent && mine ? (
+                    <>
+                      <p className="m-0 text-sm">
+                        Hablas desde tu agente{" "}
+                        <strong>{demo.buyerAgent.name}</strong>: la sala muestra
+                        lo que conversó con el fabricante. Pega este mensaje en
+                        tu asistente para seguir desde ahí.
+                      </p>
+                      <p className="m-0 rounded-md bg-muted p-3 text-sm">
+                        {BOT_PROMPT}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button data-size="sm" onClick={copyPrompt}>
+                          {copied ? "Mensaje copiado" : "Copiar el mensaje"}
+                        </Button>
+                        <Button
+                          data-size="sm"
+                          disabled={busy}
+                          onClick={() => run(() => join({ seat, name }))}
+                        >
+                          Volver a hablar desde la web
+                        </Button>
+                      </div>
+                    </>
+                  ) : ownAgents?.length ? (
+                    ownAgents.slice(0, MAX_OWN_AGENTS).map((agent) => (
+                      <Button
+                        key={agent.agentId}
+                        data-size="sm"
+                        disabled={busy}
+                        onClick={() =>
+                          run(() =>
+                            join({ seat, name, agentId: agent.agentId }),
+                          )
+                        }
+                      >
+                        {mine ? "Hablar" : "Entrar"} desde mi agente{" "}
+                        {agent.name}
+                      </Button>
+                    ))
+                  ) : (
+                    <p className="m-0 text-sm text-subtle-foreground">
+                      Para hablar desde tu propio asistente, conéctalo con
+                      «Conecta tu agente a Agora» en la{" "}
+                      <Link href="/" className="underline">
+                        portada
+                      </Link>{" "}
+                      y vincúlalo a tu cuenta.
+                    </p>
+                  )}
+                </div>
+              ) : null}
             </li>
           );
         })}

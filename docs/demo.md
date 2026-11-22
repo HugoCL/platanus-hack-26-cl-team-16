@@ -46,6 +46,28 @@ Para repetir la demo, cualquiera de las dos pulsa "Reiniciar la sala" en `/demo`
 
 Las cifras de los pasos 3 y 5 salen de la lista de precios y son las que el modelo dio en la prueba local del 2026-11-22. El texto exacto cambia entre ejecuciones.
 
+## Variante: el comprador habla desde su propio asistente
+
+En vez de usar la web, el comprador le habla a su asistente (Grok Bot, Claude, ChatGPT, Cursor…) y el asistente escribe en la sala por MCP. Don Huang sigue en la web y el público ve la sala en el proyector con "Ver como observador".
+
+Preparación, una vez por persona:
+
+1. El comprador conecta su asistente a `https://<servicio>.onrender.com/api/mcp` y deja su agente vinculado a su cuenta (`docs/mcp.md`): con una API key en el encabezado `Authorization: Bearer <key>` y el enlace de vinculación, o iniciando sesión por OAuth. Un asistente en la nube, como Grok Bot, no llega a `localhost`.
+2. En `/demo`, con sesión iniciada, pulsa "Entrar desde mi agente <nombre>". Solo aparecen los agentes vinculados a su cuenta.
+3. La sala se reinicia con ese agente como el que conversó con el fabricante. La solicitud pendiente ya no es un formulario, porque un formulario solo lo responde una persona: es la misma pregunta en texto (cantidad, acabado y envío).
+4. `/demo` muestra un mensaje para copiar y pegar en el asistente: le pide encontrar la sala con `list_sessions`, leerla y contar en qué quedó.
+
+"Reiniciar la sala" conserva el agente. "Volver a hablar desde la web", o dejar el asiento, devuelve la sala al agente de ejemplo y al formulario.
+
+| Paso | Quién | Qué hace | Qué se ve |
+| --- | --- | --- | --- |
+| 1 | Comprador | Pega el mensaje de `/demo` en su asistente. | El asistente resume la negociación y dice que el fabricante espera cantidad, acabado y envío. |
+| 2 | Comprador | Le dice: "Confirma 100 unidades con ENIG por DHL Express, con máscara negra." | En el proyector aparece el mensaje del agente del comprador y, en unos 10 segundos, la cotización: total USD 468. |
+| 3 | Comerciante | Pulsa "Tomar control" y escribe: "Soy Don Huang. Si confirmas hoy 200 unidades, te dejo el envío por DHL gratis." | El asistente del comprador recibe la oferta en su siguiente lectura. |
+| 4 | Comprador | Le dice: "Acepta la oferta de Don Huang y pregunta el total y cómo pago." | El agente del fabricante recalcula: total USD 660. |
+
+Probado en local el 2026-11-22 con los modelos reales y un cliente MCP de prueba que envía esos mismos mensajes por `/api/mcp` con una API key. No se ha probado con Grok Bot ni con otro asistente real: qué escribe cada asistente, y si pide aprobación antes de cada mensaje, depende de él.
+
 ## Si algo falla
 
 - **Aparece "El moderador no respondió a tiempo".** No cuenta como falta. Si era un mensaje tuyo, envíalo de nuevo tal cual antes de seguir: el paso 5 se bloquea si la oferta del paso 4 no llegó. Si era la respuesta del agente, el comerciante la da a mano con las cifras del guion. En las pruebas locales pasó en cerca de una de cada tres pasadas.
