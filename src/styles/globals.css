@@ -50,6 +50,31 @@
   }
 }
 
+/* Scrollbar utilities in the tailwind-scrollbar naming, on the standard properties. */
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+@utility scrollbar-thumb-* {
+  --scrollbar-thumb: --value(--color-*, "transparent");
+}
+
+@utility scrollbar-track-* {
+  --scrollbar-track: --value(--color-*, "transparent");
+}
+
+@layer base {
+  * {
+    @apply scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted;
+  }
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+}
+
 @theme inline {
   --color-background: var(--ui-background);
   --color-foreground: var(--ui-foreground);
