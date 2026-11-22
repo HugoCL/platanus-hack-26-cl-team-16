@@ -57,11 +57,11 @@ export const credential = mutation({
     } else {
       if (agent.ownerTokenIdentifier !== owner)
         fail("Conflict", "that agent belongs to someone else");
-      const keys = await ctx.db
+      // One row per past secret, read one at a time instead of loaded together.
+      const keys = ctx.db
         .query("agentApiKeys")
-        .withIndex("by_agentId", (q) => q.eq("agentId", agent._id))
-        .collect();
-      for (const old of keys) {
+        .withIndex("by_agentId", (q) => q.eq("agentId", agent._id));
+      for await (const old of keys) {
         if (old.label === OAUTH_LABEL && old.revokedAt === undefined)
           await ctx.db.patch(old._id, { revokedAt: Date.now() });
       }
