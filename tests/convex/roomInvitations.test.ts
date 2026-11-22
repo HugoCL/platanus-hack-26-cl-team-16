@@ -258,6 +258,28 @@ describe("room invitations", () => {
     ]);
   });
 
+  it("names the other human as the viewer knows them, not by the room's own label", async () => {
+    const { juan, beto, caro, invite, invitationId, sessionId } = await setup();
+    await invite();
+    await respond(beto, (await invitationId()) as Id<"roomInvitations">);
+    const humans = async (caller: typeof juan) => {
+      const view = await caller.query(api.rooms.view, { sessionId });
+      return view?.participantNames
+        .filter((p) =>
+          view.session.participants.some(
+            (s) => s.participantId === p.participantId && s.kind === "human",
+          ),
+        )
+        .map((p) => p.name);
+    };
+    const [own] = (await humans(juan)) ?? [];
+    expect(await humans(juan)).toEqual([own, "Beto Paz"]);
+    expect(await humans(beto)).toEqual(["Juan Soto", "Beto Paz"]);
+    expect(await errorKind(caro.query(api.rooms.view, { sessionId }))).toBe(
+      "NotParticipant",
+    );
+  });
+
   it("shows the guest side the room only from the moment it joined", async () => {
     const { juan, beto, invite, invitationId, sessionId } = await setup();
     const say = (text: string) =>
