@@ -115,22 +115,107 @@ function strings(value: unknown): string[] {
 
 function hasCard(text: string): boolean {
   for (const [run] of text.matchAll(DIGIT_RUN)) {
-    const parts = run.split(CARD_SEPARATOR);
-    const groups = parts.filter((_, i) => i % 2 === 0);
-    const dotted = parts
-      .filter((_, i) => i % 2 === 1)
-      .map((separator) => separator.includes("."));
+    const { groups, dotted } = splitRun(run);
     for (let first = 0; first < groups.length; first++) {
-      let digits = "";
-      for (let last = first; last < groups.length; last++) {
-        if (last > first && dotted[last - 1] !== dotted[first]) break;
-        digits += groups[last];
-        if (digits.length > 19) break;
-        if (digits.length >= 13 && passesLuhn(digits)) return true;
-      }
+      if (cardEnd(groups, dotted, first) !== undefined) return true;
     }
   }
   return false;
+}
+
+function splitRun(run: string) {
+  const parts = run.split(CARD_SEPARATOR);
+  return {
+    parts,
+    groups: parts.filter((_, i) => i % 2 === 0),
+    dotted: parts
+      .filter((_, i) => i % 2 === 1)
+      .map((separator) => separator.includes(".")),
+  };
+}
+
+// The last group of the longest card that starts at group `first`.
+function cardEnd(
+  groups: string[],
+  dotted: boolean[],
+  first: number,
+): number | undefined {
+  let end: number | undefined;
+  let digits = "";
+  for (let last = first; last < groups.length; last++) {
+    if (last > first && dotted[last - 1] !== dotted[first]) break;
+    digits += groups[last];
+    if (digits.length > 19) break;
+    if (digits.length >= 13 && passesLuhn(digits)) end = last;
+  }
+  return end;
+}
+
+const MASK = "•";
+
+// A message blocked for carrying a card or a RUT is stored with the value
+// masked, so the database never holds it: a card keeps its last four digits
+// and a RUT keeps none. Masking follows the rules' own readings; when one of
+// them still finds a value afterwards, every digit in the message is masked.
+export function maskSensitiveData<T>(content: T): T {
+  const masked = mapStrings(content, (s) => maskRuts(maskCards(s)));
+  const text = strings(masked).join("\n");
+  if (!hasCard(text) && !hasRut(text)) return masked;
+  return mapStrings(content, (s) => s.replace(/\d/g, MASK));
+}
+
+function mapStrings<T>(value: T, mask: (text: string) => string): T {
+  if (typeof value === "string") return mask(value) as T;
+  if (typeof value === "number") {
+    const text = String(value);
+    return (mask(text) === text ? value : 0) as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => mapStrings(item, mask)) as T;
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, mapStrings(item, mask)]),
+    ) as T;
+  }
+  return value;
+}
+
+function maskCards(text: string): string {
+  return text.replace(DIGIT_RUN, (run) => {
+    const { parts, groups, dotted } = splitRun(run);
+    const starts: number[] = [];
+    let at = 0;
+    for (const [i, part] of parts.entries()) {
+      if (i % 2 === 0) starts.push(at);
+      at += part.length;
+    }
+    const chars = run.split("");
+    for (let first = 0; first < groups.length; first++) {
+      const last = cardEnd(groups, dotted, first);
+      if (last === undefined) continue;
+      let kept = 0;
+      for (
+        let i = starts[last] + groups[last].length - 1;
+        i >= starts[first];
+        i--
+      ) {
+        if (!/\d/.test(chars[i])) continue;
+        if (kept < 4) kept++;
+        else chars[i] = MASK;
+      }
+      first = last;
+    }
+    return chars.join("");
+  });
+}
+
+function maskRuts(text: string): string {
+  const mask = (match: string, body: string, checkDigit: string) =>
+    rutCheckDigit(body.replace(/\./g, "")) === checkDigit.toLowerCase()
+      ? match.replace(/[\dk]/gi, MASK)
+      : match;
+  return text.replace(RUT_FORMATTED, mask).replace(RUT_COMPACT, mask);
 }
 
 function passesLuhn(digits: string): boolean {

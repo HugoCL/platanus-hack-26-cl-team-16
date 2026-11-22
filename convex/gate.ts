@@ -13,6 +13,7 @@ import {
   ModerationStage,
   Verdict,
 } from "../shared/moderation";
+import { maskSensitiveData } from "../shared/moderator/rules";
 import type { Participant, SessionContract } from "../shared/session";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -132,7 +133,10 @@ export async function sendThroughGate(
     sessionId: args.sessionId,
     senderParticipantId: args.senderParticipantId,
     recipient: args.recipient,
-    content,
+    content:
+      outcome.verdict.decision === "block"
+        ? maskSensitiveData(content)
+        : content,
     verdict: outcome.verdict,
     events: outcome.events,
     hostedReply: args.hostedReply,

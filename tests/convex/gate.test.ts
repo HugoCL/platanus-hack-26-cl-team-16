@@ -309,6 +309,22 @@ describe("the moderation gate", () => {
     ]);
   });
 
+  it("stores a message blocked for a card without the card number", async () => {
+    const blocked = await send(
+      room.consumer,
+      room.provider,
+      text("Pago con la tarjeta 4111 1111 1111 1111"),
+    );
+
+    const masked = text("Pago con la tarjeta •••• •••• •••• 1111");
+    expect(blocked).toMatchObject({ status: "blocked", content: masked });
+    const stored = await rooms.t.run((ctx) =>
+      ctx.db.get("messages", blocked.messageId as Id<"messages">),
+    );
+    expect(stored?.content).toEqual(masked);
+    expect((await humanHistory()).at(-2)).toEqual(blocked);
+  });
+
   it("runs only the deterministic stage when the content cannot be read", async () => {
     rooms.judge.mockClear();
     const message = await send(room.consumer, room.provider, {
