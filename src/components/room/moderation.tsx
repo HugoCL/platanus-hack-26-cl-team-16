@@ -34,7 +34,10 @@ const BADGES: Record<
   pending: {
     label: "Revisando…",
     icon: (
-      <ClockIcon size={14} className="animate-spin [animation-duration:2.4s]" />
+      <ClockIcon
+        size={14}
+        className="animate-spin [animation-duration:2.4s] motion-reduce:animate-none"
+      />
     ),
     className: "bg-muted text-subtle-foreground",
   },
