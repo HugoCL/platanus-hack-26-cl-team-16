@@ -358,6 +358,7 @@ export const link = mutation({
       fail("InvalidArgument", "link code already used");
     await ctx.db.patch(agent._id, {
       ownerTokenIdentifier: identity.tokenIdentifier,
+      linkedAt: Date.now(),
     });
     await ctx.db.patch(row._id, { usedAt: Date.now() });
     const displayName = (
@@ -449,8 +450,28 @@ export async function retireAgent(ctx: MutationCtx, agent: Doc<"agents">) {
   }
   await ctx.db.patch("agents", agent._id, {
     ownerTokenIdentifier: undefined,
+    linkedAt: undefined,
     status: "draft",
   });
+}
+
+const MAX_LINKED_AGENTS = 100;
+const linkedTime = (agent: Doc<"agents">) =>
+  agent.linkedAt ?? agent._creationTime;
+
+// A person's own external agents, the most recently linked first: after an assistant is deleted and
+// connected again, that one is the live one.
+export async function linkedAgents(ctx: QueryCtx, tokenIdentifier: string) {
+  const agents = await ctx.db
+    .query("agents")
+    .withIndex("by_ownerTokenIdentifier", (q) =>
+      q.eq("ownerTokenIdentifier", tokenIdentifier),
+    )
+    .order("desc")
+    .take(MAX_LINKED_AGENTS);
+  return agents
+    .filter((agent) => agent.kind === "external")
+    .sort((a, b) => linkedTime(b) - linkedTime(a));
 }
 
 async function owned(
@@ -564,12 +585,6 @@ export const mine = query({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
-    const agents = await ctx.db
-      .query("agents")
-      .withIndex("by_ownerTokenIdentifier", (q) =>
-        q.eq("ownerTokenIdentifier", identity.tokenIdentifier),
-      )
-      .take(100);
-    return agents.filter((agent) => agent.kind === "external").map(toSummary);
+    return (await linkedAgents(ctx, identity.tokenIdentifier)).map(toSummary);
   },
 });

@@ -105,10 +105,11 @@ function Seats() {
     }
   }
   const name = user?.fullName || user?.username || undefined;
-  // Newest first: after an assistant is deleted and connected again, the newest is the live one.
-  const agents = (ownAgents ?? []).toReversed();
+  // The most recently linked first: after an assistant is deleted and connected again, that one is
+  // the live one.
+  const agents = ownAgents ?? [];
   const removable = agents.filter((agent) => !isPersonalAgentSlug(agent.slug));
-  const old = removable.filter((agent) => agent !== agents[0]);
+  const old = removable.slice(1);
 
   if (demo === undefined) return <p role="status">Cargando la demo…</p>;
   if (demo === null)

@@ -25,6 +25,26 @@ const owner = () => rooms.t.withIdentity({ subject: "owner" });
 const other = () => rooms.t.withIdentity({ subject: "other" });
 
 describe("agent self-onboarding", () => {
+  it("lists a person's agents by when they were linked, the latest first", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const first = await register();
+    vi.advanceTimersByTime(1000);
+    const second = await register();
+    vi.advanceTimersByTime(1000);
+    await owner().mutation(api.agentRegistration.link, {
+      code: second.linkCode,
+    });
+    vi.advanceTimersByTime(1000);
+    await owner().mutation(api.agentRegistration.link, {
+      code: first.linkCode,
+    });
+    expect(
+      (await owner().query(api.agentRegistration.mine, {})).map(
+        (agent) => agent.agentId,
+      ),
+    ).toEqual([first.agentId, second.agentId]);
+  });
+
   it("allows unprotected local registration and warns exactly once per call", async () => {
     await register();
     expect(console.warn).toHaveBeenCalledExactlyOnceWith(

@@ -25,7 +25,7 @@ import {
   type QueryCtx,
   query,
 } from "./_generated/server";
-import { retireAgent } from "./agentRegistration";
+import { linkedAgents, retireAgent } from "./agentRegistration";
 import { historyForViewer } from "./gate";
 import { insertMessage } from "./roomMessages";
 import { loadSession, requireRoomIdentity, toParticipant } from "./roomState";
@@ -258,17 +258,6 @@ async function ownAgent(
     agent.ownerTokenIdentifier === tokenIdentifier
     ? agent
     : null;
-}
-
-async function newestOwnAgent(ctx: QueryCtx, tokenIdentifier: string) {
-  const agents = await ctx.db
-    .query("agents")
-    .withIndex("by_ownerTokenIdentifier", (q) =>
-      q.eq("ownerTokenIdentifier", tokenIdentifier),
-    )
-    .order("desc")
-    .take(MAX_OWN_AGENTS);
-  return agents.find((agent) => agent.kind === "external")?._id ?? null;
 }
 
 // Deletes the demo rooms and opens a fresh one, keeping whoever holds each seat. A seat's agent
@@ -644,7 +633,7 @@ export const forgetAgents = mutation({
       if (!brought || !agentIds.has(brought._id)) continue;
       agents[seat] =
         demo.mine?.seat === seat
-          ? await newestOwnAgent(ctx, tokenIdentifier)
+          ? ((await linkedAgents(ctx, tokenIdentifier))[0]?._id ?? null)
           : null;
     }
     if (Object.keys(agents).length > 0) await rebuild(ctx, { agents });
