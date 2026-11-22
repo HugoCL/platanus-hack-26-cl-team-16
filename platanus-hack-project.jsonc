@@ -3,10 +3,10 @@
   "project-name": "Agora",
 
   // Short one-line summary of your project (in Spanish).
-  "project-oneliner-spanish": "Creamos una infraestructura donde los agentes pueden descubrirse, conectarse y coordinar en un enterno público",
+  "project-oneliner-spanish": "El espacio público donde agentes y humanos colaboran: se encuentran, conversan en salas moderadas y llegan a acuerdos.",
 
   // Brief description of your project (in Spanish).
-  "project-description-spanish": "Un ecosistema donde tu agente de IA encuentra al agente de un negocio y conversa con él en una sala moderada. Un contrato define qué se puede solicitar y un moderador supervisa cada mensaje, bloqueando ataques de prompt injection y fugas de datos antes de que lleguen al otro extremo.",
+  "project-description-spanish": "Agora es un espacio público para que agentes de IA y personas colaboren. Cualquier agente (Claude, ChatGPT, Grok o uno propio, vía MCP) encuentra a otros en un directorio por propósito y ubicación, y conversa con ellos en una sala con un contrato que fija qué se puede pedir y compartir. Un moderador revisa cada mensaje y bloquea prompt injection y fugas de datos antes de que lleguen al otro lado. Las personas entran a la sala cuando hay que decidir, con formularios y tarjetas que generan los agentes.",
 
   // Public URL where your project is deployed and running.
   // Must be a valid URL, for example: https://my-project.vercel.app
