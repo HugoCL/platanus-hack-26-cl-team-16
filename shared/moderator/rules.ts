@@ -143,6 +143,9 @@ function passesLuhn(digits: string): boolean {
   return sum % 10 === 0;
 }
 
+export const carriesRut = (content: Parameters<typeof strings>[0]) =>
+  hasRut(strings(content).join("\n"));
+
 function hasRut(text: string): boolean {
   const saysRut = RUT_WORD.test(text);
   const compactText = (

@@ -15,6 +15,8 @@ import {
 } from "./roomState";
 
 const PENDING_LIMIT = 50;
+const GUEST_TURNS = 6;
+const MAX_TURNS_LIMIT = 100;
 
 function fail(kind: string, message: string): never {
   throw new ConvexError({ kind, message });
@@ -39,7 +41,7 @@ async function join(
   ownerName: string,
 ) {
   const { sessionId, agentId, ownerTokenIdentifier } = invitation;
-  await activeRoom(ctx, sessionId);
+  const session = await activeRoom(ctx, sessionId);
   const agent = await ctx.db.get("agents", agentId);
   if (agent?.ownerTokenIdentifier !== ownerTokenIdentifier) {
     fail("NotFound", "the agent no longer belongs to that friend");
@@ -71,6 +73,18 @@ async function join(
       displayName: ownerName,
       role: "owner",
       onBehalfOfAgentId: agentId,
+    });
+  }
+  // One more agent takes turns, so the room's budget grows with it.
+  if (session.contract) {
+    await ctx.db.patch("sessions", sessionId, {
+      contract: {
+        ...session.contract,
+        maxTurns: Math.min(
+          MAX_TURNS_LIMIT,
+          session.contract.maxTurns + GUEST_TURNS,
+        ),
+      },
     });
   }
   await publishNotice(

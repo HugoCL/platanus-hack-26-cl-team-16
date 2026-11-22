@@ -356,11 +356,9 @@ function responders(
   sender: Participant,
   { recipient }: { recipient: Doc<"messages">["recipient"] },
 ) {
-  // A guest agent gets no hosted turn yet: nothing defines what it may say in someone else's room.
   return participants.filter(
     (p) =>
       p.kind === "agent" &&
-      p.role !== "guest" &&
       p.participantId !== sender.participantId &&
       (p.participantId === recipient ||
         (recipient === "all" && sender.kind === "human")),
@@ -401,13 +399,14 @@ export const replyContext = internalQuery({
     const viewer = room.participants.find(
       (p) => p.participantId === recipient._id,
     );
-    if (!viewer) return null;
+    const message = toMessage(source);
+    if (!viewer || !visibleTo(message, viewer, room.participants)) return null;
     const recent = await recentMessages(ctx, source.sessionId);
     return {
       agent,
       self: recipient._id,
       sessionId: source.sessionId,
-      message: toMessage(source),
+      message,
       contract: room.contract,
       participants: room.participants,
       history: recent.filter((message) =>
@@ -431,7 +430,11 @@ export const reply = internalAction({
       await ctx.scheduler.runAfter(retryAfter, internal.gate.reply, args);
       return null;
     }
-    const { agent: roomAgent, llm } = roomAgentFor(agent, ctx);
+    const guest = room.participants.some(
+      (p) =>
+        p.participantId === self && p.kind === "agent" && p.role === "guest",
+    );
+    const { agent: roomAgent, llm } = roomAgentFor(agent, ctx, guest);
     const actions = await roomAgent.reply({ self, ...room, llm });
     const strangers = actions.filter(
       (action) =>

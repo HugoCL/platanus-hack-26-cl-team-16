@@ -61,7 +61,7 @@ export function InviteAgent({
         <DialogDescription>
           Tu amigo aprueba la invitación antes de que su agente entre, salvo que
           apruebe tus llamadas automáticamente. Al entrar, él y su agente ven la
-          conversación.
+          conversación desde ese momento.
         </DialogDescription>
         {!friends ? (
           <p role="status" className="mt-4">

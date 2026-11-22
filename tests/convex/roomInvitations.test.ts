@@ -232,19 +232,54 @@ describe("room invitations", () => {
     expect(await texts(beto)).toEqual([`${card}.`, `${card}.`]);
   });
 
-  it("gives a guest agent no hosted turn", async () => {
-    const { t, juan, beto, invite, invitationId, sessionId } = await setup();
+  it("gives the guest a turn when someone writes to it, and the room more turns", async () => {
+    const { t, juan, beto, invite, invitationId, sessionId, members } =
+      await setup();
+    const maxTurns = async () =>
+      (await juan.query(api.rooms.view, { sessionId }))?.session.contract
+        ?.maxTurns;
+    const before = (await maxTurns()) as number;
     await invite();
     await respond(beto, (await invitationId()) as Id<"roomInvitations">);
-    const guest = (await juan.query(api.rooms.view, { sessionId }))?.session
-      .participants[3].participantId as Id<"participants">;
-    await juan.action(api.gate.send, {
+    expect(await maxTurns()).toBe(before + 6);
+    const guest = (await members())?.[3].participantId as Id<"participants">;
+    const { messageId } = await juan.action(api.gate.send, {
       sessionId,
       recipient: guest,
       content: { kind: "text", text: "¿Puede Beto el jueves?" },
     });
     await t.finishAllScheduledFunctions(() => {});
     const history = await juan.query(api.gate.history, { sessionId });
-    expect(history.filter((m) => m.senderParticipantId === guest)).toEqual([]);
+    const asked = history.find((m) => m.messageId === messageId);
+    expect(
+      history.filter((m) => m.senderParticipantId === guest),
+    ).toMatchObject([
+      { recipient: asked?.senderParticipantId, status: "allowed" },
+    ]);
+  });
+
+  it("shows the guest side the room only from the moment it joined", async () => {
+    const { juan, beto, invite, invitationId, sessionId } = await setup();
+    const say = (text: string) =>
+      juan.action(api.gate.send, {
+        sessionId,
+        recipient: "all",
+        content: { kind: "text", text },
+      });
+    const texts = async (caller: typeof juan) =>
+      (await caller.query(api.gate.history, { sessionId })).flatMap((m) =>
+        m.content.kind === "text" && m.senderParticipantId
+          ? [m.content.text]
+          : [],
+      );
+    await say("Esto es de antes.");
+    await invite();
+    await respond(beto, (await invitationId()) as Id<"roomInvitations">);
+    await say("Esto es de después.");
+    expect(await texts(juan)).toEqual(
+      expect.arrayContaining(["Esto es de antes.", "Esto es de después."]),
+    );
+    expect(await texts(beto)).toContain("Esto es de después.");
+    expect(await texts(beto)).not.toContain("Esto es de antes.");
   });
 });

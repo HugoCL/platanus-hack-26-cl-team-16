@@ -7,7 +7,11 @@ import { CONSUMER_AGENT_SLUG } from "../shared/seed-data";
 import type { Participant, SessionContract } from "../shared/session";
 import type { Doc } from "./_generated/dataModel";
 import type { ActionCtx } from "./_generated/server";
-import { referenceConsumer, referenceProvider } from "./referenceAgents";
+import {
+  referenceConsumer,
+  referenceGuest,
+  referenceProvider,
+} from "./referenceAgents";
 import { referenceLlm } from "./referenceLlm";
 
 const ACK = "Recibido.";
@@ -57,12 +61,14 @@ export const fakeRoomLlm = createFakeLlmProvider({ text: () => ACK });
 export function roomAgentFor(
   agent: Doc<"agents">,
   ctx: ActionCtx,
+  guest = false,
 ): {
   agent: RoomAgent;
   llm: LlmProvider;
 } {
   const llm = referenceLlm();
   if (!llm) return { agent: testRoomAgent, llm: fakeRoomLlm };
+  if (guest) return { agent: referenceGuest(ctx, agent._id), llm };
   return {
     agent:
       agent.slug === CONSUMER_AGENT_SLUG
