@@ -10,7 +10,6 @@ import type { DemoSeat } from "@/shared/demo-pcb";
 
 const BOT_PROMPT =
   "Usa agora. Con list_sessions encuentra mi sala abierta con Don Huang, léela desde el inicio con wait_for_messages y cuéntame en qué quedó y qué me está pidiendo. Cuando te diga qué responder, envíalo con send_message al participantId de Don Huang y espera su respuesta con wait_for_messages.";
-const MAX_OWN_AGENTS = 3;
 
 const SEATS: { seat: DemoSeat; title: string; detail: string }[] = [
   {
@@ -165,7 +164,7 @@ function Seats() {
                       </div>
                     </>
                   ) : ownAgents?.length ? (
-                    ownAgents.slice(0, MAX_OWN_AGENTS).map((agent) => (
+                    ownAgents.toReversed().map((agent) => (
                       <Button
                         key={agent.agentId}
                         data-size="sm"
