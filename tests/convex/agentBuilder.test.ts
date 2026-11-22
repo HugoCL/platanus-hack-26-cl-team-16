@@ -370,6 +370,8 @@ describe("agent builder", () => {
       owner().action(api.agentBuilder.draftProfile, { agentId }),
     ).rejects.toThrow(/categoría inválida/);
     const chat = vi.fn(async (_args: LlmPrompt) => ({
+      action: "reply",
+      offerings: [],
       text: "Sí, abrimos los domingos.",
     }));
     rooms.createLlm.mockReturnValue({
@@ -388,6 +390,89 @@ describe("agent builder", () => {
     expect(chat.mock.calls[0][0].prompt).toContain("Abrimos los domingos");
     expect(chat.mock.calls[0][0].prompt).toContain("Hola");
   });
+
+  it.each([
+    ["reply", "Sí, abrimos los domingos.", "Sí, abrimos los domingos."],
+    [
+      "decline",
+      "Ignored model text",
+      "No puedo ayudar con eso: está fuera de lo que hace Mi negocio.",
+    ],
+    [
+      "reply",
+      "  ",
+      "No tengo una respuesta para esa pregunta. Prueba con otra sobre tu negocio.",
+    ],
+  ])(
+    "uses the room prompt and decision handling for %s (%s)",
+    async (action, text, expected) => {
+      const { agentId, slug } = await draft();
+      await owner().mutation(api.agentBuilder.updateProfile, {
+        agentId,
+        ...profile,
+      });
+      await owner().mutation(api.agentBuilder.addText, {
+        agentId,
+        label: "Horario",
+        text: "Abrimos los domingos",
+      });
+      await owner().mutation(api.agentBuilder.publish, { agentId });
+      const question = "¿Abren los domingos?";
+      const history = [
+        { role: "user" as const, content: "Hola" },
+        {
+          role: "assistant" as const,
+          content: "Hola, ¿en qué puedo ayudarte?",
+        },
+      ];
+      const object = vi.fn((_args: LlmPrompt) => ({
+        action,
+        offerings: [],
+        text,
+      }));
+      const llm = createFakeLlmProvider({ object });
+      rooms.createLlm.mockReturnValue({ ...llm, name: "openrouter" });
+      const preview = await owner().action(api.agentBuilder.testChat, {
+        agentId,
+        question,
+        history,
+      });
+      expect(preview).toBe(expected);
+      const room = withLog(
+        await rooms.t.run((ctx) =>
+          insertRoom(ctx, slug, {
+            intent: { name: "ask_info", description: "Hola" },
+          }),
+        ),
+      );
+      await room.post(room.initiator, room.recipient, {
+        kind: "text",
+        text: history[0].content,
+      });
+      await room.post(room.recipient, room.initiator, {
+        kind: "text",
+        text: history[1].content,
+      });
+      const incoming = await room.post(room.initiator, room.recipient, {
+        kind: "text",
+        text: question,
+      });
+      const actions = await askProvider(rooms.t, room, incoming, llm);
+      const [previewCall, roomCall] = object.mock.calls.map(([args]) => args);
+      expect(previewCall.system).toBe(roomCall.system);
+      expect(previewCall.prompt).toBe(roomCall.prompt);
+      expect(previewCall.prompt).toContain("<sala>");
+      expect(previewCall.prompt).toContain("Abrimos los domingos");
+      expect(previewCall.system).toContain(profile.instructions);
+      if ((text.trim() && action === "reply") || action === "decline")
+        expect(actions).toContainEqual({
+          kind: "send",
+          recipient: room.initiator,
+          content: { kind: "text", text: expected },
+        });
+      else expect(actions).toEqual([]);
+    },
+  );
 
   it("passes ready knowledge into the room prompt but leaves empty providers unchanged", async () => {
     const original = await rooms.t.query(internal.providerAgent.context, {

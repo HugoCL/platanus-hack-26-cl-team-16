@@ -4,12 +4,14 @@ import { zodToConvex } from "convex-helpers/server/zod4";
 import { z } from "zod";
 import {
   formatKnowledge,
-  knowledgePrompt,
   SOURCE_TEXT_LIMIT,
   validateWebsiteUrl,
 } from "../lib/agent-knowledge";
-import { systemPrompt } from "../lib/agents/provider";
-import { AgentCard } from "../shared/agent";
+import { providerTurn } from "../lib/agents/provider";
+import type { AgentTurn } from "../lib/agents/turn";
+import { AgentCard, effectiveAllowedIntents } from "../shared/agent";
+import type { Message } from "../shared/messages";
+import { DEFAULT_MAX_TURNS, SessionContract } from "../shared/session";
 import { components, internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
@@ -479,37 +481,77 @@ export const testChat = action({
       agentId,
       kind: "chat",
     });
-    const context = await ctx.runQuery(
-      internal.agentBuilder.generationContext,
-      { agentId },
-    );
+    const context = await ctx.runQuery(internal.providerAgent.context, {
+      agentId,
+      now: Date.now(),
+    });
     const llm = referenceLlm();
     if (!llm)
-      return `Soy el agente de ${context.agent.name}. ${context.agent.description} Estoy en modo de prueba sin modelo conectado.`;
-    const answer = await llm.generateObject({
-      role: "agent",
-      schema: z.object({ text: z.string().trim().min(1).max(4000) }),
-      system: systemPrompt(
-        {
-          card: context.agent,
-          instructions: context.instructions || null,
-          knowledge: context.knowledge,
-          categories: [],
-          offerings: [],
-          freeSlots: [],
+      return `Soy el agente de ${context.card.name}. ${context.card.description} Estoy en modo de prueba sin modelo conectado.`;
+    const self = "preview-provider";
+    const consumer = "preview-consumer";
+    const messages: Message[] = [
+      ...history,
+      { role: "user", content: message },
+    ].map((entry, index) => ({
+      messageId: `preview-${index}`,
+      sessionId: "preview",
+      senderParticipantId: entry.role === "assistant" ? self : consumer,
+      recipient: entry.role === "assistant" ? consumer : self,
+      content: { kind: "text", text: entry.content },
+      status: "allowed",
+      verdict: { decision: "allow", reason: "Conversación de prueba." },
+      sentAt: index,
+    }));
+    const allowedIntents = effectiveAllowedIntents(context.card);
+    const turn: AgentTurn = {
+      self,
+      contract: SessionContract.parse({
+        intent: {
+          name: allowedIntents[0],
+          description: (
+            history.find((entry) => entry.role === "user")?.content ?? message
+          )
+            .trim()
+            .slice(0, 500),
         },
-        false,
-      ),
-      prompt: [
-        JSON.stringify({
-          ficha: AgentCard.parse(context.agent),
-          historial: history,
-          pregunta: message,
-        }),
-        knowledgePrompt(context.knowledge),
-      ].join("\n"),
+        purpose: context.card.purpose,
+        capabilities: context.card.capabilities,
+        allowedIntents,
+        forbiddenTopics: context.card.scope.forbiddenTopics,
+        recipientShares: context.card.scope.dataItShares,
+        recipientRequests: context.card.scope.dataItRequests,
+        maxTurns: DEFAULT_MAX_TURNS,
+        maxViolations: 3,
+      }),
+      participants: [
+        { participantId: self, kind: "agent", agentId, role: "recipient" },
+        {
+          participantId: consumer,
+          kind: "agent",
+          agentId: consumer,
+          role: "initiator",
+        },
+      ],
+      history: messages,
+      incoming: messages[messages.length - 1],
+    };
+    const actions = await providerTurn(turn, context, {
+      llm,
+      book: async () => {
+        throw new Error("Las pruebas no permiten reservas.");
+      },
     });
-    return answer.text;
+    return (
+      actions
+        .flatMap((action) =>
+          action.kind === "send" && action.content.kind === "text"
+            ? [action.content.text]
+            : [],
+        )
+        .join("\n\n") ||
+      "No tengo una respuesta para esa pregunta. Prueba con otra sobre tu negocio."
+    );
   },
 });
 
