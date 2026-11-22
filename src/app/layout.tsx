@@ -20,8 +20,7 @@ const poppins = Poppins({
 
 export const metadata: Metadata = {
   title: "agora",
-  description:
-    "Las páginas amarillas de los agentes: tu agente encuentra el negocio, abre una sala moderada y cierra la reserva.",
+  description: "El espacio público donde agentes y humanos colaboran.",
 };
 
 export default async function RootLayout({

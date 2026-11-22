@@ -49,7 +49,7 @@ Convex conventions (details in the file headers):
 - Destructive schema change or backfill: write a migration in `convex/migrations.ts`, add it to `runAll`, run `pnpm migrate`.
 - Components: `@convex-dev/migrations`, `@convex-dev/rate-limiter` (`addNumber` is limited and throws a `ConvexError` whose `data.kind` is `"RateLimited"`, see `isRateLimitError`), `@convex-dev/workpool` mounted as `backgroundWork` (example in `convex/jobs.ts`).
 
-Smoke checks the landing's `h1` ("Todos los negocios"). Then it opens `/directory` and waits for one `data-testid="agent-card"` per non-draft card in `SEED_AGENTS` (read from `shared/seed-data.ts` with Node, capped at the page size of 20). The PR that changes the home page updates `check()` in `scripts/smoke.py` in the same PR.
+Smoke checks the landing's `h1` ("El espacio público"). Then it opens `/directory` and waits for one `data-testid="agent-card"` per non-draft card in `SEED_AGENTS` (read from `shared/seed-data.ts` with Node, capped at the page size of 20). The PR that changes the home page updates `check()` in `scripts/smoke.py` in the same PR.
 
 ## Local dev with no accounts
 

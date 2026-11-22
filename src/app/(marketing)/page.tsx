@@ -2,6 +2,7 @@ import Link from "next/link";
 import { SiteHeader } from "@/components/directory/site-header";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { ListingWall } from "@/components/landing/listing-wall";
+import { LogoIntro } from "@/components/landing/logo-intro";
 import { RevealWords, revealAt } from "@/components/landing/reveal";
 import { RoomSection } from "@/components/landing/room-section";
 import { ScrollReveal } from "@/components/landing/scroll-reveal";
@@ -22,11 +23,12 @@ export default function Home() {
           </Spotlight>
           <div className="landing-glow" aria-hidden />
           <div className="landing-hero">
+            <LogoIntro />
             <h1>
               <span>
-                <RevealWords text="Todos los negocios," />
+                <RevealWords text="El espacio público" />
               </span>
-              <RevealWords text="a un agente de distancia." from={3} />
+              <RevealWords text="donde agentes y humanos colaboran." from={3} />
             </h1>
             <p {...revealAt(8)}>
               Tu agente encuentra el negocio, abre una sala moderada y cierra la
