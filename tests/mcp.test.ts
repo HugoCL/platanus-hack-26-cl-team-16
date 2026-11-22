@@ -1581,5 +1581,87 @@ describe("MCP room tools", () => {
       });
       expect(output?.truncated).toBe(true);
     });
+
+    it("list_friends shows each friend's own auto-approve switch and the friend link still waiting", async () => {
+      await friends();
+      // Beto lets Ana's invitations in; Ana does not return the favour.
+      await t.run(async (ctx) => {
+        const row = await ctx.db
+          .query("friendships")
+          .withIndex("by_ownerTokenIdentifier_and_friendTokenIdentifier", (q) =>
+            q.eq("ownerTokenIdentifier", BETO).eq("friendTokenIdentifier", ANA),
+          )
+          .unique();
+        if (!row) throw new Error("missing friendship");
+        await ctx.db.patch("friendships", row._id, { autoApprove: true });
+      });
+      expect(await use("list_friends", {})).toEqual({
+        friends: [{ name: "Beto Paz", autoApprovesYou: true }],
+        inviteExpiresAt: null,
+      });
+      expect((await asFriend("list_friends")).output).toEqual({
+        friends: [{ name: "Ana Rojas", autoApprovesYou: false }],
+        inviteExpiresAt: null,
+      });
+      expect(
+        await use("invite_agent", {
+          sessionId: (await openRoom()).sessionId,
+          agentId: friend.agentId,
+        }),
+      ).toEqual({ status: "approved" });
+
+      const { expiresAt } = await t
+        .withIdentity({ tokenIdentifier: ANA })
+        .mutation(api.friends.createInvite, { displayName: "Ana Rojas" });
+      expect((await use("list_friends", {})).inviteExpiresAt).toBe(expiresAt);
+    });
+
+    it("list_friends needs a linked human", async () => {
+      expect(await refusal("list_friends", {})).toContain(
+        "NotLinked: you have no human yet",
+      );
+    });
+  });
+
+  describe("whoami and renew_link", () => {
+    const ANA = "https://clerk.example|ana";
+    const codeOf = (url: string) => url.split("/").at(-1) ?? "";
+
+    it("tells an unlinked agent so, and renew_link hands out a link that replaces the previous one", async () => {
+      expect(await use("whoami", {})).toEqual({
+        agentId: agents.external,
+        name: expect.any(String),
+        slug: EXTERNAL_AGENT_SLUG,
+        published: expect.any(Boolean),
+        linked: false,
+        linkExpiresAt: null,
+      });
+
+      const first = await use("renew_link", {});
+      expect(first.linkUrl).toMatch(
+        new RegExp(`^${PUBLIC_ORIGIN}/link/[0-9a-f-]+$`),
+      );
+      expect((await use("whoami", {})).linkExpiresAt).toBe(first.expiresAt);
+
+      const second = await use("renew_link", {});
+      expect(
+        await t.query(api.agentRegistration.linkInfo, {
+          code: codeOf(first.linkUrl),
+        }),
+      ).toBeNull();
+
+      await t
+        .withIdentity({ tokenIdentifier: ANA })
+        .mutation(api.agentRegistration.link, {
+          code: codeOf(second.linkUrl),
+        });
+      expect(await use("whoami", {})).toMatchObject({
+        linked: true,
+        linkExpiresAt: null,
+      });
+      expect(await refusal("renew_link", {})).toContain(
+        "AlreadyLinked: you are already linked to a human",
+      );
+    });
   });
 });

@@ -278,6 +278,7 @@ export function createMcpEndpoint(
   };
   const handler = createMcpHandler(({ authInfo }) => {
     const apiKey = authInfo?.token ?? "";
+    const origin = String(authInfo?.extra?.origin ?? "");
     const server = new McpServer(
       { name: "directorio-agentes", version: "0.1.0" },
       { capabilities: { tools: {} } },
@@ -309,6 +310,19 @@ export function createMcpEndpoint(
     );
     registerTool(server, "list_sessions", () =>
       convex.action(api.mcpRooms.sessions, { apiKey }),
+    );
+    registerTool(server, "whoami", () =>
+      convex.action(api.mcpAccount.whoami, { apiKey }),
+    );
+    registerTool(server, "renew_link", async () => {
+      const { code, expiresAt } = await convex.action(
+        api.mcpAccount.renewLink,
+        { apiKey },
+      );
+      return { linkUrl: `${origin}/link/${code}`, expiresAt };
+    });
+    registerTool(server, "list_friends", () =>
+      convex.action(api.mcpAccount.friends, { apiKey }),
     );
     return server;
   });
@@ -348,7 +362,13 @@ export function createMcpEndpoint(
       });
     }
     return handler.fetch(request, {
-      authInfo: { token: apiKey, clientId: apiKey.slice(0, 12), scopes: [] },
+      authInfo: {
+        token: apiKey,
+        clientId: apiKey.slice(0, 12),
+        scopes: [],
+        // Links handed to an agent point at the public origin, like the ones from registration.
+        extra: { origin: new URL(publicOrigin ?? request.url).origin },
+      },
     });
   };
 }

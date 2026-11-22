@@ -45,13 +45,13 @@ function fail(kind: string, message: string): never {
   throw new ConvexError({ kind, message });
 }
 
-async function callerCredential(ctx: QueryCtx, apiKey: string) {
+export async function callerCredential(ctx: QueryCtx, apiKey: string) {
   const credential = await credentialForApiKey(ctx, apiKey);
   if (!credential) fail("Unauthorized", "the API key is not valid");
   return credential;
 }
 
-async function chargeRequest(ctx: ActionCtx, apiKey: string) {
+export async function chargeRequest(ctx: ActionCtx, apiKey: string) {
   const result = await ctx.runMutation(api.agentKeys.authenticate, { apiKey });
   if (!result) fail("Unauthorized", "the API key is not valid");
   if (!result.ok) {

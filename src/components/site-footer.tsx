@@ -6,7 +6,7 @@ export function SiteFooter() {
   return (
     <footer className="site-footer">
       <span className="site-footer-logo inline-flex items-baseline gap-[0.28cap]">
-        <AgoraMark className="h-[0.85cap] w-[0.92cap] shrink-0" />
+        <AgoraMark className="h-[1.02cap] w-[1.1cap] shrink-0" />
         agora
       </span>
       <span>Hecho en Platanus Hack 26 · Santiago</span>
