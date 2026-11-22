@@ -32,17 +32,6 @@
   flex-direction: column;
   margin: 0;
 
-  /* In a narrow column a long value takes its own line under the label. */
-  @container (max-width: 30rem) {
-    & > div {
-      flex-wrap: wrap;
-    }
-
-    & dd {
-      max-width: 100%;
-    }
-  }
-
   & > div {
     display: flex;
     align-items: baseline;
@@ -76,6 +65,17 @@
     font-weight: 500;
     text-wrap: balance;
     overflow-wrap: anywhere;
+  }
+
+  /* In a narrow column a long value takes its own line under the label. After the base rules. */
+  @container (max-width: 30rem) {
+    & > div {
+      flex-wrap: wrap;
+    }
+
+    & dd {
+      max-width: 100%;
+    }
   }
 }
 

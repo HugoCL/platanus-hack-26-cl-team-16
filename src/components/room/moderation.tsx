@@ -17,6 +17,7 @@ import {
 } from "@ui-sdk/react/popover";
 import {
   CheckIcon,
+  MinusIcon,
   ShieldAlertIcon,
   ShieldBanIcon,
   ShieldCheckIcon,
@@ -168,10 +169,14 @@ const STAGES = ["deterministic", "injection", "purpose"] as const;
 function StageList({ message }: { message: RoomMessage }) {
   const pending = message.status === "pending";
   const blocked = message.status === "blocked";
+  // A rule that fails ends the review: the two judges never see the message.
+  const stoppedAtRules =
+    message.reasons?.some((r) => r.stage === "deterministic") ?? false;
   return (
     <ul className="room-pop-stages" aria-label="Etapas del moderador">
       {STAGES.map((stage, i) => {
         const flagged = message.reasons?.some((r) => r.stage === stage);
+        const skipped = stoppedAtRules && stage !== "deterministic";
         return (
           <li key={stage}>
             {pending ? (
@@ -185,6 +190,8 @@ function StageList({ message }: { message: RoomMessage }) {
                 size={12}
                 className={blocked ? "text-destructive-text" : "text-warning"}
               />
+            ) : skipped ? (
+              <MinusIcon size={12} className="text-muted-foreground" />
             ) : (
               <CheckIcon size={12} className="text-success" />
             )}
@@ -194,7 +201,9 @@ function StageList({ message }: { message: RoomMessage }) {
                 ? ": en revisión"
                 : flagged
                   ? ": con hallazgos"
-                  : ": sin hallazgos"}
+                  : skipped
+                    ? ": no se ejecutó"
+                    : ": sin hallazgos"}
             </span>
           </li>
         );

@@ -58,11 +58,50 @@ export function DemoRoom({
 }) {
   const room = useDemoRoom(fixture.script, instant);
   const [role, setRole] = useState<Viewer["role"]>("owner");
-  // Closing the demo room freezes the thread where it was and adds the closing notice.
-  const [closed, setClosed] = useState<RoomMessage[] | null>(null);
-  const messages = closed ?? room.messages;
+  // Closing the demo room cuts the thread where it was and adds the closing notice. It keeps
+  // the message count, not a copy, so a verdict still pending at that moment can arrive.
+  const [closedAt, setClosedAt] = useState<number | null>(null);
+  const count = useRef(0);
+  const closing = useRef<{ timer: number; done: () => void } | null>(null);
+  useEffect(() => {
+    count.current = room.messages.length;
+  }, [room.messages.length]);
+  const closed = closedAt !== null;
+  const kept = closed ? room.messages.slice(0, closedAt) : room.messages;
+  const messages: RoomMessage[] = closed
+    ? [
+        ...kept,
+        {
+          messageId: "demo-closed",
+          sessionId: DEMO_SESSION_ID,
+          senderParticipantId: null,
+          recipient: "all",
+          sentAt: (kept.at(-1)?.sentAt ?? 0) + 60_000,
+          content: {
+            kind: "system",
+            code: "session_closed",
+            text: "Sala cerrada por su dueño",
+          },
+          status: "allowed",
+          verdict: { decision: "allow", reason: "Aviso de la plataforma" },
+        },
+      ]
+    : kept;
+  const cancelClosing = () => {
+    if (!closing.current) return;
+    window.clearTimeout(closing.current.timer);
+    closing.current.done();
+    closing.current = null;
+  };
+  useEffect(
+    () => () => {
+      if (closing.current) window.clearTimeout(closing.current.timer);
+    },
+    [],
+  );
   const reset = () => {
-    setClosed(null);
+    cancelClosing();
+    setClosedAt(null);
     room.reset();
   };
   return (
@@ -85,29 +124,13 @@ export function DemoRoom({
       onReview={room.review}
       onCloseRoom={() =>
         new Promise<void>((resolve) => {
-          window.setTimeout(() => {
-            setClosed([
-              ...room.messages,
-              {
-                messageId: "demo-closed",
-                sessionId: DEMO_SESSION_ID,
-                senderParticipantId: null,
-                recipient: "all",
-                sentAt: (room.messages.at(-1)?.sentAt ?? Date.now()) + 60_000,
-                content: {
-                  kind: "system",
-                  code: "session_closed",
-                  text: "Sala cerrada por su dueño",
-                },
-                status: "allowed",
-                verdict: {
-                  decision: "allow",
-                  reason: "Aviso de la plataforma",
-                },
-              },
-            ]);
+          cancelClosing();
+          const timer = window.setTimeout(() => {
+            closing.current = null;
+            setClosedAt(count.current);
             resolve();
           }, DEMO_CLOSE_MS);
+          closing.current = { timer, done: resolve };
         })
       }
       demoControls={
@@ -454,7 +477,7 @@ function Thread({
   const ref = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLElement>(null);
   const atBottom = useRef(true);
-  const seen = useRef(0);
+  const seen = useRef(new Set<string>());
   const [unread, setUnread] = useState(0);
 
   // Follow the thread while the reader is at the bottom, including when a pending
@@ -470,12 +493,21 @@ function Thread({
     return () => observer.disconnect();
   }, []);
 
+  // Count by id: a message that comes back when a filter is lifted is not an arrival.
   useEffect(() => {
-    const added = messages.length - seen.current;
-    seen.current = messages.length;
-    if (messages.length === 0) setUnread(0);
-    else if (added > 0 && !atBottom.current) setUnread((n) => n + added);
-  }, [messages.length]);
+    if (messages.length === 0) {
+      seen.current.clear();
+      setUnread(0);
+      return;
+    }
+    let added = 0;
+    for (const { messageId } of messages) {
+      if (seen.current.has(messageId)) continue;
+      seen.current.add(messageId);
+      added += 1;
+    }
+    if (added > 0 && !atBottom.current) setUnread((n) => n + added);
+  }, [messages]);
 
   return (
     <div className="relative min-h-0 flex-1 border-t border-border">
