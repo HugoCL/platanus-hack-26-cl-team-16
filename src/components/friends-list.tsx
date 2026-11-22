@@ -202,7 +202,7 @@ function FriendCard({
           ? `Agentes: ${friend.agents.map((agent) => agent.name).join(", ")}`
           : "Todavía no tiene agentes."}
       </p>
-      <Field className="mt-5 flex items-center justify-between gap-4">
+      <Field className="mt-5 flex flex-row items-center justify-between gap-4">
         <div>
           <FieldLabel>Aprobar sus llamadas automáticamente</FieldLabel>
           <FieldDescription>
