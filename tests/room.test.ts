@@ -13,6 +13,7 @@ import {
   canSeeContent,
   countViolations,
   describeUiResponse,
+  formatLastActivity,
   formatTime,
   groupSlotsByDay,
   initials,
@@ -174,6 +175,26 @@ describe("GenUI interaction state", () => {
       });
     },
   );
+});
+
+describe("formatLastActivity", () => {
+  const now = Date.parse("2026-11-22T16:20:00-03:00");
+  it.each([
+    ["2026-11-22T09:05:00-03:00", "09:05"],
+    ["2026-11-21T16:20:00-03:00", "Sáb 21"],
+    ["2026-03-22T12:00:00-03:00", "22 mar"],
+    ["2026-02-22T09:30:00-03:00", "22 feb"],
+    ["2025-11-22T10:00:00-03:00", "22 nov 2025"],
+    ["2020-11-22T10:00:00-03:00", "22 nov 2020"],
+  ])("formats %s as %s", (at, label) => {
+    expect(formatLastActivity(Date.parse(at), now)).toBe(label);
+  });
+
+  it("includes the year for recent activity on the previous Santiago year", () => {
+    const at = Date.parse("2026-01-01T02:59:00Z");
+    const nextYear = Date.parse("2026-01-01T03:01:00Z");
+    expect(formatLastActivity(at, nextYear)).toBe("31 dic 2025");
+  });
 });
 
 describe("formatting", () => {
