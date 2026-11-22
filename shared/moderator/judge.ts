@@ -122,6 +122,9 @@ function label(participant: Participant): string {
   if (participant.kind === "human") {
     return `${participant.participantId} (humano, ${participant.role})`;
   }
+  if (participant.role === "guest") {
+    return `${participant.participantId} (agente invitado)`;
+  }
   const side = participant.role === "initiator" ? "consumidor" : "proveedor";
   return `${participant.participantId} (agente ${side})`;
 }

@@ -7,6 +7,7 @@ import { Component, type ReactNode, useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { SendableContent } from "@/shared/messages";
+import { InviteAgent } from "./invite-agent";
 import { liveAnswers, mapLiveRoom, sendError } from "./live-room";
 import type { RoomMessage } from "./room-format";
 import { RoomView } from "./room-view";
@@ -127,6 +128,16 @@ function ConnectedRoom({ sessionId }: { sessionId: Id<"sessions"> }) {
     <RoomView
       {...mapped}
       sessionId={sessionId}
+      headerActions={
+        view.session.status === "active" ? (
+          <InviteAgent
+            sessionId={sessionId}
+            agentIdsInRoom={view.session.participants.flatMap((p) =>
+              p.kind === "agent" ? [p.agentId] : [],
+            )}
+          />
+        ) : null
+      }
       violationCount={view.violationCount}
       turnCount={view.session.turnCount}
       messages={[...history, ...(pending ? [pending] : [])]}

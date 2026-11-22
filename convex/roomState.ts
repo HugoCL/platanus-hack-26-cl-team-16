@@ -4,7 +4,7 @@ import type { Participant, Session } from "../shared/session";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 
-const MAX_PARTICIPANTS = 10;
+export const MAX_PARTICIPANTS = 10;
 
 export async function requireRoomIdentity(ctx: Pick<QueryCtx, "auth">) {
   const identity = await ctx.auth.getUserIdentity();

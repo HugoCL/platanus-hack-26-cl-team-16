@@ -25,12 +25,21 @@ export function mapLiveRoom(
 ) {
   const nameOf = (id: string) =>
     names.find((p) => p.participantId === id)?.name;
-  const initiator = session.participants.find(
-    (p) => p.kind === "agent" && p.role === "initiator",
+  const human = session.participants.find(
+    (p) => p.participantId === humanParticipantId,
   );
+  const ownAgentId = human?.kind === "human" && human.onBehalfOfAgentId;
+  // The viewer's agent: the one they are here for, which for an invited friend is the guest.
+  const ownAgent =
+    session.participants.find(
+      (p) => p.kind === "agent" && p.agentId === ownAgentId,
+    ) ??
+    session.participants.find(
+      (p) => p.kind === "agent" && p.role === "initiator",
+    );
   const ownParticipantIds = [
     humanParticipantId,
-    ...(initiator ? [initiator.participantId] : []),
+    ...(ownAgent ? [ownAgent.participantId] : []),
   ];
   const participants: RoomParticipant[] = session.participants.map((p) => ({
     participantId: p.participantId,
@@ -46,10 +55,8 @@ export function mapLiveRoom(
         }
       : {}),
     side: ownParticipantIds.includes(p.participantId) ? "self" : "other",
-    ...(p.kind === "human" &&
-    p.participantId === humanParticipantId &&
-    initiator
-      ? { onBehalfOf: nameOf(initiator.participantId) ?? "Agente" }
+    ...(p.kind === "human" && p.participantId === humanParticipantId && ownAgent
+      ? { onBehalfOf: nameOf(ownAgent.participantId) ?? "Agente" }
       : {}),
   }));
   const viewer: Viewer = { role: "owner", ownParticipantIds };
@@ -87,6 +94,36 @@ export function sendError(error: unknown) {
     default:
       return "No se pudo completar la acción. Inténtalo de nuevo.";
   }
+}
+
+export function inviteError(error: unknown) {
+  const kind = (error as { data?: { kind?: string } } | null)?.data?.kind;
+  switch (kind) {
+    case "NotFriend":
+      return "Solo puedes invitar agentes de tus amigos.";
+    case "AlreadyInvited":
+      return "Ese agente ya tiene una invitación pendiente.";
+    case "AlreadyParticipant":
+      return "Ese agente ya está en la sala.";
+    case "AlreadyAnswered":
+      return "Esa invitación ya fue respondida.";
+    case "OwnerHasGuest":
+      return "Ese amigo ya tiene un agente en la sala.";
+    case "RoomFull":
+      return "La sala está llena.";
+    case "RoomNotActive":
+      return "La sala está cerrada.";
+    default:
+      return sendError(error);
+  }
+}
+
+// The agent's owner answering an invitation: the same failures, read from their side.
+export function respondError(error: unknown) {
+  const kind = (error as { data?: { kind?: string } } | null)?.data?.kind;
+  return kind === "NotFriend"
+    ? "Ya no eres amigo de quien te invitó, así que no puedes aprobar esta invitación."
+    : inviteError(error);
 }
 
 export function openRoomError(error: unknown) {

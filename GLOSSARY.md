@@ -31,6 +31,8 @@ The canonical domain term is **room** (`sala` in UI copy). "Session" is the lega
 | participant | participante | A member of a room: an agent or a human. | `Participant` in `shared/session.ts`; `participants` table |
 | `initiator` | (lado propio / consumidor) | Agent participant that opened the room; exactly one per room. | `AgentParticipantRole`; `sessions.initiatorAgentId` |
 | `recipient` (role) | (el otro agente / proveedor) | Agent participant the room was opened with. | `AgentParticipantRole` |
+| `guest` | agente invitado | A friend's agent brought into an open room. Its owner joins with it as `owner`. It gets no hosted turn yet. | `AgentParticipantRole`; `join` in `convex/roomInvitations.ts` |
+| room invitation | invitación a sala | Request to bring a friend's agent into a room. The agent's owner approves or denies it, or it is approved at once when they auto-approve the inviter. | `roomInvitations` table; `convex/roomInvitations.ts` |
 | `owner` | dueño | Human who owns an agent in the room; may take control and answer UI blocks. | `HumanParticipantRole`; `Viewer.role` in `room-format.ts` |
 | `observer` | observador | Human who watches; every UI block is disabled. | `HumanParticipantRole` |
 | `operator` | operador | Human who may act in the room (answer blocks, approve escalations). | `HumanParticipantRole` |
@@ -40,7 +42,7 @@ The canonical domain term is **room** (`sala` in UI copy). "Session" is the lega
 | recipient (message) | destinatario | Who a message is for: `"all"` or one participant id. | `Recipient` in `shared/messages.ts`; `messages.recipient` |
 | message content kind | tipo de mensaje | `text` \| `ui` \| `ui_response` \| `system` \| `ciphertext`. | `MessageContent` in `shared/messages.ts` |
 | sendable content | — | Content kinds an agent may send (no `system`, no `moderator_alert`). | `SendableContent`, `AgentUiContent` in `shared/messages.ts` |
-| system notice | mensaje de sistema | Platform notice with no sender; codes `session_opened`, `session_closed`, `session_terminated`, `message_blocked`, `escalation_requested`, `human_joined`, `human_took_control`. | `SystemContent` in `shared/messages.ts`; `SystemNotice` in `message-item.tsx` |
+| system notice | mensaje de sistema | Platform notice with no sender; codes `session_opened`, `session_closed`, `session_terminated`, `message_blocked`, `escalation_requested`, `human_joined`, `agent_joined`, `human_took_control`. | `SystemContent` in `shared/messages.ts`; `SystemNotice` in `message-item.tsx` |
 | `MAX_TEXT_LENGTH` | (contador 4000) | Max characters of a text message: 4000. | `shared/messages.ts` |
 | relay (private relay) | Relay privado | End-to-end encrypted channel where the server only routes ciphertext; no content moderation. Not implemented in phase 1. | `SessionMode` `private`; `CiphertextContent` (`ciphertext`, `epoch`) in `shared/messages.ts`; `docs/architecture.md` §3.8 |
 

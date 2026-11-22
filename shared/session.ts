@@ -33,7 +33,7 @@ export const SessionStatus = z.enum([
 ]);
 export type SessionStatus = z.infer<typeof SessionStatus>;
 
-export const AgentParticipantRole = z.enum(["initiator", "recipient"]);
+export const AgentParticipantRole = z.enum(["initiator", "recipient", "guest"]);
 export const HumanParticipantRole = z.enum(["owner", "observer", "operator"]);
 
 const id = z.string().min(1);

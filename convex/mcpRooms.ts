@@ -229,7 +229,7 @@ export const readMessages = internalQuery({
             (m.recipient === "all" ||
               m.recipient === viewer.participantId ||
               m.senderParticipantId === viewer.participantId) &&
-            visibleTo(m, viewer),
+            visibleTo(m, viewer, room.participants),
         ),
       cursor: page.cursor,
       sessionStatus: room.status,
