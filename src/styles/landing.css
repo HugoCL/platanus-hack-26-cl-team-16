@@ -653,6 +653,15 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .landing-replay-room {
+    height: auto;
+  }
+
+  .landing-replay-thread {
+    overflow: visible;
+    mask-image: none;
+  }
+
   .landing-track {
     animation: none;
   }
