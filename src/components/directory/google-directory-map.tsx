@@ -9,8 +9,9 @@ import {
   useMap,
 } from "@vis.gl/react-google-maps";
 import { useTheme } from "next-themes";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { LatLng } from "@/shared/geo";
+import { DirectoryMap } from "./directory-map";
 import {
   type DirectoryMapProps,
   EmptyMapNote,
@@ -29,7 +30,24 @@ const YOU = "#3b82f6";
 // Centers the selected pin lower than the middle so its card, drawn above it, stays in view.
 const POPUP_LIFT_PX = 110;
 
-export default function GoogleDirectoryMap({
+declare global {
+  interface Window {
+    gm_authFailure?: () => void;
+  }
+}
+
+export default function GoogleDirectoryMap(props: DirectoryMapProps) {
+  const [rejected, setRejected] = useState(false);
+  useEffect(() => {
+    window.gm_authFailure = () => setRejected(true);
+    return () => {
+      window.gm_authFailure = undefined;
+    };
+  }, []);
+  return rejected ? <DirectoryMap {...props} /> : <GoogleMapView {...props} />;
+}
+
+function GoogleMapView({
   cards,
   categories,
   selectedId,

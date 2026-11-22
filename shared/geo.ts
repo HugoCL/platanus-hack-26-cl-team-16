@@ -63,8 +63,8 @@ export type LatLng = z.infer<typeof LatLng>;
 
 export const Location = LatLng.extend({
   geohash: z.string().regex(/^[0-9b-hjkmnp-z]{1,12}$/),
-  comuna: z.string().min(1),
-  region: z.string().min(1),
-  address: z.string().optional(),
+  comuna: z.string().min(1).max(60),
+  region: z.string().min(1).max(80),
+  address: z.string().max(200).optional(),
 });
 export type Location = z.infer<typeof Location>;
