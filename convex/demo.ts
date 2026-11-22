@@ -14,6 +14,7 @@ import {
   DEMO_SEATS,
   type DemoSeat,
 } from "../shared/demo-pcb";
+import { isPersonalAgentSlug } from "../shared/mcp";
 import { CONSUMER_AGENT_SLUG, SEED_AGENTS } from "../shared/seed-data";
 import type { SessionContract } from "../shared/session";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -24,6 +25,7 @@ import {
   type QueryCtx,
   query,
 } from "./_generated/server";
+import { linkedAgents, retireAgent } from "./agentRegistration";
 import { historyForViewer } from "./gate";
 import { insertMessage } from "./roomMessages";
 import { loadSession, requireRoomIdentity, toParticipant } from "./roomState";
@@ -47,6 +49,7 @@ const broughtAgent = v.union(
 const SEATS = Object.keys(DEMO_SEATS) as DemoSeat[];
 const MAX_DEMO_ROOMS = 20;
 const MAX_ROOM_ROWS = 500;
+const MAX_OWN_AGENTS = 100;
 
 type Seats = Record<DemoSeat, { tokenIdentifier: string; displayName: string }>;
 
@@ -598,5 +601,42 @@ export const restart = mutation({
     if (!demo) fail("NotFound", "the demo room is not set up");
     if (!demo.mine) fail("Forbidden", "take a seat to restart the demo room");
     return { sessionId: await rebuild(ctx) };
+  },
+});
+
+// Removes agents the caller no longer uses from their account, for an assistant that was deleted
+// and connected again as a new agent. It cannot be undone: see `retireAgent`. The agent an
+// assistant gets by signing in with OAuth stays, because that assistant comes back to it.
+//
+// A seat whose agent is removed gets its holder's newest remaining agent, or the hosted one.
+export const forgetAgents = mutation({
+  args: { agentIds: v.array(v.id("agents")) },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { tokenIdentifier } = await requireRoomIdentity(ctx);
+    const agentIds = new Set(args.agentIds);
+    if (agentIds.size > MAX_OWN_AGENTS) {
+      fail("InvalidArgument", `at most ${MAX_OWN_AGENTS} agents at a time`);
+    }
+    for (const agentId of agentIds) {
+      const agent = await ownAgent(ctx, agentId, tokenIdentifier);
+      if (!agent || isPersonalAgentSlug(agent.slug)) {
+        fail("NotYourAgent", "you can only remove a linked agent of your own");
+      }
+      await retireAgent(ctx, agent);
+    }
+    const demo = await current(ctx, tokenIdentifier);
+    if (!demo) return null;
+    const agents: Partial<Record<DemoSeat, Id<"agents"> | null>> = {};
+    for (const seat of SEATS) {
+      const brought = demo.brought[seat];
+      if (!brought || !agentIds.has(brought._id)) continue;
+      agents[seat] =
+        demo.mine?.seat === seat
+          ? ((await linkedAgents(ctx, tokenIdentifier))[0]?._id ?? null)
+          : null;
+    }
+    if (Object.keys(agents).length > 0) await rebuild(ctx, { agents });
+    return null;
   },
 });

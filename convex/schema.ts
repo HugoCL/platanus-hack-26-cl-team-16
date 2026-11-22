@@ -75,6 +75,8 @@ export default defineSchema({
     ...zodToConvex(AgentCard).fields,
     entityId: v.optional(v.id("entities")),
     ownerTokenIdentifier: v.optional(v.string()),
+    // When its owner last linked it. Unset on agents linked before this was recorded.
+    linkedAt: v.optional(v.number()),
     primaryCategory: v.string(),
     selfRegistered: v.optional(v.boolean()),
     builderCreated: v.optional(v.boolean()),

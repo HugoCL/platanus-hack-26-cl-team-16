@@ -1,4 +1,5 @@
 import { ConvexError, v } from "convex/values";
+import { PERSONAL_AGENT_SLUG_PREFIX } from "../shared/mcp";
 import { mutation } from "./_generated/server";
 import { isApiKeyFormat, sha256Hex, storeApiKey } from "./agentKeys";
 import { insertSelfRegistered } from "./agentRegistration";
@@ -39,7 +40,7 @@ export const credential = mutation({
 
     // The agent is found by the user, not by the key, so a rotated secret gives the same agent a
     // new key instead of leaving its rooms behind with an agent nobody can reach.
-    const slug = `agente-personal-${(await sha256Hex(`mcp-oauth:${userId}`)).slice(0, 24)}`;
+    const slug = `${PERSONAL_AGENT_SLUG_PREFIX}${(await sha256Hex(`mcp-oauth:${userId}`)).slice(0, 24)}`;
     // The same identifier Convex gives this person when they sign in to the app.
     const owner = `${authConfig.providers[0].domain}|${userId}`;
     const agent = await ctx.db

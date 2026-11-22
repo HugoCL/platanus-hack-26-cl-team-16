@@ -13,6 +13,7 @@ import {
   DEMO_PROVIDER_SLUG,
   DEMO_SCRIPT,
 } from "../../shared/demo-pcb";
+import { PERSONAL_AGENT_SLUG_PREFIX } from "../../shared/mcp";
 import * as providers from "../../shared/providers/llm";
 import { errorKind } from "./roomFixture";
 
@@ -592,5 +593,151 @@ describe("demo room, a seat through its holder's own agent", () => {
       mySeat: null,
       agents: { buyer: null, merchant: null },
     });
+  });
+
+  it("removes an old agent for good and moves its seat to the newest one left", async () => {
+    await seated();
+    await ana().mutation(api.demo.leave, {});
+    const old = await ownAgent(CARO_TOKEN, "grok-viejo", "Grok viejo");
+    vi.advanceTimersByTime(1000);
+    const fresh = await ownAgent(CARO_TOKEN, "grok-nuevo", "Grok nuevo");
+    const demo = await caro().mutation(api.demo.join, {
+      seat: "buyer",
+      agentId: old.agentId,
+    });
+    // More keys than one batch of rows, the last of them the one to check.
+    let spare = "";
+    for (let i = 0; i < 101; i++) {
+      spare = (
+        await t.action(internal.agentKeys.issue, {
+          slug: "grok-viejo",
+          label: `extra ${i}`,
+        })
+      ).apiKey;
+    }
+    // What else the old agent left behind: a room it opened and an invitation nobody answered.
+    const left = await t.run(async (ctx) => {
+      const session = await ctx.db.get("sessions", demo.sessionId);
+      if (!session) throw new Error("no demo room");
+      const { _id, _creationTime, demo: _demo, ...room } = session;
+      const sessionId = await ctx.db.insert("sessions", room);
+      const invitationId = await ctx.db.insert("roomInvitations", {
+        sessionId,
+        agentId: old.agentId,
+        inviterTokenIdentifier: "https://clerk.test|friend",
+        inviterName: "Amiga",
+        ownerTokenIdentifier: CARO_TOKEN,
+        status: "pending",
+        autoApproved: false,
+      });
+      return { sessionId, invitationId };
+    });
+
+    await caro().mutation(api.demo.forgetAgents, { agentIds: [old.agentId] });
+
+    const state = await caro().query(api.demo.state, {});
+    expect(state).toMatchObject({
+      mySeat: "buyer",
+      agents: {
+        buyer: { agentId: fresh.agentId, name: "Grok nuevo" },
+        merchant: null,
+      },
+    });
+    expect(state?.sessionId).not.toBe(demo.sessionId);
+    expect((await rooms(fresh.apiKey)).sessions).toMatchObject([
+      { sessionId: state?.sessionId },
+    ]);
+    expect(await errorKind(rooms(old.apiKey))).toBe("Unauthorized");
+    expect(await errorKind(rooms(spare))).toBe("Unauthorized");
+    expect(
+      (await caro().query(api.agentRegistration.mine, {})).map((a) => a.slug),
+    ).toEqual(["grok-nuevo"]);
+    const after = await t.run(async (ctx) => ({
+      agent: await ctx.db.get("agents", old.agentId),
+      room: await ctx.db.get("sessions", left.sessionId),
+      invitation: await ctx.db.get("roomInvitations", left.invitationId),
+    }));
+    expect(after.agent).toMatchObject({ status: "draft" });
+    expect(after.agent?.ownerTokenIdentifier).toBeUndefined();
+    expect(after.room).toMatchObject({
+      status: "closed",
+      closedReason: "agent_removed",
+    });
+    expect(after.invitation?.status).toBe("cancelled");
+  });
+
+  it("goes back to the hosted agent when the seat's holder removes their only agent", async () => {
+    await seated();
+    const { agentId, apiKey } = await ownAgent(
+      "https://clerk.test|li",
+      "bot-de-li",
+      "Bot de Li",
+    );
+    const liWei = () =>
+      t.withIdentity({
+        subject: "li",
+        name: "Li Wei",
+        tokenIdentifier: "https://clerk.test|li",
+      });
+    await li().mutation(api.demo.leave, {});
+    await liWei().mutation(api.demo.join, { seat: "merchant", agentId });
+    expect((await rooms(apiKey)).sessions).toHaveLength(1);
+
+    await liWei().mutation(api.demo.forgetAgents, { agentIds: [agentId] });
+
+    expect(await liWei().query(api.demo.state, {})).toMatchObject({
+      mySeat: "merchant",
+      agents: { buyer: null, merchant: null },
+    });
+    expect(await ana().query(api.demo.state, {})).toMatchObject({
+      mySeat: "buyer",
+    });
+    expect(await liWei().query(api.agentRegistration.mine, {})).toEqual([]);
+  });
+
+  it("removes only the caller's own agents, never the one from signing in, and all or none", async () => {
+    await reset();
+    const mine = await ownAgent();
+    const theirs = await ownAgent(
+      "https://clerk.test|someone-else",
+      "bot-ajeno",
+      "Bot ajeno",
+    );
+    const personal = await ownAgent(
+      CARO_TOKEN,
+      `${PERSONAL_AGENT_SLUG_PREFIX}0123456789abcdef01234567`,
+      "Mi agente personal",
+    );
+    for (const refused of [theirs.agentId, personal.agentId]) {
+      expect(
+        await errorKind(
+          caro().mutation(api.demo.forgetAgents, {
+            agentIds: [mine.agentId, refused],
+          }),
+        ),
+      ).toBe("NotYourAgent");
+    }
+    expect(
+      await errorKind(
+        t.mutation(api.demo.forgetAgents, { agentIds: [mine.agentId] }),
+      ),
+    ).toBe("Unauthorized");
+    // Nothing was removed: all three keys still work.
+    for (const { apiKey } of [mine, theirs, personal]) {
+      expect((await rooms(apiKey)).sessions).toEqual([]);
+    }
+    expect(await caro().query(api.agentRegistration.mine, {})).toHaveLength(2);
+  });
+
+  it("removes a registered agent that is only named like the one from signing in", async () => {
+    await reset();
+    const { agentId, apiKey } = await ownAgent(
+      CARO_TOKEN,
+      `${PERSONAL_AGENT_SLUG_PREFIX}8f14e45f-ceea-467f-a9f1-0c1b2d3e4f5a`,
+      "Agente personal",
+    );
+    await caro().mutation(api.demo.forgetAgents, { agentIds: [agentId] });
+    expect(await errorKind(rooms(apiKey))).toBe("Unauthorized");
+    expect(await caro().query(api.agentRegistration.mine, {})).toEqual([]);
   });
 });

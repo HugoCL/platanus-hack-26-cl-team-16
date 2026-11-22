@@ -26,7 +26,7 @@ El deployment necesita los modelos reales: `LLM_PROVIDER=openrouter` y `OPENROUT
 Antes de cada presentación:
 
 1. Las dos personas inician sesión, cada una en su navegador, y abren `/demo`.
-2. Una pulsa "Entrar como comprador" y la otra "Entrar como fabricante".
+2. Una pulsa "Entrar como comprador" y la otra "Entrar como fabricante". Quien tiene agentes vinculados a su cuenta ve "Entrar desde la web" en su lugar.
 3. Ambas pulsan "Abrir la sala". Deben ver el mismo historial, con el formulario al final.
 4. Para proyectar la sala, una tercera cuenta abre `/demo` y pulsa "Ver como observador" (`/room/demo/watch`): ve la conversación en vivo como la ve el comprador, en solo lectura y sin ocupar un asiento. Tras "Reiniciar la sala" sigue mostrando la sala nueva sin recargar.
 
@@ -53,7 +53,7 @@ En vez de usar la web, el comprador le habla a su asistente (Grok Bot, Claude, C
 Preparación, una vez por persona:
 
 1. El comprador conecta su asistente a `https://<servicio>.onrender.com/api/mcp` y deja su agente vinculado a su cuenta (`docs/mcp.md`): con una API key en el encabezado `Authorization: Bearer <key>` y el enlace de vinculación, o iniciando sesión por OAuth. Un asistente en la nube, como Grok Bot, no llega a `localhost`.
-2. En `/demo`, con sesión iniciada, pulsa "Entrar desde mi agente <nombre>". Solo aparecen los agentes vinculados a su cuenta.
+2. En `/demo`, con sesión iniciada, pulsa "Entrar con mi agente <nombre>": es el botón principal del asiento y lleva el agente que vinculó más recientemente. Solo aparecen los agentes vinculados a su cuenta.
 3. La sala se reinicia con ese agente como el que conversó con el fabricante. La solicitud pendiente ya no es un formulario, porque un formulario solo lo responde una persona: es la misma pregunta en texto (cantidad, acabado y envío).
 4. `/demo` muestra un mensaje para copiar y pegar en el asistente: le pide encontrar la sala con `list_sessions`, leerla y contar en qué quedó.
 
@@ -70,7 +70,7 @@ Probado en local el 2026-11-22 con los modelos reales y un cliente MCP de prueba
 
 ## Variante: el fabricante habla desde su propio asistente
 
-El fabricante también puede traer su agente: en `/demo` pulsa "Entrar desde mi agente <nombre>" en el asiento de fabricante. La preparación es la misma que la del comprador, y las dos variantes se pueden usar a la vez.
+El fabricante también puede traer su agente: en `/demo` pulsa "Entrar con mi agente <nombre>" en el asiento de fabricante. La preparación es la misma que la del comprador, y las dos variantes se pueden usar a la vez.
 
 Su agente **reemplaza** al agente de Don Huang en la sala: ya no hay un agente alojado que cotice solo. Cotiza el asistente del fabricante, con la lista de precios que trae el mensaje para copiar de `/demo`, cuando su dueño se lo pide. La sala conserva el propósito y los límites de la ficha de Don Huang, y el moderador revisa los mensajes igual.
 
@@ -84,6 +84,15 @@ Su agente **reemplaza** al agente de Don Huang en la sala: ya no hay un agente a
 
 "Reiniciar la sala" conserva el agente. "Volver a hablar desde la web", o dejar el asiento, devuelve la sala al agente de Don Huang.
 
+## Agentes antiguos
+
+Quien borra su asistente y lo conecta de nuevo queda con un agente nuevo y con el anterior todavía vinculado a su cuenta. `/demo` los lista en "Tus agentes vinculados", del más reciente al más antiguo:
+
+- "Quitar" saca uno y "Quitar los antiguos" deja solo el más reciente. Los dos piden confirmar, porque no se puede deshacer.
+- Quitar un agente lo desvincula de la cuenta, anula sus API keys, cierra las salas que abrió y cancela sus invitaciones pendientes. La ficha y las salas cerradas quedan, para que el historial se siga leyendo.
+- Si el agente quitado es el del asiento de quien lo quita, la sala se reinicia con su agente más reciente, o con el agente alojado si no le queda ninguno.
+- El agente que se crea al iniciar sesión por OAuth desde el asistente no se puede quitar: el asistente vuelve a ese mismo agente en cada conexión.
+
 ## Si algo falla
 
 - **Aparece "El moderador no respondió a tiempo".** No cuenta como falta. Si era un mensaje tuyo, envíalo de nuevo tal cual antes de seguir: el paso 5 se bloquea si la oferta del paso 4 no llegó. Si era la respuesta del agente, el comerciante la da a mano con las cifras del guion. En las pruebas locales pasó en cerca de una de cada tres pasadas.
@@ -91,6 +100,7 @@ Su agente **reemplaza** al agente de Don Huang en la sala: ya no hay un agente a
 - **El agente no responde en 30 segundos.** El comerciante toma el control y responde a mano con las cifras del guion. La demo sigue igual.
 - **La sala se cerró** (tres faltas o 40 turnos). "Reiniciar la sala" en `/demo`.
 - **`/demo` dice que la sala no está preparada.** Falta ejecutar `demo:reset` en ese entorno.
+- **El asistente no encuentra la sala.** Su agente no es el del asiento: en `/demo`, la tarjeta del asiento dice desde qué agente hablas; pulsa "Cambiar a mi agente <nombre>", o quita los antiguos en "Tus agentes vinculados".
 - **Un asiento aparece tomado por otra persona.** `pnpm demo:reset '{"clearSeats":true}'`.
 
 ## Límites
