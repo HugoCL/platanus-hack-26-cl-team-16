@@ -46,8 +46,8 @@ function llm(action: "reply" | "wait", text = "El jueves puede a las 10.") {
     prompts,
     llm: {
       ...createFakeLlmProvider(),
-      generateObject: async ({ system }: { system?: string }) => {
-        prompts.push(system ?? "");
+      generateObject: async (args: { system?: string; prompt: string }) => {
+        prompts.push(`${args.system}\n${args.prompt}`);
         return { action, text } as never;
       },
     },
@@ -65,6 +65,10 @@ describe("guest agent turn", () => {
       },
     ]);
     expect(prompts[0]).toContain("No eres el proveedor de la sala");
+    expect(prompts[0]).toContain("te sacaría del propósito de la sala");
+    expect(prompts[0]).toContain(
+      JSON.stringify(turn(incoming()).contract.purpose),
+    );
   });
 
   it("stays quiet when the model says the message is not for it", async () => {
