@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SiteHeader } from "@/components/directory/site-header";
+import { CopyAgentPrompt } from "@/components/landing/copy-agent-prompt";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { ListingWall } from "@/components/landing/listing-wall";
 import { LogoIntro } from "@/components/landing/logo-intro";
@@ -64,6 +65,7 @@ export default function Home() {
             <span>Explorar el directorio</span>
             <span aria-hidden>→</span>
           </Link>
+          <CopyAgentPrompt {...revealAt(3)} />
         </section>
       </main>
       <SiteFooter />
