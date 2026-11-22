@@ -325,6 +325,33 @@ describe("the moderation gate", () => {
     expect((await humanHistory()).at(-2)).toEqual(blocked);
   });
 
+  it("stores a notice when masking would leave a UI block its schema refuses", async () => {
+    const blocked = await send(room.provider, room.human, {
+      kind: "ui",
+      spec: {
+        type: "slot_picker",
+        id: "4111111111111111",
+        title: "Elige un horario",
+        timezone: "America/Santiago",
+        slots: [
+          {
+            id: "lunes-0900",
+            start: "2026-11-24T09:00:00-03:00",
+            end: "2026-11-24T09:30:00-03:00",
+          },
+        ],
+      },
+    });
+
+    expect(blocked).toMatchObject({
+      status: "blocked",
+      content: text("Contenido retirado por la moderación."),
+    });
+    for (const message of await history(room.provider)) {
+      expect(Message.safeParse(message).success).toBe(true);
+    }
+  });
+
   it("runs only the deterministic stage when the content cannot be read", async () => {
     rooms.judge.mockClear();
     const message = await send(room.consumer, room.provider, {

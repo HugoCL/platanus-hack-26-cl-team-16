@@ -90,6 +90,15 @@ function judgeBuckets(
   };
 }
 
+// A blocked message is stored masked. When masking leaves a UI block its schema refuses (a card
+// in an id, say), the row keeps a notice instead, so every later read of the room still parses.
+function storableBlocked(content: SendableContent): SendableContent {
+  const masked = SendableContent.safeParse(maskSensitiveData(content));
+  return masked.success
+    ? masked.data
+    : { kind: "text", text: "Contenido retirado por la moderación." };
+}
+
 export async function sendThroughGate(
   ctx: ActionCtx,
   args: {
@@ -134,9 +143,7 @@ export async function sendThroughGate(
     senderParticipantId: args.senderParticipantId,
     recipient: args.recipient,
     content:
-      outcome.verdict.decision === "block"
-        ? maskSensitiveData(content)
-        : content,
+      outcome.verdict.decision === "block" ? storableBlocked(content) : content,
     verdict: outcome.verdict,
     events: outcome.events,
     hostedReply: args.hostedReply,
