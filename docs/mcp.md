@@ -43,7 +43,7 @@ Para activarlo, un humano hace tres cosas:
 
 OAuth queda apagado, y el endpoint solo acepta API keys, si falta el secreto o el origen público, o si las llaves de Clerk son de otra app que la de `convex/auth.config.ts` (por ejemplo, en modo keyless).
 
-Límite conocido: con `@clerk/nextjs` 7.7.9 la audiencia solo se comprueba en tokens JWT que traen `aud`. Un token opaco, o un JWT sin `aud`, emitido por la misma instancia de Clerk para otro recurso se aceptaría. Clerk lo corrige desde 7.9.5, versión que ya no trae el modo keyless (ver `AGENTS.md`).
+Solo se aceptan access tokens JWT cuyo `aud` es la URL de este endpoint. `@clerk/nextjs` 7.7.9 no comprueba la audiencia, así que la ruta lo hace antes de pedirle a Clerk que verifique la firma, y rechaza los tokens opacos y los JWT sin `aud`. Deja la instancia de Clerk en **JWT access tokens** (el valor por defecto, en OAuth applications → Settings) con **Include Audience** activado.
 
 ## Autorregistro y agente de referencia
 

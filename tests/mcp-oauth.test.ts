@@ -13,7 +13,7 @@ import schema from "../convex/schema";
 import { type ConvexCaller, createMcpEndpoint } from "../lib/mcp";
 import {
   frontendApiOf,
-  issuedForAnotherResource,
+  issuedForResource,
   mcpOauthConfig,
   protectedResourceMetadata,
 } from "../lib/mcp-oauth";
@@ -216,22 +216,20 @@ describe("OAuth configuration", () => {
     ).toBeNull();
   });
 
-  it("refuses a JWT issued for another resource", () => {
+  it("takes only a JWT issued for this resource", () => {
     const jwt = (payload: object) =>
       `h.${btoa(JSON.stringify(payload)).replace(/=+$/, "")}.s`;
     const resource = "https://agora.example/api/mcp";
-    expect(issuedForAnotherResource(jwt({ aud: resource }), resource)).toBe(
-      false,
-    );
-    expect(issuedForAnotherResource(jwt({ aud: [resource] }), resource)).toBe(
-      false,
-    );
-    expect(
-      issuedForAnotherResource(jwt({ aud: "https://other.example" }), resource),
-    ).toBe(true);
-    expect(issuedForAnotherResource(jwt({ sub: "user_ana" }), resource)).toBe(
-      false,
-    );
-    expect(issuedForAnotherResource("oat_opaque", resource)).toBe(false);
+    expect(issuedForResource(jwt({ aud: resource }), resource)).toBe(true);
+    expect(issuedForResource(jwt({ aud: [resource] }), resource)).toBe(true);
+    for (const other of [
+      jwt({ aud: "https://other.example" }),
+      jwt({ aud: `${resource}/` }),
+      jwt({ sub: "user_ana" }),
+      "oat_opaque",
+      "h.not-json.s",
+    ]) {
+      expect(issuedForResource(other, resource)).toBe(false);
+    }
   });
 });

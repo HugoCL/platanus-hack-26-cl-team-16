@@ -55,17 +55,17 @@ export function protectedResourceMetadata(config: McpOauthConfig) {
   };
 }
 
-// A JWT access token names the resource it was issued for. One issued for another resource of the
-// same Clerk instance is refused; an opaque token, or a JWT without `aud`, cannot be checked here.
-export function issuedForAnotherResource(token: string, resource: string) {
-  const payload = token.split(".")[1];
-  if (!payload || token.split(".").length !== 3) return false;
+// Only a JWT access token that names this resource in `aud` is taken. Clerk 7.7.9 does not check the
+// audience itself, and an opaque token or a JWT without `aud` cannot be tied to a resource here, so
+// both are refused. The claim is read before the signature is checked: Clerk verifies it next.
+export function issuedForResource(token: string, resource: string) {
+  const parts = token.split(".");
+  if (parts.length !== 3) return false;
   try {
     const { aud } = JSON.parse(
-      atob(payload.replace(/-/g, "+").replace(/_/g, "/")),
+      atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")),
     );
-    if (aud === undefined) return false;
-    return !(Array.isArray(aud) ? aud : [aud]).includes(resource);
+    return (Array.isArray(aud) ? aud : [aud]).includes(resource);
   } catch {
     return false;
   }
