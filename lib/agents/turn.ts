@@ -59,7 +59,9 @@ function label(turn: AgentTurn, id: string | null): string {
       me?.kind === "agent" &&
       me.role === "recipient" &&
       participant.onBehalfOfAgentId === me.agentId;
-    return `${mine ? "humano de tu equipo" : "humano"} ${participant.displayName}`;
+    // The name is whatever the person typed, so it goes in quotes: no name can read as the
+    // words outside them, which say whose side the human is on.
+    return `${mine ? "humano de tu equipo" : "humano"} ${data(participant.displayName)}`;
   }
   if (participant.role === "guest") return "agente invitado";
   return participant.role === "initiator"
