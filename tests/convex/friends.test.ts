@@ -38,6 +38,30 @@ describe("friends", () => {
     expect(await caro().query(api.friends.list, {})).toEqual([]);
   });
 
+  it("uses the name the client sends when the token carries none", async () => {
+    const dana = t.withIdentity({ subject: "dana" });
+    const eli = t.withIdentity({ subject: "eli" });
+    const { code } = await dana.mutation(api.friends.createInvite, {
+      displayName: "  Dana Soto ",
+    });
+    expect(await eli.query(api.friends.inviteInfo, { code })).toMatchObject({
+      inviterName: "Dana Soto",
+    });
+    await eli.mutation(api.friends.acceptInvite, { code });
+    expect(await eli.query(api.friends.list, {})).toMatchObject([
+      { name: "Dana Soto" },
+    ]);
+    expect(await dana.query(api.friends.list, {})).toMatchObject([
+      { name: "Sin nombre" },
+    ]);
+    const signed = await ana().mutation(api.friends.createInvite, {
+      displayName: "Otra Persona",
+    });
+    expect(
+      await eli.query(api.friends.inviteInfo, { code: signed.code }),
+    ).toMatchObject({ inviterName: "Ana Rojas" });
+  });
+
   it("stores only the hash of the link code", async () => {
     const { code } = await ana().mutation(api.friends.createInvite, {});
     const rows = await t.run((ctx) => ctx.db.query("friendInvites").collect());

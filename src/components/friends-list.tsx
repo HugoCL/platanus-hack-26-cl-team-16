@@ -1,6 +1,6 @@
 "use client";
 
-import { SignInButton, useAuth } from "@clerk/nextjs";
+import { SignInButton, useAuth, useUser } from "@clerk/nextjs";
 import { Button } from "@ui-sdk/react/button";
 import {
   Dialog,
@@ -21,6 +21,11 @@ import { type ReactNode, useState } from "react";
 import { api } from "@/convex/_generated/api";
 
 const FAILED = "No pudimos guardar el cambio. Inténtalo de nuevo.";
+
+function useDisplayName() {
+  const { user } = useUser();
+  return user?.fullName || user?.username || undefined;
+}
 
 function SignedIn({
   children,
@@ -63,6 +68,7 @@ export function FriendsList() {
 
 function InviteLink() {
   const createInvite = useMutation(api.friends.createInvite);
+  const displayName = useDisplayName();
   const [url, setUrl] = useState("");
   const [status, setStatus] = useState("");
   const [pending, setPending] = useState(false);
@@ -70,7 +76,7 @@ function InviteLink() {
     setPending(true);
     setStatus("");
     try {
-      const { code } = await createInvite({});
+      const { code } = await createInvite({ displayName });
       setUrl(`${window.location.origin}/friends/${code}`);
     } catch {
       setStatus("No pudimos crear el enlace. Inténtalo de nuevo.");
@@ -226,6 +232,7 @@ function FriendCard({
 export function FriendInvite({ code }: { code: string }) {
   const info = useQuery(api.friends.inviteInfo, { code });
   const accept = useMutation(api.friends.acceptInvite);
+  const displayName = useDisplayName();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   if (info === undefined) return <p role="status">Cargando la invitación…</p>;
@@ -281,7 +288,7 @@ export function FriendInvite({ code }: { code: string }) {
             setPending(true);
             setError("");
             try {
-              await accept({ code });
+              await accept({ code, displayName });
             } catch {
               setError(
                 "No pudimos aceptar la invitación. Puede que el enlace haya vencido.",

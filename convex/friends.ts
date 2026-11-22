@@ -16,7 +16,11 @@ function fail(kind: string, message: string): never {
   throw new ConvexError({ kind, message });
 }
 
-async function requireUser(ctx: Pick<QueryCtx, "auth">) {
+// The team's Clerk session token carries no name claim, so the client sends the name to show.
+// It is only a label for the friend who shares or opens the link: nothing is authorized by it.
+const displayNameArg = { displayName: v.optional(v.string()) };
+
+async function requireUser(ctx: Pick<QueryCtx, "auth">, displayName?: string) {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) fail("Unauthorized", "sign in to manage your friends");
   return {
@@ -24,6 +28,7 @@ async function requireUser(ctx: Pick<QueryCtx, "auth">) {
     name: (
       identity.name?.trim() ||
       identity.givenName?.trim() ||
+      displayName?.trim() ||
       "Sin nombre"
     ).slice(0, 120),
   };
@@ -54,10 +59,10 @@ async function inviteRow(ctx: Pick<QueryCtx, "db">, code: string) {
 
 // A user has one link at a time: a new one replaces the previous one, used or not.
 export const createInvite = mutation({
-  args: {},
+  args: displayNameArg,
   returns: v.object({ code: v.string(), expiresAt: v.number() }),
-  handler: async (ctx) => {
-    const user = await requireUser(ctx);
+  handler: async (ctx, { displayName }) => {
+    const user = await requireUser(ctx, displayName);
     const previous = await ctx.db
       .query("friendInvites")
       .withIndex("by_inviterTokenIdentifier", (q) =>
@@ -135,10 +140,10 @@ async function befriend(
 }
 
 export const acceptInvite = mutation({
-  args: { code: v.string() },
+  args: { code: v.string(), ...displayNameArg },
   returns: v.null(),
-  handler: async (ctx, { code }) => {
-    const user = await requireUser(ctx);
+  handler: async (ctx, { code, displayName }) => {
+    const user = await requireUser(ctx, displayName);
     const row = await inviteRow(ctx, code);
     if (!row || row.usedAt !== undefined || row.expiresAt <= Date.now()) {
       fail("InvalidArgument", "invalid, used or expired friend link");
