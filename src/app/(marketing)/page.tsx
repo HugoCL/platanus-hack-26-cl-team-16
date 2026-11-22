@@ -1,11 +1,5 @@
 import Link from "next/link";
 import { SiteHeader } from "@/components/directory/site-header";
-import {
-  ClaudeLogo,
-  GeminiLogo,
-  GrokLogo,
-  OpenAILogo,
-} from "@/components/landing/agent-logos";
 import { CopyAgentPrompt } from "@/components/landing/copy-agent-prompt";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { ListingWall } from "@/components/landing/listing-wall";
@@ -15,17 +9,6 @@ import { ScrollReveal } from "@/components/landing/scroll-reveal";
 import { SectionScroll } from "@/components/landing/section-scroll";
 import { Spotlight } from "@/components/landing/spotlight";
 import { SiteFooter } from "@/components/site-footer";
-
-const AGENTS = [
-  ["Claude", ClaudeLogo],
-  ["ChatGPT", OpenAILogo],
-  ["Grok", GrokLogo],
-  ["Gemini", GeminiLogo],
-] as const;
-
-const AGENT_NAMES = new Intl.ListFormat("es", { type: "conjunction" }).format(
-  AGENTS.map(([name]) => name),
-);
 
 export default function Home() {
   return (
@@ -53,20 +36,8 @@ export default function Home() {
                 <span>Explorar el directorio</span>
                 <span aria-hidden>→</span>
               </Link>
-              <Link href="/room/demo" className="landing-secondary">
-                Ver una sala en vivo
-              </Link>
+              <CopyAgentPrompt />
             </div>
-          </div>
-          <div className="landing-agents" {...revealAt(12)}>
-            <ul aria-hidden>
-              {AGENTS.map(([name, Logo]) => (
-                <li key={name}>
-                  <Logo />
-                </li>
-              ))}
-            </ul>
-            <p>Funciona con {AGENT_NAMES}</p>
           </div>
         </section>
         <RoomSection />
