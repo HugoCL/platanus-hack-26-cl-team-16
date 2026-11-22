@@ -172,6 +172,33 @@ describe("mcpOauth.credential", () => {
     expect((await post("Bearer token-ana")).status).toBe(401);
     expect(await agentsOf("user_ana")).toHaveLength(1);
   });
+
+  it("keeps the same agent, with a new key, when the secret is rotated", async () => {
+    const { apiKey: before } = await credential(SECRET);
+    vi.stubEnv("MCP_OAUTH_SECRET", "rotated-secret");
+    expect(await errorKind(credential(SECRET))).toBe("Unauthorized");
+    const { apiKey: after } = await credential("rotated-secret");
+
+    expect(after).not.toBe(before);
+    const [agent, ...others] = await agentsOf("user_ana");
+    expect(others).toHaveLength(0);
+    const authenticate = (apiKey: string) =>
+      t.mutation(api.agentKeys.authenticate, { apiKey });
+    expect(await authenticate(before)).toBeNull();
+    expect(await authenticate(after)).toMatchObject({ agentId: agent._id });
+  });
+
+  it("refuses to key an agent that is no longer the person's", async () => {
+    await credential(SECRET);
+    const [agent] = await agentsOf("user_ana");
+    await t.run((ctx) =>
+      ctx.db.patch(agent._id, {
+        ownerTokenIdentifier: `${ISSUER}|user_bruno`,
+      }),
+    );
+    vi.stubEnv("MCP_OAUTH_SECRET", "rotated-secret");
+    expect(await errorKind(credential("rotated-secret"))).toBe("Conflict");
+  });
 });
 
 describe("OAuth configuration", () => {

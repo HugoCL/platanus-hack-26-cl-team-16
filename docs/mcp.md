@@ -38,7 +38,7 @@ Claude, ChatGPT y otros asistentes que no guardan una API key se conectan con OA
 Para activarlo, un humano hace tres cosas:
 
 1. En el dashboard de Clerk, **Agents → MCP servers → Add MCP server**, con la URL completa del endpoint (`https://<servicio>.onrender.com/api/mcp`; para desarrollo, `http://localhost:3000/api/mcp`). Marca **Allow public clients to connect** para que Claude o ChatGPT se conecten sin registrarlos a mano; al agregar el primer servidor Clerk activa el claim de audiencia.
-2. Define `MCP_OAUTH_SECRET` con el mismo valor aleatorio y privado en Convex y en Next.js (Render, o `.env.local`). Con él la ruta le prueba a Convex que ya verificó el token.
+2. Define `MCP_OAUTH_SECRET` con el mismo valor aleatorio y privado en Convex y en Next.js (Render, o `.env.local`). Con él la ruta le prueba a Convex que ya verificó el token. Si lo cambias, cada persona conserva su agente y sus salas; solo cambia la key interna.
 3. En local, define también `MCP_PUBLIC_ORIGIN=http://localhost:3000` y usa las llaves de Clerk del equipo.
 
 OAuth queda apagado, y el endpoint solo acepta API keys, si falta el secreto o el origen público, o si las llaves de Clerk son de otra app que la de `convex/auth.config.ts` (por ejemplo, en modo keyless).
