@@ -413,7 +413,6 @@ export const readInvitations = internalQuery({
 });
 
 const SESSION_LIMIT = 20;
-const SESSION_SCAN_LIMIT = 200;
 
 type AgentSession = {
   sessionId: Id<"sessions">;
@@ -430,46 +429,43 @@ export const sessions = action({
   },
 });
 
-// The active rooms the calling agent is in, so an agent in a new conversation
+// The active rooms the calling agent started, newest first, so an agent in a new conversation
 // finds a room it opened earlier, or one its owner set up for it, without being handed its id.
+// Rooms it joined as a guest are in `readInvitations`.
 export const readSessions = internalQuery({
   args: { apiKey: v.string() },
   handler: async (ctx, { apiKey }): Promise<AgentSessions> => {
     const { agent } = await callerCredential(ctx, apiKey);
+    const rows = await ctx.db
+      .query("sessions")
+      .withIndex("by_initiatorAgentId_and_status", (q) =>
+        q.eq("initiatorAgentId", agent._id).eq("status", "active"),
+      )
+      .order("desc")
+      .take(SESSION_LIMIT + 1);
     const sessions: AgentSession[] = [];
-    let truncated = false;
-    let scanned = 0;
-    const rows = ctx.db
-      .query("participants")
-      .withIndex("by_agentId_and_sessionId", (q) => q.eq("agentId", agent._id))
-      .order("desc");
-    // Closed rooms keep their rows, so they are skipped instead of counting against the list.
-    for await (const row of rows) {
-      if (
-        sessions.length === SESSION_LIMIT ||
-        scanned++ === SESSION_SCAN_LIMIT
-      ) {
-        truncated = true;
-        break;
+    for (const { _id: sessionId } of rows.slice(0, SESSION_LIMIT)) {
+      const room = await loadSession(ctx, sessionId);
+      let me: Id<"participants"> | undefined;
+      for await (const row of ctx.db
+        .query("participants")
+        .withIndex("by_agentId_and_sessionId", (q) =>
+          q.eq("agentId", agent._id).eq("sessionId", sessionId),
+        )) {
+        if (row.leftAt === undefined) me = row._id;
       }
-      if (row.leftAt !== undefined) continue;
-      const room = await loadSession(ctx, row.sessionId);
-      if (room?.status !== "active") continue;
+      if (!room || !me) continue;
       const agents: AgentSession["agents"] = [];
       for (const p of room.participants) {
-        if (p.kind !== "agent" || p.participantId === row._id) continue;
+        if (p.kind !== "agent" || p.participantId === me) continue;
         const other = await ctx.db.get("agents", p.agentId as Id<"agents">);
         agents.push({
           participantId: p.participantId as Id<"participants">,
           name: other?.name ?? "Agente",
         });
       }
-      sessions.push({
-        sessionId: row.sessionId,
-        request: room.intent.description,
-        agents,
-      });
+      sessions.push({ sessionId, request: room.intent.description, agents });
     }
-    return { sessions, truncated };
+    return { sessions, truncated: rows.length > SESSION_LIMIT };
   },
 });

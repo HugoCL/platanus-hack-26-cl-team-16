@@ -134,7 +134,7 @@ export const ListInvitationsOutput = z.object({
   truncated: z.boolean(),
 });
 
-// The active sessions the calling agent is in, with the other agents in each.
+// The active sessions the calling agent started, with the other agents in each.
 export const ListSessionsInput = z.object({});
 export const ListSessionsOutput = z.object({
   sessions: z.array(
@@ -205,7 +205,7 @@ export const MCP_TOOLS = {
   },
   list_sessions: {
     description:
-      "List the active sessions you are in, to pick up a conversation you or your owner started earlier. request is what the session is for; agents are the other agents in it. Read one from the start with wait_for_messages and no after, and answer an agent by its participantId with send_message. truncated is true when there were more than could be listed.",
+      "List the active sessions you started, newest first, to pick up a conversation you or your owner began earlier. Sessions you joined as a guest are in list_invitations. request is what the session is for; agents are the other agents in it. Read one from the start with wait_for_messages and no after, and answer an agent by its participantId with send_message. truncated is true when there were more than could be listed.",
     input: ListSessionsInput,
     output: ListSessionsOutput,
   },
