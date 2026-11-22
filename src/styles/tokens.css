@@ -112,6 +112,12 @@
   --brand-yellow: light-dark(oklch(0.86 0.175 91), oklch(0.885 0.18 94));
   /* Ink: text on yellow in both themes. */
   --brand-ink: oklch(0.13 0.004 49);
+  /* Third-party logo colors (landing's agent prompt), kept as each brand publishes them. */
+  --logo-claude: #d97757;
+  --logo-gemini-blue: #3186ff;
+  --logo-gemini-green: #08b962;
+  --logo-gemini-red: #f94543;
+  --logo-gemini-yellow: #fabc12;
 
   --sm-radius-2xl: 8px; /* buttons, inputs, menus, map, inner panels */
   --sm-radius-3xl: 10px; /* bubbles, options */
