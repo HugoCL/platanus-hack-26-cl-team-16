@@ -465,6 +465,34 @@ describe("the judge prompt", () => {
     expect(prompt.match(/<\/mensaje>/g)).toHaveLength(1);
     expect(prompt).toContain("\\u003c/mensaje>");
   });
+
+  it("tells the judges whose side a human speaks for", async () => {
+    const input = moderationInput(caseById("clinica-pide-hora"));
+    const provider = input.participants.find(
+      (p) => p.kind === "agent" && p.role === "recipient",
+    );
+    if (provider?.kind !== "agent") throw new Error("no provider in the case");
+    const { llm, prompts } = scriptedJudge();
+    await createModerator({ llm }).moderate({
+      ...input,
+      participants: [
+        ...input.participants,
+        {
+          participantId: "operadora",
+          kind: "human",
+          displayName: "Li",
+          role: "operator",
+          onBehalfOfAgentId: provider.agentId,
+        },
+      ],
+    });
+    expect(prompts).toHaveLength(2);
+    for (const { prompt } of prompts) {
+      expect(prompt).toContain(
+        `operadora (humano, operator, habla por ${provider.participantId})`,
+      );
+    }
+  });
 });
 
 describe("beforeJudge", () => {
