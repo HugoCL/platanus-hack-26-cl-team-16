@@ -184,6 +184,34 @@ describe("room invitations", () => {
     expect(await errorKind(invite())).toBe("AlreadyParticipant");
   });
 
+  it("takes one guest agent per friend, so its owner sees what the moderator withholds from it", async () => {
+    const { juan, beto, invite, invitationId, sessionId, members } =
+      await setup();
+    const second = await beto.mutation(api.agentBuilder.createDraft, {
+      name: "Tienda de Beto",
+      summary: "Atiende la tienda de Beto",
+    });
+    const inviteSecond = () =>
+      juan.mutation(api.roomInvitations.invite, {
+        sessionId,
+        agentId: second.agentId,
+      });
+    await invite();
+    expect(await inviteSecond()).toEqual({ status: "pending" });
+    const first = (await invitationId()) as Id<"roomInvitations">;
+    const pending = await beto.query(api.roomInvitations.inbox, {});
+    await respond(beto, first);
+    const other = pending.find((row) => row.invitationId !== first);
+    expect(
+      await errorKind(
+        respond(beto, other?.invitationId as Id<"roomInvitations">),
+      ),
+    ).toBe("OwnerHasGuest");
+    await respond(beto, other?.invitationId as Id<"roomInvitations">, false);
+    expect(await errorKind(inviteSecond())).toBe("OwnerHasGuest");
+    expect(await members()).toHaveLength(5);
+  });
+
   it("voids a pending invitation once the friendship ends or the room closes", async () => {
     const { juan, beto, invite, invitationId, sessionId, members } =
       await setup();

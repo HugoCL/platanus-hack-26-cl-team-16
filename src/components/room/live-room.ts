@@ -107,6 +107,8 @@ export function inviteError(error: unknown) {
       return "Ese agente ya está en la sala.";
     case "AlreadyAnswered":
       return "Esa invitación ya fue respondida.";
+    case "OwnerHasGuest":
+      return "Ese amigo ya tiene un agente en la sala.";
     case "RoomFull":
       return "La sala está llena.";
     case "RoomNotActive":
