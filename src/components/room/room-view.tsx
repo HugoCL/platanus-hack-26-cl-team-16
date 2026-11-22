@@ -106,9 +106,7 @@ export function DemoRoom({
       status={sessionEnd(room.messages)?.status ?? "active"}
       messages={room.messages}
       answers={room.answers}
-      typingName={
-        fixture.participants.find((p) => p.participantId === room.typing)?.name
-      }
+      typing={fixture.participants.find((p) => p.participantId === room.typing)}
       onRespond={room.respond}
       onSendText={room.sendText}
       onRestart={room.reset}
@@ -128,7 +126,7 @@ export function RoomView({
   messages,
   answers,
   violationCount,
-  typingName,
+  typing,
   onRespond,
   onSendText,
   onCloseRoom,
@@ -147,7 +145,7 @@ export function RoomView({
   messages: RoomMessage[];
   answers: Record<string, GenUiAnswer>;
   violationCount?: number;
-  typingName?: string;
+  typing?: RoomParticipant;
   sessions?: { sessionId: string; name: string; intent: string }[];
   onRespond: (response: UiResponse, inReplyTo: string) => void;
   onSendText: (text: string) => void | Promise<boolean | void>;
@@ -249,7 +247,7 @@ export function RoomView({
               Cerrar sala
             </Button>
           ) : null}
-          <Thread messages={messages} typingName={typingName} blocked={blocked}>
+          <Thread messages={messages} typing={typing} blocked={blocked}>
             {messages.map((message, i) => {
               const prev = messages[i - 1];
               const day = formatLongDay(message.sentAt);
@@ -459,8 +457,8 @@ function SessionList({
         className="relative flex items-start gap-3 bg-muted px-6 py-3 !text-foreground !no-underline before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-foreground"
       >
         <span className="flex -space-x-2">
-          <Avatar participant={self} size={28} />
           <Avatar participant={other} size={28} />
+          <Avatar participant={self} size={28} />
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-sm font-medium">{other?.name}</span>
@@ -500,8 +498,8 @@ function SessionHeader({
     <header className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-border px-5 py-4">
       <div className="flex min-w-0 flex-[1_1_18rem] items-center gap-3">
         <span className="hidden shrink-0 -space-x-2.5 sm:flex">
-          <Avatar participant={self} size={36} />
           <Avatar participant={other} size={36} />
+          <Avatar participant={self} size={36} />
         </span>
         <div className="flex min-w-0 flex-col gap-0.5">
           <h1 className="m-0 flex min-w-0 items-center gap-1 text-lg leading-tight font-semibold tracking-tight">
@@ -555,12 +553,12 @@ function DayDivider({ label }: { label: string }) {
 function Thread({
   blocked,
   messages,
-  typingName,
+  typing,
   children,
 }: {
   blocked: number;
   messages: RoomMessage[];
-  typingName?: string;
+  typing?: RoomParticipant;
   children: React.ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -602,7 +600,7 @@ function Thread({
         }}
         className="flex h-full flex-col gap-6 overflow-y-auto px-4 py-6"
       >
-        {messages.length === 0 && !typingName ? (
+        {messages.length === 0 && !typing ? (
           <p className="m-auto text-center text-sm text-subtle-foreground">
             Esperando el primer mensaje de los agentes…
           </p>
@@ -616,10 +614,12 @@ function Thread({
         >
           {children}
         </section>
-        <p className="m-0 mx-auto h-5 w-full max-w-3xl shrink-0 text-xs text-subtle-foreground">
-          {typingName ? (
+        <p
+          className={`m-0 mx-auto h-5 w-full max-w-3xl shrink-0 px-1 text-xs text-subtle-foreground ${typing?.side === "self" ? "text-right" : ""}`}
+        >
+          {typing ? (
             <>
-              <span className="room-typing" aria-hidden="true" /> {typingName}{" "}
+              <span className="room-typing" aria-hidden="true" /> {typing.name}{" "}
               está escribiendo…
             </>
           ) : null}
