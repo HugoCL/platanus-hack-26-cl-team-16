@@ -134,6 +134,21 @@ export const ListInvitationsOutput = z.object({
   truncated: z.boolean(),
 });
 
+// The active sessions the calling agent is in, with the other agents in each.
+export const ListSessionsInput = z.object({});
+export const ListSessionsOutput = z.object({
+  sessions: z.array(
+    z.object({
+      sessionId,
+      request: z.string(),
+      agents: z.array(
+        z.object({ participantId: z.string().min(1), name: z.string() }),
+      ),
+    }),
+  ),
+  truncated: z.boolean(),
+});
+
 export const MCP_TOOLS = {
   search_agents: {
     description:
@@ -187,6 +202,12 @@ export const MCP_TOOLS = {
       'List the sessions you were asked into as a guest. "pending": your owner has not answered yet; they approve or reject on this site, you cannot. "approved": you are in the session, so read it with wait_for_messages and answer with send_message. As a guest you see the session from the moment you joined. truncated is true when there were more than could be listed.',
     input: ListInvitationsInput,
     output: ListInvitationsOutput,
+  },
+  list_sessions: {
+    description:
+      "List the active sessions you are in, to pick up a conversation you or your owner started earlier. request is what the session is for; agents are the other agents in it. Read one from the start with wait_for_messages and no after, and answer an agent by its participantId with send_message. truncated is true when there were more than could be listed.",
+    input: ListSessionsInput,
+    output: ListSessionsOutput,
   },
 } as const;
 export type McpToolName = keyof typeof MCP_TOOLS;

@@ -411,3 +411,65 @@ export const readInvitations = internalQuery({
     return { invitations, truncated };
   },
 });
+
+const SESSION_LIMIT = 20;
+const SESSION_SCAN_LIMIT = 200;
+
+type AgentSession = {
+  sessionId: Id<"sessions">;
+  request: string;
+  agents: { participantId: Id<"participants">; name: string }[];
+};
+type AgentSessions = { sessions: AgentSession[]; truncated: boolean };
+
+export const sessions = action({
+  args: { apiKey: v.string() },
+  handler: async (ctx, args): Promise<AgentSessions> => {
+    await chargeRequest(ctx, args.apiKey);
+    return ctx.runQuery(internal.mcpRooms.readSessions, args);
+  },
+});
+
+// The active rooms the calling agent is in, so an agent in a new conversation
+// finds a room it opened earlier, or one its owner set up for it, without being handed its id.
+export const readSessions = internalQuery({
+  args: { apiKey: v.string() },
+  handler: async (ctx, { apiKey }): Promise<AgentSessions> => {
+    const { agent } = await callerCredential(ctx, apiKey);
+    const sessions: AgentSession[] = [];
+    let truncated = false;
+    let scanned = 0;
+    const rows = ctx.db
+      .query("participants")
+      .withIndex("by_agentId_and_sessionId", (q) => q.eq("agentId", agent._id))
+      .order("desc");
+    // Closed rooms keep their rows, so they are skipped instead of counting against the list.
+    for await (const row of rows) {
+      if (
+        sessions.length === SESSION_LIMIT ||
+        scanned++ === SESSION_SCAN_LIMIT
+      ) {
+        truncated = true;
+        break;
+      }
+      if (row.leftAt !== undefined) continue;
+      const room = await loadSession(ctx, row.sessionId);
+      if (room?.status !== "active") continue;
+      const agents: AgentSession["agents"] = [];
+      for (const p of room.participants) {
+        if (p.kind !== "agent" || p.participantId === row._id) continue;
+        const other = await ctx.db.get("agents", p.agentId as Id<"agents">);
+        agents.push({
+          participantId: p.participantId as Id<"participants">,
+          name: other?.name ?? "Agente",
+        });
+      }
+      sessions.push({
+        sessionId: row.sessionId,
+        request: room.intent.description,
+        agents,
+      });
+    }
+    return { sessions, truncated };
+  },
+});
