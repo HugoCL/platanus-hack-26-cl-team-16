@@ -13,6 +13,7 @@ import {
   canSeeContent,
   countViolations,
   describeUiResponse,
+  formatLastActivity,
   formatTime,
   groupSlotsByDay,
   initials,
@@ -168,6 +169,19 @@ describe("GenUI interaction state", () => {
       });
     },
   );
+});
+
+describe("formatLastActivity", () => {
+  const now = Date.parse("2026-11-22T16:20:00-03:00");
+  it.each([
+    ["2026-11-22T09:05:00-03:00", "09:05"],
+    ["2026-11-21T16:20:00-03:00", "Sáb 21"],
+    ["2026-03-22T12:00:00-03:00", "22 mar"],
+    ["2026-02-22T09:30:00-03:00", "22 feb"],
+    ["2025-11-22T10:00:00-03:00", "22 nov 2025"],
+  ])("formats %s as %s", (at, label) => {
+    expect(formatLastActivity(Date.parse(at), now)).toBe(label);
+  });
 });
 
 describe("formatting", () => {

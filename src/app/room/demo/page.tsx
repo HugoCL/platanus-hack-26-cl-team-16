@@ -25,7 +25,7 @@ export default async function RoomDemoPage({
         fixture={ROOM_DATASETS[dataset].fixture}
         instant={dataset !== "demo"}
       />
-      {DEV ? <DataToggle current={dataset} /> : null}
+      {DEV ? <DataToggle datasets={ROOM_DATASETS} current={dataset} /> : null}
     </>
   );
 }

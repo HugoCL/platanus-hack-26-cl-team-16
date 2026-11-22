@@ -163,11 +163,33 @@ export function formatSlot(at: number | string) {
   return `${formatDay(at)} · ${formatTime(at)}`;
 }
 
-// A room in a list: the time when it was active today, else the day.
+const monthDayFormat = new Intl.DateTimeFormat("es-CL", {
+  day: "numeric",
+  month: "short",
+  timeZone: SANTIAGO,
+});
+
+const fullDateFormat = new Intl.DateTimeFormat("es-CL", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  timeZone: SANTIAGO,
+});
+
+const yearFormat = new Intl.DateTimeFormat("es-CL", {
+  year: "numeric",
+  timeZone: SANTIAGO,
+});
+
+// A room in a list: "16:15" today, "Sáb 21" this week, "22 mar" this year, "22 nov 2025" before.
 export function formatLastActivity(at: number, now = Date.now()) {
-  return formatLongDay(at) === formatLongDay(now)
-    ? formatTime(at)
-    : formatDay(at);
+  if (formatLongDay(at) === formatLongDay(now)) return formatTime(at);
+  if (now - at < 6 * 86_400_000) return formatDay(at);
+  const format =
+    yearFormat.format(at) === yearFormat.format(now)
+      ? monthDayFormat
+      : fullDateFormat;
+  return format.format(at).replaceAll(".", "");
 }
 
 export function violationTone(count: number, max: number) {
