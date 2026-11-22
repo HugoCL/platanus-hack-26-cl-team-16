@@ -201,6 +201,37 @@ describe("room invitations", () => {
     expect(await errorKind(invite())).toBe("RoomNotActive");
   });
 
+  it("hides the room's blocked messages from the invited owner, except their own", async () => {
+    const { juan, beto, invite, invitationId, sessionId } = await setup();
+    await invite();
+    await respond(beto, (await invitationId()) as Id<"roomInvitations">);
+    const card = "Mi tarjeta es 4111 1111 1111 1111";
+    const send = (caller: typeof juan, text: string) =>
+      caller.action(api.gate.send, {
+        sessionId,
+        recipient: "all",
+        content: { kind: "text", text },
+      });
+    expect(await send(juan, card)).toMatchObject({ status: "blocked" });
+    expect(await send(beto, `${card}.`)).toMatchObject({ status: "blocked" });
+    const texts = async (caller: typeof juan) =>
+      [
+        ...(await caller.query(api.gate.history, { sessionId })),
+        ...(
+          await caller.query(api.gate.historyPage, {
+            sessionId,
+            paginationOpts: { numItems: 50, cursor: null },
+          })
+        ).page,
+      ].flatMap((m) =>
+        m.status === "blocked" && m.content.kind === "text"
+          ? [m.content.text]
+          : [],
+      );
+    expect(await texts(juan)).toEqual([card, `${card}.`, card, `${card}.`]);
+    expect(await texts(beto)).toEqual([`${card}.`, `${card}.`]);
+  });
+
   it("gives a guest agent no hosted turn", async () => {
     const { t, juan, beto, invite, invitationId, sessionId } = await setup();
     await invite();

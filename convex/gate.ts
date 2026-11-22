@@ -36,6 +36,7 @@ import {
 } from "./roomMessages";
 import {
   loadSession,
+  MAX_PARTICIPANTS,
   requireRoomHuman,
   toMessage,
   toParticipant,
@@ -409,7 +410,9 @@ export const replyContext = internalQuery({
       message: toMessage(source),
       contract: room.contract,
       participants: room.participants,
-      history: recent.filter((message) => visibleTo(message, viewer)),
+      history: recent.filter((message) =>
+        visibleTo(message, viewer, room.participants),
+      ),
     };
   },
 });
@@ -542,7 +545,8 @@ async function historyForViewer(
   viewer: Participant,
 ) {
   const messages = await recentMessages(ctx, sessionId);
-  return messages.filter((message) => visibleTo(message, viewer));
+  const participants = await roomParticipants(ctx, sessionId);
+  return messages.filter((message) => visibleTo(message, viewer, participants));
 }
 
 export const historyPage = query({
@@ -577,12 +581,21 @@ async function historyPageForViewer(
         HISTORY_BYTE_BUDGET,
       ),
     });
+  const participants = await roomParticipants(ctx, sessionId);
   return {
     ...result,
     page: result.page
       .map(toMessage)
-      .filter((message) => visibleTo(message, viewer)),
+      .filter((message) => visibleTo(message, viewer, participants)),
   };
+}
+
+async function roomParticipants(ctx: QueryCtx, sessionId: Id<"sessions">) {
+  const rows = await ctx.db
+    .query("participants")
+    .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+    .take(MAX_PARTICIPANTS);
+  return rows.map(toParticipant);
 }
 
 async function roomViewer(
