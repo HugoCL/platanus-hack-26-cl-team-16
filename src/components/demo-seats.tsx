@@ -16,7 +16,7 @@ import { useState } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { DEMO_KNOWLEDGE, type DemoSeat } from "@/shared/demo-pcb";
-import { PERSONAL_AGENT_SLUG_PREFIX } from "@/shared/mcp";
+import { isPersonalAgentSlug } from "@/shared/mcp";
 
 // What each seat's holder pastes into their assistant. The manufacturer's own agent replaces
 // the hosted one, so its message carries the price list the hosted agent quotes from.
@@ -107,9 +107,7 @@ function Seats() {
   const name = user?.fullName || user?.username || undefined;
   // Newest first: after an assistant is deleted and connected again, the newest is the live one.
   const agents = (ownAgents ?? []).toReversed();
-  const removable = agents.filter(
-    (agent) => !agent.slug.startsWith(PERSONAL_AGENT_SLUG_PREFIX),
-  );
+  const removable = agents.filter((agent) => !isPersonalAgentSlug(agent.slug));
   const old = removable.filter((agent) => agent !== agents[0]);
 
   if (demo === undefined) return <p role="status">Cargando la demo…</p>;

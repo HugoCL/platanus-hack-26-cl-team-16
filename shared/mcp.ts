@@ -177,6 +177,13 @@ export const ListFriendsOutput = z.object({
 
 // The slug of the agent a person gets when their assistant signs in with OAuth starts with this.
 export const PERSONAL_AGENT_SLUG_PREFIX = "agente-personal-";
+const PERSONAL_AGENT_SLUG = new RegExp(
+  `^${PERSONAL_AGENT_SLUG_PREFIX}[0-9a-f]{24}$`,
+);
+// Whether a slug is that agent's. A registered agent's slug ends in a UUID, so one named "Agente
+// personal" does not pass for it.
+export const isPersonalAgentSlug = (slug: string) =>
+  PERSONAL_AGENT_SLUG.test(slug);
 
 export const MCP_TOOLS = {
   search_agents: {

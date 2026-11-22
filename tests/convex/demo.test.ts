@@ -705,7 +705,7 @@ describe("demo room, a seat through its holder's own agent", () => {
     );
     const personal = await ownAgent(
       CARO_TOKEN,
-      `${PERSONAL_AGENT_SLUG_PREFIX}abc`,
+      `${PERSONAL_AGENT_SLUG_PREFIX}0123456789abcdef01234567`,
       "Mi agente personal",
     );
     for (const refused of [theirs.agentId, personal.agentId]) {
@@ -727,5 +727,17 @@ describe("demo room, a seat through its holder's own agent", () => {
       expect((await rooms(apiKey)).sessions).toEqual([]);
     }
     expect(await caro().query(api.agentRegistration.mine, {})).toHaveLength(2);
+  });
+
+  it("removes a registered agent that is only named like the one from signing in", async () => {
+    await reset();
+    const { agentId, apiKey } = await ownAgent(
+      CARO_TOKEN,
+      `${PERSONAL_AGENT_SLUG_PREFIX}8f14e45f-ceea-467f-a9f1-0c1b2d3e4f5a`,
+      "Agente personal",
+    );
+    await caro().mutation(api.demo.forgetAgents, { agentIds: [agentId] });
+    expect(await errorKind(rooms(apiKey))).toBe("Unauthorized");
+    expect(await caro().query(api.agentRegistration.mine, {})).toEqual([]);
   });
 });

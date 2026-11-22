@@ -14,7 +14,7 @@ import {
   DEMO_SEATS,
   type DemoSeat,
 } from "../shared/demo-pcb";
-import { PERSONAL_AGENT_SLUG_PREFIX } from "../shared/mcp";
+import { isPersonalAgentSlug } from "../shared/mcp";
 import { CONSUMER_AGENT_SLUG, SEED_AGENTS } from "../shared/seed-data";
 import type { SessionContract } from "../shared/session";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -631,7 +631,7 @@ export const forgetAgents = mutation({
     }
     for (const agentId of agentIds) {
       const agent = await ownAgent(ctx, agentId, tokenIdentifier);
-      if (!agent || agent.slug.startsWith(PERSONAL_AGENT_SLUG_PREFIX)) {
+      if (!agent || isPersonalAgentSlug(agent.slug)) {
         fail("NotYourAgent", "you can only remove a linked agent of your own");
       }
       await retireAgent(ctx, agent);
