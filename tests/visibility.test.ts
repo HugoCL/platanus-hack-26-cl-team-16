@@ -28,7 +28,7 @@ const participants: Participant[] = [
     kind: "agent",
     agentId: "a3",
     role: "guest",
-    joinedAt: 100,
+    joinedAt: 100.4,
   },
   {
     participantId: "beto",
@@ -61,11 +61,22 @@ describe("what a guest side sees", () => {
     ["the guest agent", guest],
     ["the human it brought", beto],
   ])("hides from %s what was said before it joined", (_who, viewer) => {
-    expect(visibleTo(message("juan", "Hola", 99), viewer, participants)).toBe(
+    const at = (createdAt: number) =>
+      visibleTo(
+        message("juan", "Hola", Math.floor(createdAt)),
+        viewer,
+        participants,
+        createdAt,
+      );
+    expect(at(99)).toBe(false);
+    expect(at(100.3)).toBe(false);
+    expect(at(100.5)).toBe(true);
+    expect(at(101)).toBe(true);
+  });
+
+  it("keeps a message from the join millisecond hidden when its exact time is unknown", () => {
+    expect(visibleTo(message("juan", "Hola", 100), guest, participants)).toBe(
       false,
-    );
-    expect(visibleTo(message("juan", "Hola", 100), viewer, participants)).toBe(
-      true,
     );
   });
 

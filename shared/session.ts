@@ -44,8 +44,9 @@ export const Participant = z.discriminatedUnion("kind", [
     kind: z.literal("agent"),
     agentId: id,
     role: AgentParticipantRole,
-    // Set for a guest: its side sees the room from this moment on.
-    joinedAt: z.number().int().nonnegative().optional(),
+    // Set for a guest: its side sees the room from this moment on. Unrounded, so it orders
+    // against messages created in the same millisecond.
+    joinedAt: z.number().nonnegative().optional(),
   }),
   z.object({
     participantId: id,

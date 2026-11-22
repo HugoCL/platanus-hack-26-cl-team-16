@@ -16,10 +16,13 @@ export function guestOf(viewer: Participant, participants: Participant[]) {
 
 // A guest side sees its own messages, and of the rest only what was delivered after it joined
 // and carries no RUT: the room lets the consumer hand a RUT to the provider, not to a guest.
+// `createdAt` is the message's unrounded creation time. `sentAt` is rounded down, so without it
+// a message from the millisecond the guest joined in stays hidden, never shown by mistake.
 export function visibleTo(
   message: Message,
   viewer: Participant,
   participants: Participant[],
+  createdAt: number = message.sentAt,
 ): boolean {
   const guest = guestOf(viewer, participants);
   const audits = viewer.kind === "human" && !guest;
@@ -37,7 +40,5 @@ export function visibleTo(
   if (message.status === "blocked") return audits || mine;
   if (!DELIVERABLE_STATUSES.includes(message.status)) return false;
   if (!guest || mine) return true;
-  return (
-    message.sentAt >= (guest.joinedAt ?? 0) && !carriesRut(message.content)
-  );
+  return createdAt > (guest.joinedAt ?? 0) && !carriesRut(message.content);
 }

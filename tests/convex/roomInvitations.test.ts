@@ -281,5 +281,11 @@ describe("room invitations", () => {
     );
     expect(await texts(beto)).toContain("Esto es de después.");
     expect(await texts(beto)).not.toContain("Esto es de antes.");
+    const notices = (await beto.query(api.gate.history, { sessionId })).filter(
+      (m) => m.senderParticipantId === null,
+    );
+    expect(notices).toMatchObject([
+      { content: { text: expect.stringMatching(/se unió a la sala/) } },
+    ]);
   });
 });

@@ -222,15 +222,15 @@ export const readMessages = internalQuery({
       },
     );
     return {
-      messages: page.messages
-        .map(toMessage)
-        .filter(
-          (m) =>
-            (m.recipient === "all" ||
-              m.recipient === viewer.participantId ||
-              m.senderParticipantId === viewer.participantId) &&
-            visibleTo(m, viewer, room.participants),
-        ),
+      messages: page.messages.flatMap((doc) => {
+        const m = toMessage(doc);
+        return (m.recipient === "all" ||
+          m.recipient === viewer.participantId ||
+          m.senderParticipantId === viewer.participantId) &&
+          visibleTo(m, viewer, room.participants, doc._creationTime)
+          ? [m]
+          : [];
+      }),
       cursor: page.cursor,
       sessionStatus: room.status,
     };

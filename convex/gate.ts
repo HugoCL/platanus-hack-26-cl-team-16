@@ -400,8 +400,13 @@ export const replyContext = internalQuery({
       (p) => p.participantId === recipient._id,
     );
     const message = toMessage(source);
-    if (!viewer || !visibleTo(message, viewer, room.participants)) return null;
-    const recent = await recentMessages(ctx, source.sessionId);
+    if (
+      !viewer ||
+      !visibleTo(message, viewer, room.participants, source._creationTime)
+    ) {
+      return null;
+    }
+    const recent = await recentDocs(ctx, source.sessionId);
     return {
       agent,
       self: recipient._id,
@@ -409,9 +414,7 @@ export const replyContext = internalQuery({
       message,
       contract: room.contract,
       participants: room.participants,
-      history: recent.filter((message) =>
-        visibleTo(message, viewer, room.participants),
-      ),
+      history: visibleMessages(recent, viewer, room.participants),
     };
   },
 });
@@ -501,7 +504,24 @@ export const reply = internalAction({
 });
 
 async function recentMessages(ctx: QueryCtx, sessionId: Id<"sessions">) {
-  const recent: Message[] = [];
+  return (await recentDocs(ctx, sessionId)).map(toMessage);
+}
+
+function visibleMessages(
+  docs: Doc<"messages">[],
+  viewer: Participant,
+  participants: Participant[],
+) {
+  return docs.flatMap((doc) => {
+    const message = toMessage(doc);
+    return visibleTo(message, viewer, participants, doc._creationTime)
+      ? [message]
+      : [];
+  });
+}
+
+async function recentDocs(ctx: QueryCtx, sessionId: Id<"sessions">) {
+  const recent: Doc<"messages">[] = [];
   let bytes = 0;
   for await (const doc of ctx.db
     .query("messages")
@@ -509,7 +529,7 @@ async function recentMessages(ctx: QueryCtx, sessionId: Id<"sessions">) {
     .order("desc")) {
     bytes += messageBytes(doc);
     if (bytes > HISTORY_BYTE_BUDGET && recent.length > 0) break;
-    recent.push(toMessage(doc));
+    recent.push(doc);
     if (recent.length === HISTORY_LIMIT) break;
   }
   return recent.reverse();
@@ -547,9 +567,9 @@ async function historyForViewer(
   sessionId: Id<"sessions">,
   viewer: Participant,
 ) {
-  const messages = await recentMessages(ctx, sessionId);
+  const docs = await recentDocs(ctx, sessionId);
   const participants = await roomParticipants(ctx, sessionId);
-  return messages.filter((message) => visibleTo(message, viewer, participants));
+  return visibleMessages(docs, viewer, participants);
 }
 
 export const historyPage = query({
@@ -587,9 +607,7 @@ async function historyPageForViewer(
   const participants = await roomParticipants(ctx, sessionId);
   return {
     ...result,
-    page: result.page
-      .map(toMessage)
-      .filter((message) => visibleTo(message, viewer, participants)),
+    page: visibleMessages(result.page, viewer, participants),
   };
 }
 

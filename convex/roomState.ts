@@ -76,7 +76,7 @@ export function toParticipant(p: Doc<"participants">): Participant {
       kind: "agent",
       agentId: p.agentId,
       role: p.role,
-      ...(p.role === "guest" ? { joinedAt: Math.floor(p._creationTime) } : {}),
+      ...(p.role === "guest" ? { joinedAt: p._creationTime } : {}),
     };
   }
   return {
