@@ -1,54 +1,55 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { UiSpec } from "@/shared/genui";
+import { liveAnswers } from "../room/live-room";
+import { MessageItem } from "../room/message-item";
+import {
+  countAgentTurns,
+  countViolations,
+  openingNotice,
+  type RoomMessage,
+  sessionEnd,
+  violationOrdinals,
+} from "../room/room-format";
+import { RoomHeader } from "../room/room-header";
+import {
+  REPLAY_CONTRACT,
+  REPLAY_PARTICIPANTS,
+  REPLAY_SCRIPT,
+  REPLAY_VIEWER,
+} from "./room-replay-script";
+import { buildReplayFrames, REST_MS } from "./room-replay-timeline";
 
-type Line =
-  | { kind: "system"; text: string }
-  | { kind: "self" | "other"; text: string }
-  | { kind: "slots"; slots: string[]; chosen: number }
-  | { kind: "redacted"; before: string; struck: string; note: string }
-  | { kind: "blocked"; note: string }
-  | { kind: "receipt"; title: string; detail: string };
+const FRAMES = buildReplayFrames(REPLAY_SCRIPT);
+const LAST = FRAMES.length - 1;
+const PARTICIPANTS = new Map(
+  REPLAY_PARTICIPANTS.map((p) => [p.participantId, p]),
+);
+const OTHER = REPLAY_PARTICIPANTS.find((p) => p.side === "other");
+const SELF = REPLAY_PARTICIPANTS.find((p) => p.side === "self");
+const UI_SPECS: Record<string, UiSpec> = Object.fromEntries(
+  REPLAY_SCRIPT.flatMap(({ message }) =>
+    message.content.kind === "ui"
+      ? [[message.messageId, message.content.spec]]
+      : [],
+  ),
+);
+const noop = () => {};
 
-const SCRIPT: Line[] = [
-  { kind: "system", text: "Sala abierta · contrato: reservar hora" },
-  {
-    kind: "self",
-    text: "Necesito hora con cardiólogo esta semana para Juan.",
-  },
-  {
-    kind: "slots",
-    slots: ["Mié 25 · 09:00", "Jue 26 · 10:30", "Jue 26 · 16:00"],
-    chosen: 1,
-  },
-  { kind: "self", text: "Jueves a las 10:30, por favor." },
-  {
-    kind: "redacted",
-    before: "Para confirmar necesito el RUT y ",
-    struck: "su historial médico completo",
-    note: "Tachado · pide datos fuera del contrato",
-  },
-  { kind: "blocked", note: "Bloqueado · intento de prompt injection" },
-  {
-    kind: "receipt",
-    title: "Reserva confirmada",
-    detail: "Jue 26 nov, 10:30 · Dra. Carolina Muñoz",
-  },
-];
-
-const STEP_MS = 1700;
-const REST_MS = 5000;
-
+// The landing's demo: the real room's parts (header, messages, moderator) playing a
+// scripted conversation on a loop. It pauses off screen, and under reduced motion it shows the
+// last frame and stays still.
 export function RoomReplay() {
   const ref = useRef<HTMLDivElement>(null);
-  const [shown, setShown] = useState(SCRIPT.length);
+  const [index, setIndex] = useState(LAST);
   const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
     const element = ref.current;
     if (!element) return;
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    setShown(1);
+    setIndex(0);
     const observer = new IntersectionObserver(
       ([entry]) => setPlaying(entry.isIntersecting),
       { threshold: 0.35 },
@@ -59,90 +60,115 @@ export function RoomReplay() {
 
   useEffect(() => {
     if (!playing) return;
-    const done = shown >= SCRIPT.length;
+    const done = index >= LAST;
     const timer = setTimeout(
-      () => setShown(done ? 1 : shown + 1),
-      done ? REST_MS : STEP_MS,
+      () => setIndex(done ? 0 : index + 1),
+      done ? REST_MS : FRAMES[index].holdMs,
     );
     return () => clearTimeout(timer);
-  }, [playing, shown]);
+  }, [playing, index]);
 
-  const faults = SCRIPT.slice(0, shown).filter(
-    (line) => line.kind === "redacted" || line.kind === "blocked",
-  ).length;
+  const { messages, typing } = FRAMES[index];
+  const answers = useMemo(() => liveAnswers(messages), [messages]);
+  const ordinals = useMemo(() => violationOrdinals(messages), [messages]);
+  const end = sessionEnd(messages);
+  const typist = typing ? PARTICIPANTS.get(typing) : undefined;
 
   return (
     <div
       ref={ref}
       className="landing-replay"
       role="img"
-      aria-label="Repetición de una sala: el agente de Juan reserva una hora con la clínica mientras el moderador tacha un pedido de datos y bloquea un intento de prompt injection."
+      aria-label="Repetición de una sala: los agentes de tres hermanos reservan una hora al cardiólogo para su mamá con el agente de una clínica. El moderador bloquea un intento de prompt injection, tacha un pedido de datos fuera del contrato y oculta el RUT al resto de la sala."
     >
-      <div className="landing-replay-head" aria-hidden>
-        <div>
-          <strong>Clínica Providencia</strong>
-          <span>con Mi agente (Juan)</span>
-        </div>
-        <div className="landing-replay-faults">
-          <span>Faltas</span>
-          {[0, 1, 2].map((slot) => (
-            <i key={slot} data-on={slot < faults || undefined} />
-          ))}
+      <div inert className="landing-replay-room">
+        <RoomHeader
+          self={SELF}
+          other={OTHER}
+          viewer={REPLAY_VIEWER}
+          participants={REPLAY_PARTICIPANTS}
+          contract={REPLAY_CONTRACT}
+          status={end?.status ?? "active"}
+          turns={countAgentTurns(messages, REPLAY_PARTICIPANTS)}
+          faults={countViolations(messages)}
+          onlyInterventions={false}
+          onOnlyInterventions={noop}
+          onOpenAudit={noop}
+        />
+        <div className="landing-replay-thread">
+          <div className="room-thread">
+            {messages.map((message, i) => (
+              <Entry
+                key={message.messageId}
+                message={message}
+                previous={messages[i - 1]}
+                answers={answers}
+                fault={ordinals.get(message.messageId)}
+              />
+            ))}
+          </div>
+          <p
+            data-mine={typist?.side === "self" ? "" : undefined}
+            className="room-thread room-typing-line"
+          >
+            {typist ? (
+              <span>
+                <span className="room-typing" aria-hidden="true" />{" "}
+                {typist.name} está escribiendo…
+              </span>
+            ) : null}
+          </p>
         </div>
       </div>
-      <ol aria-hidden>
-        {SCRIPT.slice(0, shown).map((line, index) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: the script is static and only grows.
-          <li key={index} data-kind={line.kind}>
-            <LineBody line={line} />
-          </li>
-        ))}
-      </ol>
     </div>
   );
 }
 
-function LineBody({ line }: { line: Line }) {
-  switch (line.kind) {
-    case "system":
-    case "self":
-    case "other":
-      return <p>{line.text}</p>;
-    case "slots":
-      return (
-        <div className="landing-replay-slots">
-          {line.slots.map((slot, index) => (
-            <span key={slot} data-chosen={index === line.chosen || undefined}>
-              {slot}
-            </span>
-          ))}
-        </div>
-      );
-    case "redacted":
-      return (
-        <>
-          <p>
-            {line.before}
-            <s>{line.struck}</s>
-          </p>
-          <small>{line.note}</small>
-        </>
-      );
-    case "blocked":
-      return (
-        <>
-          <p className="landing-replay-hatch">
-            Mensaje retenido por el moderador
-          </p>
-          <small>{line.note}</small>
-        </>
-      );
-    case "receipt":
-      return (
-        <>
-          <strong>{line.title}</strong>
-          <p>{line.detail}</p>
-        </>
-      );
-  }
+function Entry({
+  message,
+  previous,
+  answers,
+  fault,
+}: {
+  message: RoomMessage;
+  previous?: RoomMessage;
+  answers: ReturnType<typeof liveAnswers>;
+  fault?: number;
+}) {
+  const { content } = message;
+  const answer = content.kind === "ui" ? answers[content.spec.id] : undefined;
+  return (
+    <div className="landing-replay-entry">
+      <MessageItem
+        // The slot picker reads its answer only when it mounts, so it remounts once answered.
+        key={answer ? "answered" : "open"}
+        message={message}
+        noticeText={
+          content.kind === "system" && content.code === "session_opened"
+            ? openingNotice(message.sentAt, REPLAY_CONTRACT.intent.name)
+            : undefined
+        }
+        sender={
+          message.senderParticipantId
+            ? PARTICIPANTS.get(message.senderParticipantId)
+            : undefined
+        }
+        continued={
+          message.senderParticipantId !== null &&
+          previous?.senderParticipantId === message.senderParticipantId
+        }
+        viewer={REPLAY_VIEWER}
+        answers={answers}
+        uiSpecsByMessage={UI_SPECS}
+        fault={
+          fault
+            ? { ordinal: fault, max: REPLAY_CONTRACT.maxViolations }
+            : undefined
+        }
+        readOnly
+        onRespond={noop}
+        onShowAudit={noop}
+      />
+    </div>
+  );
 }
