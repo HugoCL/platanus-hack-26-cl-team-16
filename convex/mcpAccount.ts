@@ -8,19 +8,13 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { pendingLinkExpiry, renewLinkCode } from "./agentRegistration";
-import {
-  acceptFriendInvite,
-  FRIEND_LIMIT,
-  friendship,
-  issueFriendInvite,
-  pendingInviteExpiry,
-} from "./friends";
+import { FRIEND_LIMIT, friendship, pendingInviteExpiry } from "./friends";
 import { callerCredential, chargeRequest } from "./mcpRooms";
 
 // Account tools for external agents, called by the MCP server in lib/mcp.ts: who the calling agent
 // is, its link to a human, and that human's friends. Like the room tools, each one takes the
 // caller's API key and spends a token of the key's `mcpRequest` bucket first. The server turns the
-// codes returned here into URLs on its public origin.
+// link code returned here into a URL on its public origin.
 
 function fail(kind: string, message: string): never {
   throw new ConvexError({ kind, message });
@@ -80,7 +74,8 @@ export const renewLinkAsCaller = internalMutation({
 });
 
 // Friends belong to the human who owns the calling agent, so an agent with no human has none to
-// manage. The name the agent passes is only the label the friend sees, as on the site.
+// list. A key only reads them: friendships are made and accepted by that human on the site, like
+// invitations to rooms (convex/mcpRooms.ts).
 async function callerOwner(ctx: QueryCtx, apiKey: string) {
   const { agent } = await callerCredential(ctx, apiKey);
   if (!agent.ownerTokenIdentifier) {
@@ -132,66 +127,6 @@ export const readFriends = internalQuery({
         })),
       ),
       inviteExpiresAt: await pendingInviteExpiry(ctx, ownerTokenIdentifier),
-    };
-  },
-});
-
-const nameArg = { ownerName: v.string() };
-
-function label(name: string) {
-  const trimmed = name.trim();
-  if (!trimmed) fail("InvalidArgument", "ownerName must not be empty");
-  return trimmed.slice(0, 120);
-}
-
-export const createFriendInvite = action({
-  args: { ...keyArgs, ...nameArg },
-  handler: async (ctx, args): Promise<Code> => {
-    await chargeRequest(ctx, args.apiKey);
-    return ctx.runMutation(
-      internal.mcpAccount.createFriendInviteAsCaller,
-      args,
-    );
-  },
-});
-
-export const createFriendInviteAsCaller = internalMutation({
-  args: { ...keyArgs, ...nameArg },
-  handler: async (ctx, { apiKey, ownerName }): Promise<Code> => {
-    const { ownerTokenIdentifier } = await callerOwner(ctx, apiKey);
-    return issueFriendInvite(ctx, {
-      tokenIdentifier: ownerTokenIdentifier,
-      name: label(ownerName),
-    });
-  },
-});
-
-const acceptArgs = { ...keyArgs, ...nameArg, code: v.string() };
-
-export const acceptFriendInviteForOwner = action({
-  args: acceptArgs,
-  handler: async (ctx, args): Promise<{ friendName: string }> => {
-    await chargeRequest(ctx, args.apiKey);
-    return ctx.runMutation(
-      internal.mcpAccount.acceptFriendInviteAsCaller,
-      args,
-    );
-  },
-});
-
-export const acceptFriendInviteAsCaller = internalMutation({
-  args: acceptArgs,
-  handler: async (
-    ctx,
-    { apiKey, ownerName, code },
-  ): Promise<{ friendName: string }> => {
-    const { ownerTokenIdentifier } = await callerOwner(ctx, apiKey);
-    return {
-      friendName: await acceptFriendInvite(
-        ctx,
-        { tokenIdentifier: ownerTokenIdentifier, name: label(ownerName) },
-        code,
-      ),
     };
   },
 });

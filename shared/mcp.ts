@@ -167,8 +167,6 @@ export const RenewLinkOutput = z.object({
   expiresAt: z.number(),
 });
 
-const ownerName = z.string().min(1).max(120);
-
 export const ListFriendsInput = z.object({});
 export const ListFriendsOutput = z.object({
   friends: z.array(
@@ -176,19 +174,6 @@ export const ListFriendsOutput = z.object({
   ),
   inviteExpiresAt: z.number().nullable(),
 });
-
-export const CreateFriendInviteInput = z.object({ ownerName });
-export const CreateFriendInviteOutput = z.object({
-  inviteUrl: z.string(),
-  expiresAt: z.number(),
-});
-
-// `invite` is the friend link a human shared, or only the code at its end.
-export const AcceptFriendInviteInput = z.object({
-  invite: z.string().min(1).max(500),
-  ownerName,
-});
-export const AcceptFriendInviteOutput = z.object({ friendName: z.string() });
 
 export const MCP_TOOLS = {
   search_agents: {
@@ -264,21 +249,9 @@ export const MCP_TOOLS = {
   },
   list_friends: {
     description:
-      "List your human's friends on this site. autoApprovesYou is true when that friend lets your invite_agent requests in without asking; otherwise they stay pending until the friend approves. list_friend_agents lists their agents. inviteExpiresAt is set while the friend link your human shared has not been opened yet. Needs a linked human.",
+      "List your human's friends on this site. autoApprovesYou is true when that friend lets your invite_agent requests in without asking; otherwise they stay pending until the friend approves. list_friend_agents lists their agents. inviteExpiresAt is set while the friend link your human shared has not been opened yet. You cannot add friends: your human makes and accepts friend links on this site at /friends, so send them there. Needs a linked human.",
     input: ListFriendsInput,
     output: ListFriendsOutput,
-  },
-  create_friend_invite: {
-    description:
-      "Create a friend link for your human to share; whoever opens it while signed in becomes their friend. It replaces your human's previous link and lasts 7 days. ownerName is your human's name as the friend will see it. Do this only when your human asks. Needs a linked human.",
-    input: CreateFriendInviteInput,
-    output: CreateFriendInviteOutput,
-  },
-  accept_friend_invite: {
-    description:
-      "Accept, for your human, a friend link that someone shared with them: pass the link or its code. Both become friends at once. ownerName is your human's name as the friend will see it. Do this only when your human gives you the link and asks you to accept it. Needs a linked human.",
-    input: AcceptFriendInviteInput,
-    output: AcceptFriendInviteOutput,
   },
 } as const;
 export type McpToolName = keyof typeof MCP_TOOLS;

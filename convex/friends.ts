@@ -61,30 +61,26 @@ async function inviteRow(ctx: Pick<QueryCtx, "db">, code: string) {
 export const createInvite = mutation({
   args: displayNameArg,
   returns: v.object({ code: v.string(), expiresAt: v.number() }),
-  handler: async (ctx, { displayName }) =>
-    issueFriendInvite(ctx, await requireUser(ctx, displayName)),
+  handler: async (ctx, { displayName }) => {
+    const user = await requireUser(ctx, displayName);
+    const previous = await ctx.db
+      .query("friendInvites")
+      .withIndex("by_inviterTokenIdentifier", (q) =>
+        q.eq("inviterTokenIdentifier", user.tokenIdentifier),
+      )
+      .take(10);
+    for (const row of previous) await ctx.db.delete("friendInvites", row._id);
+    const code = crypto.randomUUID() + crypto.randomUUID();
+    const expiresAt = Date.now() + INVITE_TTL_MS;
+    await ctx.db.insert("friendInvites", {
+      codeHash: await sha256Hex(code),
+      inviterTokenIdentifier: user.tokenIdentifier,
+      inviterName: user.name,
+      expiresAt,
+    });
+    return { code, expiresAt };
+  },
 });
-
-type FriendUser = { tokenIdentifier: string; name: string };
-
-export async function issueFriendInvite(ctx: MutationCtx, user: FriendUser) {
-  const previous = await ctx.db
-    .query("friendInvites")
-    .withIndex("by_inviterTokenIdentifier", (q) =>
-      q.eq("inviterTokenIdentifier", user.tokenIdentifier),
-    )
-    .take(10);
-  for (const row of previous) await ctx.db.delete("friendInvites", row._id);
-  const code = crypto.randomUUID() + crypto.randomUUID();
-  const expiresAt = Date.now() + INVITE_TTL_MS;
-  await ctx.db.insert("friendInvites", {
-    codeHash: await sha256Hex(code),
-    inviterTokenIdentifier: user.tokenIdentifier,
-    inviterName: user.name,
-    expiresAt,
-  });
-  return { code, expiresAt };
-}
 
 // When the user's friend link is still waiting to be opened: unused and not expired.
 export async function pendingInviteExpiry(
@@ -165,32 +161,26 @@ export const acceptInvite = mutation({
   args: { code: v.string(), ...displayNameArg },
   returns: v.null(),
   handler: async (ctx, { code, displayName }) => {
-    await acceptFriendInvite(ctx, await requireUser(ctx, displayName), code);
+    const user = await requireUser(ctx, displayName);
+    const row = await inviteRow(ctx, code);
+    if (!row || row.usedAt !== undefined || row.expiresAt <= Date.now()) {
+      fail("InvalidArgument", "invalid, used or expired friend link");
+    }
+    if (row.inviterTokenIdentifier === user.tokenIdentifier) {
+      fail("InvalidArgument", "you cannot accept your own friend link");
+    }
+    await befriend(ctx, user.tokenIdentifier, {
+      tokenIdentifier: row.inviterTokenIdentifier,
+      name: row.inviterName,
+    });
+    await befriend(ctx, row.inviterTokenIdentifier, {
+      tokenIdentifier: user.tokenIdentifier,
+      name: user.name,
+    });
+    await ctx.db.patch("friendInvites", row._id, { usedAt: Date.now() });
     return null;
   },
 });
-
-// Returns the name of the friend who shared the link.
-export async function acceptFriendInvite(
-  ctx: MutationCtx,
-  user: FriendUser,
-  code: string,
-) {
-  const row = await inviteRow(ctx, code);
-  if (!row || row.usedAt !== undefined || row.expiresAt <= Date.now()) {
-    fail("InvalidArgument", "invalid, used or expired friend link");
-  }
-  if (row.inviterTokenIdentifier === user.tokenIdentifier) {
-    fail("InvalidArgument", "you cannot accept your own friend link");
-  }
-  await befriend(ctx, user.tokenIdentifier, {
-    tokenIdentifier: row.inviterTokenIdentifier,
-    name: row.inviterName,
-  });
-  await befriend(ctx, row.inviterTokenIdentifier, user);
-  await ctx.db.patch("friendInvites", row._id, { usedAt: Date.now() });
-  return row.inviterName;
-}
 
 // The agents a friend owns, published or not: the friend approves each invocation (or turns on
 // auto-approve), so being listed here grants nothing by itself.

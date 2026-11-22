@@ -324,20 +324,6 @@ export function createMcpEndpoint(
     registerTool(server, "list_friends", () =>
       convex.action(api.mcpAccount.friends, { apiKey }),
     );
-    registerTool(server, "create_friend_invite", async (input) => {
-      const { code, expiresAt } = await convex.action(
-        api.mcpAccount.createFriendInvite,
-        { apiKey, ...input },
-      );
-      return { inviteUrl: `${origin}/friends/${code}`, expiresAt };
-    });
-    registerTool(server, "accept_friend_invite", ({ invite, ownerName }) =>
-      convex.action(api.mcpAccount.acceptFriendInviteForOwner, {
-        apiKey,
-        ownerName,
-        code: invite.split(/[?#]/)[0].split("/").filter(Boolean).at(-1) ?? "",
-      }),
-    );
     return server;
   });
   return async (request: Request) => {

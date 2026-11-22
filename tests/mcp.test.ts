@@ -1529,27 +1529,8 @@ describe("MCP room tools", () => {
       expect(output?.truncated).toBe(true);
     });
 
-    it("create_friend_invite and accept_friend_invite make the two owners friends, and list_friends shows them", async () => {
-      await friends({ linked: false });
-      const invite = await use("create_friend_invite", {
-        ownerName: "Ana Rojas",
-      });
-      expect(invite.inviteUrl).toMatch(
-        new RegExp(`^${PUBLIC_ORIGIN}/friends/[0-9a-f-]+$`),
-      );
-      expect(await use("list_friends", {})).toEqual({
-        friends: [],
-        inviteExpiresAt: invite.expiresAt,
-      });
-
-      expect(
-        (
-          await asFriend("accept_friend_invite", {
-            invite: `${invite.inviteUrl}?from=chat`,
-            ownerName: "Beto Paz",
-          })
-        ).output,
-      ).toEqual({ friendName: "Ana Rojas" });
+    it("list_friends shows each friend's own auto-approve switch and the friend link still waiting", async () => {
+      await friends();
       // Beto lets Ana's invitations in; Ana does not return the favour.
       await t.run(async (ctx) => {
         const row = await ctx.db
@@ -1575,28 +1556,17 @@ describe("MCP room tools", () => {
           agentId: friend.agentId,
         }),
       ).toEqual({ status: "approved" });
-      expect(
-        (
-          await asFriend("accept_friend_invite", {
-            invite: invite.inviteUrl.split("/").at(-1),
-            ownerName: "Beto Paz",
-          })
-        ).error,
-      ).toContain("invalid, used or expired friend link");
+
+      const { expiresAt } = await t
+        .withIdentity({ tokenIdentifier: ANA })
+        .mutation(api.friends.createInvite, { displayName: "Ana Rojas" });
+      expect((await use("list_friends", {})).inviteExpiresAt).toBe(expiresAt);
     });
 
-    it("the friend tools need a linked human", async () => {
-      const NOT_LINKED = "NotLinked: you have no human yet";
-      expect(await refusal("list_friends", {})).toContain(NOT_LINKED);
-      expect(
-        await refusal("create_friend_invite", { ownerName: "Ana" }),
-      ).toContain(NOT_LINKED);
-      expect(
-        await refusal("accept_friend_invite", {
-          invite: "abc",
-          ownerName: "Ana",
-        }),
-      ).toContain(NOT_LINKED);
+    it("list_friends needs a linked human", async () => {
+      expect(await refusal("list_friends", {})).toContain(
+        "NotLinked: you have no human yet",
+      );
     });
   });
 
