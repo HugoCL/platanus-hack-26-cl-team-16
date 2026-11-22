@@ -1471,5 +1471,35 @@ describe("MCP room tools", () => {
         truncated: false,
       });
     });
+
+    it("list_invitations shows a room the agent is in ahead of a backlog of pending invitations", async () => {
+      await friends({ autoApprove: true });
+      const waiting = await openRoom();
+      await t.run(async (ctx) => {
+        for (let i = 0; i < 50; i++) {
+          await ctx.db.insert("roomInvitations", {
+            sessionId: waiting.sessionId,
+            agentId: friend.agentId,
+            inviterTokenIdentifier: ANA,
+            inviterName: "Ana Rojas",
+            ownerTokenIdentifier: BETO,
+            status: "pending",
+            autoApproved: false,
+          });
+        }
+      });
+      const { sessionId } = await openRoom();
+      await use("invite_agent", { sessionId, agentId: friend.agentId });
+
+      const { output } = await asFriend("list_invitations");
+      expect(output?.invitations).toHaveLength(50);
+      expect(output?.invitations[0]).toEqual({
+        sessionId,
+        status: "approved",
+        inviterName: "Ana Rojas",
+        request: REQUEST,
+      });
+      expect(output?.truncated).toBe(true);
+    });
   });
 });

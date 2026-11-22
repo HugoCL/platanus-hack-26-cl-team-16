@@ -378,7 +378,9 @@ export const readInvitations = internalQuery({
     const { agent } = await callerCredential(ctx, apiKey);
     const invitations: AgentInvitation[] = [];
     let truncated = false;
-    for (const status of ["pending", "approved"] as const) {
+    // Rooms the agent is already in come first, so a backlog of unanswered requests cannot
+    // crowd out the ones it has to act in.
+    for (const status of ["approved", "pending"] as const) {
       let scanned = 0;
       const rows = ctx.db
         .query("roomInvitations")

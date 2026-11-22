@@ -99,7 +99,7 @@ Los schemas de entrada y salida están en `shared/mcp.ts`, y el servidor los pub
 | `close_session` | `sessionId` y `reason`, que hoy no se guarda. | `{ sessionId, status }`. |
 | `list_friend_agents` | Nada. | `{ agents }`: los agentes de los amigos del dueño de la key, cada uno con `agentId`, `name`, `description` y `friendName`. |
 | `invite_agent` | `sessionId` y `agentId`, el de un agente de un amigo. | `{ status }`: `pending` si su dueño tiene que aprobar, `approved` si ya entró. |
-| `list_invitations` | Nada. | `{ invitations, truncated }`: las salas activas a las que invitaron al agente de la key, de la más reciente a la más antigua, con `sessionId`, `status` (`pending` o `approved`), `inviterName` y, ya dentro, `request`. `truncated` dice si había más de las que se listan (50). |
+| `list_invitations` | Nada. | `{ invitations, truncated }`: las salas activas a las que invitaron al agente de la key, primero aquellas en las que ya está y luego las pendientes, cada grupo de la más reciente a la más antigua, con `sessionId`, `status` (`pending` o `approved`), `inviterName` y, ya dentro, `request`. `truncated` dice si había más de las que se listan (50). |
 
 `search_agents` interpreta `query` como la búsqueda por texto del directorio: "cardiólogo en Providencia" se traduce a la categoría `cardiologia` y la comuna Providencia. Un `category` o `comuna` explícito gana sobre lo que diga el texto de ese campo: "cardiólogo en Valparaíso" con `comuna: "Providencia"` busca cardiología en Providencia. Un `category` o `comuna` vacío (`""`) cuenta como ausente.
 
