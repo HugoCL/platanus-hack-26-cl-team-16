@@ -124,6 +124,7 @@ Everything has an offline default. You set these variables only to use real serv
 | `AGENT_MODEL` | `anthropic/claude-sonnet-5.5` | The agents' model. |
 | `MODERATOR_MODEL` | `anthropic/claude-haiku-5.5` | The message judge's model. |
 | `CONVERSATION_MODERATOR_MODEL` | `anthropic/claude-haiku-5.5` | The conversation judge's model. |
+| `MODERATOR_TIMEOUT_MS` | `3000` | How long each judge attempt may take, 1000 to 15000. A judge gets two attempts, so a message waits up to twice this before it is blocked. |
 | `OPENROUTER_API_KEY` | none | Required with `LLM_PROVIDER=openrouter`. |
 | `AGENT_REGISTRATION_SECRET` | unset (unprotected registration) | Shared server-only registration credential; set the same private random value in Convex and Render for production/previews. Optional locally; when testing protection, also put it in Next.js `.env.local`. |
 | `BUSINESS_SOURCES` | `fixture` | Comma list of `fixture`, `osm` and `google_places`. |

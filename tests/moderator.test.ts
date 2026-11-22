@@ -7,6 +7,7 @@ import {
 import {
   createModerator,
   MODERATOR_TIMEOUT_MS,
+  moderatorTimeoutMs,
 } from "../shared/moderator/moderator";
 import type { LlmPrompt, LlmProvider } from "../shared/providers/llm";
 import { createFakeLlmProvider } from "../shared/providers/llm";
@@ -248,6 +249,14 @@ describe("criterion 5: fail-closed", () => {
 
   it("waits 3 seconds", () => {
     expect(MODERATOR_TIMEOUT_MS).toBe(3000);
+    expect(moderatorTimeoutMs({})).toBe(3000);
+  });
+
+  it("waits as long as the deployment says, within limits", () => {
+    expect(moderatorTimeoutMs({ MODERATOR_TIMEOUT_MS: "8000" })).toBe(8000);
+    for (const bad of ["", "abc", "0", "999", "15001", "2500.5"]) {
+      expect(moderatorTimeoutMs({ MODERATOR_TIMEOUT_MS: bad })).toBe(3000);
+    }
   });
 
   it.each([

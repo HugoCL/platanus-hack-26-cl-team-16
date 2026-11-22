@@ -21,7 +21,7 @@ Una vez por entorno:
 | Local | `pnpm demo:reset`, con `pnpm dev` corriendo | cualquiera |
 | Producción | `npx convex run --prod demo:reset`, después de que el PR esté fusionado y desplegado | una persona del equipo con `npx convex login` |
 
-El deployment necesita los modelos reales: `LLM_PROVIDER=openrouter` y `OPENROUTER_API_KEY` en sus variables de entorno (`docs/development.md`). Sin ellos, el agente del fabricante solo responde con un acuse de recibo.
+El deployment necesita los modelos reales: `LLM_PROVIDER=openrouter` y `OPENROUTER_API_KEY` en sus variables de entorno (`docs/development.md`). Sin ellos, el agente del fabricante solo responde con un acuse de recibo. Conviene además `MODERATOR_TIMEOUT_MS=8000`: con el plazo por defecto de 3 s, el moderador a veces no alcanza a responder y bloquea un mensaje del guion.
 
 Antes de cada presentación:
 

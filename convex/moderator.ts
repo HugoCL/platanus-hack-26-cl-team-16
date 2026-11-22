@@ -6,7 +6,10 @@ import {
 import { type ObjectType, v } from "convex/values";
 import { modelFor } from "../shared/models";
 import type { ModerationInput, ModerationOutcome } from "../shared/moderation";
-import { createModerator } from "../shared/moderator/moderator";
+import {
+  createModerator,
+  moderatorTimeoutMs,
+} from "../shared/moderator/moderator";
 import { createLlmProvider } from "../shared/providers/llm";
 import { components, internal } from "./_generated/api";
 import { type ActionCtx, internalMutation } from "./_generated/server";
@@ -108,6 +111,7 @@ export async function moderate(
       model: llm.name === "fake" ? "fake" : modelFor("moderator"),
       conversationModel:
         llm.name === "fake" ? "fake" : modelFor("conversation_moderator"),
+      timeoutMs: moderatorTimeoutMs(),
       beforeJudge: async (count) => {
         await ctx.runMutation(internal.moderator.takeJudgeTokens, {
           ...buckets,

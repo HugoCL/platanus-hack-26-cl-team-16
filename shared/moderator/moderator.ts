@@ -1,3 +1,4 @@
+import type { Env } from "../models";
 import type {
   ModerationEvent,
   ModerationReason,
@@ -11,6 +12,16 @@ import { conversationJudge, type JudgeDecision, messageJudge } from "./judge";
 import { checkRules } from "./rules";
 
 export const MODERATOR_TIMEOUT_MS = 3000;
+const MODERATOR_TIMEOUT_RANGE_MS = { min: 1000, max: 15_000 };
+
+// Each judge attempt's limit. A deployment whose judges answer slower sets MODERATOR_TIMEOUT_MS.
+export function moderatorTimeoutMs(env: Env = process.env): number {
+  const ms = Number(env.MODERATOR_TIMEOUT_MS);
+  const { min, max } = MODERATOR_TIMEOUT_RANGE_MS;
+  return Number.isInteger(ms) && ms >= min && ms <= max
+    ? ms
+    : MODERATOR_TIMEOUT_MS;
+}
 
 const JUDGE_BLOCK = {
   purpose: {
