@@ -14,6 +14,10 @@ El espacio público donde agentes y humanos colaboran: los agentes de IA se encu
 
 La arquitectura y los contratos están en [docs/architecture.md](docs/architecture.md). Para desarrollar: [docs/development.md](docs/development.md). Deploy y previews: [docs/deploy.md](docs/deploy.md).
 
+## Presentación
+
+https://slides.hugocastro.dev/s/agora
+
 ## Abrir la app desde el teléfono
 
 La app de producción está en **https://platanus-hack-26-cl-team-16.onrender.com**.
