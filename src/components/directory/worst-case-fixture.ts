@@ -160,6 +160,13 @@ const WORST: DirectoryCard[] = [
     categories: ["peluqueria"],
     status: "prospect",
   }),
+  card(10, {
+    name: "LaboratorioClinicoEspecializadoEnAnalisisBioquimicosYDiagnosticoMolecularDeSantiagoDeChile",
+    purpose: "Informar sobre exámenes de laboratorio.",
+    categories: ["medicina_general"],
+    location: location(-33.4489, -70.6693, "Santiago"),
+    verified: true,
+  }),
 ];
 
 export function fixtureResult(

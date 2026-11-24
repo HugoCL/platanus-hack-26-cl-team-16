@@ -107,7 +107,7 @@ function AgentResult({
             aria-controls={selected ? detailsId : undefined}
             title={card.name}
             onClick={() => onSelect?.(card.agentId)}
-            className={`min-w-0 cursor-pointer ${selected ? "text-pretty" : "truncate"} border-0 bg-transparent p-0 text-left font-[inherit] tracking-[inherit] text-inherit outline-none before:absolute before:inset-0`}
+            className={`min-w-0 cursor-pointer ${selected ? "text-pretty wrap-anywhere" : "truncate"} border-0 bg-transparent p-0 text-left font-[inherit] tracking-[inherit] text-inherit outline-none before:absolute before:inset-0`}
           >
             {card.name}
           </button>
